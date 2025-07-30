@@ -1,0 +1,30 @@
+{
+  "name": "@wordma/core",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    "./config": "./astro.base.config.ts",
+    "./content": "./content.base.config.ts"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "packageManager": "pnpm@10.13.1",
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@astrojs/mdx": "^4.3.1",
+    "@astrojs/rss": "^4.0.12",
+    "@astrojs/sitemap": "^3.4.2",
+    "@astrojs/solid-js": "^5.1.0",
+    "astro": "^5.12.4",
+    "astro-icon": "^1.1.5",
+    "rehype-external-links": "^3.0.0",
+    "rehype-mathjax": "^7.1.0",
+    "remark-math": "^6.0.0",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,21 @@
+.idea
+.deploy
+
+node_modules
+
+content/**/*.md
+content/**/*.mdx
+
+!/content/**/example_post.mdx
+!/content/**/example_page.mdx
+
+
+
+# 忽略 themes 目录下所有内容
+themes/*
+
+# 但不忽略 default 目录
+!themes/default/
+
+# 不忽略 default 目录下的所有内容
+!themes/default/**

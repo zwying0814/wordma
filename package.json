@@ -1,0 +1,15 @@
+{
+  "name": "wordma",
+  "version": "1.0.0",
+  "description": "基于 PNPM Monorepo 架构的现代化多主题静态博客系统",
+  "main": "index.js",
+  "keywords": [
+    "wordma",
+    "blog",
+    "astro",
+    "monorepo"
+  ],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.13.1"
+}
