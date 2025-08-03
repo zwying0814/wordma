@@ -4,6 +4,7 @@ import sitemap from "@astrojs/sitemap";
 import remarkMath from "remark-math";
 import rehypeMathjax from 'rehype-mathjax';
 import rehypeExternalLinks from "rehype-external-links";
+import codeHighlightIntegration from "./codeHighlight.ts";
 
 const baseConfig = {
     output: 'static',
@@ -22,6 +23,7 @@ const baseConfig = {
         }
     },
     integrations: [
+        codeHighlightIntegration(),
         mdx(),
         sitemap(),
     ],
