@@ -1,0 +1,19 @@
+{
+  "name": "wordma-theme-default",
+  "version": "1.0.0",
+  "description": "Wordma默认主题",
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"启动默认主题开发模式...\"",
+    "build": "echo \"构建默认主题...\"",
+    "preview": "echo \"预览默认主题...\""
+  },
+  "keywords": [
+    "wordma",
+    "theme",
+    "blog",
+    "astro"
+  ],
+  "author": "",
+  "license": "ISC"
+}

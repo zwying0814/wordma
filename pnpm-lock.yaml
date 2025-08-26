@@ -6,16 +6,36 @@ settings:
 
 importers:
 
-  .: {}
+  .:
+    dependencies:
+      chalk:
+        specifier: ^5.6.0
+        version: 5.6.0
+    devDependencies:
+      '@astrojs/check':
+        specifier: ^0.9.4
+        version: 0.9.4(typescript@5.9.2)
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+
+  packages/cli:
+    dependencies:
+      chalk:
+        specifier: ^5.6.0
+        version: 5.6.0
+      commander:
+        specifier: ^14.0.0
+        version: 14.0.0
 
   packages/core:
     dependencies:
       '@astrojs/check':
         specifier: ^0.9.4
-        version: 0.9.4(typescript@5.8.3)
+        version: 0.9.4(typescript@5.9.2)
       '@astrojs/mdx':
         specifier: ^4.3.1
-        version: 4.3.1(astro@5.12.4(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@4.46.1)(typescript@5.8.3)(yaml@2.8.0))
+        version: 4.3.1(astro@5.12.8(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@4.46.1)(typescript@5.9.2)(yaml@2.8.0))
       '@astrojs/rss':
         specifier: ^4.0.12
         version: 4.0.12
@@ -56,6 +76,18 @@ importers:
         specifier: ^5.8.3
         version: 5.9.2
 
+  packages/yaml-reader:
+    dependencies:
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.1.0
+    devDependencies:
+      '@types/js-yaml':
+        specifier: ^4.0.5
+        version: 4.0.9
+
+  themes/default: {}
+
   themes/soak:
     dependencies:
       '@astrojs/check':
@@ -70,6 +102,9 @@ importers:
       '@wordma/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@wordma/yaml-reader':
+        specifier: workspace:*
+        version: link:../../packages/yaml-reader
       astro:
         specifier: ^5.12.8
         version: 5.12.8(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@4.46.1)(typescript@5.9.2)(yaml@2.8.0)
@@ -933,6 +968,9 @@ packages:
   '@types/hast@3.0.4':
     resolution: {integrity: sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ==}
 
+  '@types/js-yaml@4.0.9':
+    resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
+
   '@types/katex@0.16.7':
     resolution: {integrity: sha512-HMwFiRujE5PjrgwHQ25+bsLJgowjGjm5Z8FVSf0N6PwgJrwxH0QxzHYDcKsTfV3wva0vzrpqMTJS2jXPr5BMEQ==}
 
@@ -1070,11 +1108,6 @@ packages:
     resolution: {integrity: sha512-+2LBlZby7R9lgfRIcIp7E0h1T5yCFOGuSjc3j0sNCfBl6FskE0FJHZATE0n/YNSe1B7wYolgTaFOllnD4U9lQw==}
     engines: {node: '>=18'}
 
-  astro@5.12.4:
-    resolution: {integrity: sha512-ns+/KpfWToKvVf2DJTj4EIa4U59/XVBXeeq6VZUr5DXe6OZJFs8NfJi+W20nRm5nduIeBZGRzaoxPFq9lm4WEg==}
-    engines: {node: 18.20.8 || ^20.3.0 || >=22.0.0, npm: '>=9.6.5', pnpm: '>=7.1.0'}
-    hasBin: true
-
   astro@5.12.8:
     resolution: {integrity: sha512-KkJ7FR+c2SyZYlpakm48XBiuQcRsrVtdjG5LN5an0givI/tLik+ePJ4/g3qrAVhYMjJOxBA2YgFQxANPiWB+Mw==}
     engines: {node: 18.20.8 || ^20.3.0 || >=22.0.0, npm: '>=9.6.5', pnpm: '>=7.1.0'}
@@ -1151,8 +1184,8 @@ packages:
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
 
-  chalk@5.4.1:
-    resolution: {integrity: sha512-zgVZuo2WcZgfUEmsn6eO3kINexW8RAE4maiQ8QNs8CtpPCSyMiYsULR3HQYkm3w8FIA3SberyMJMSldGsW+U3w==}
+  chalk@5.6.0:
+    resolution: {integrity: sha512-46QrSQFyVSEyYAgQ22hQ+zDa60YHA4fBstHmtSApj1Y5vKtG27fWowW03jCk5KcbXEWPZUIR894aARCA/G1kfQ==}
     engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
 
   character-entities-html4@2.1.0:
@@ -1236,6 +1269,10 @@ packages:
   commander@13.1.0:
     resolution: {integrity: sha512-/rFeCpNJQbhSZjGVwO9RFV3xPqbnERS8MmIQzCtD/zl6gpJuV/bMLuN92oG3F7d8oDEHHRrujSXNUr8fpjntKw==}
     engines: {node: '>=18'}
+
+  commander@14.0.0:
+    resolution: {integrity: sha512-2uM9rYjPvyq39NwLRqaiLtWHyDC1FvryJDa2ATTVims5YAS4PupsEQsDvP14FqhFr0P49CYDugi59xaxJlTXRA==}
+    engines: {node: '>=20'}
 
   commander@7.2.0:
     resolution: {integrity: sha512-QrWXB+ZQSVPmIWIhtEO9H+gwHaMGYiF5ChvoJ+K9ZGHG/sVsa6yiesAD1GC/x46sET00Xlwo1u49RVVVzvcSkw==}
@@ -2656,11 +2693,6 @@ packages:
   typescript-auto-import-cache@0.3.6:
     resolution: {integrity: sha512-RpuHXrknHdVdK7wv/8ug3Fr0WNsNi5l5aB8MYYuXhq2UH5lnEB1htJ1smhtD5VeCsGr2p8mUDtd83LCQDFVgjQ==}
 
-  typescript@5.8.3:
-    resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
-    engines: {node: '>=14.17'}
-    hasBin: true
-
   typescript@5.9.2:
     resolution: {integrity: sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A==}
     engines: {node: '>=14.17'}
@@ -3139,17 +3171,6 @@ snapshots:
 
   '@antfu/utils@8.1.1': {}
 
-  '@astrojs/check@0.9.4(typescript@5.8.3)':
-    dependencies:
-      '@astrojs/language-server': 2.15.4(typescript@5.8.3)
-      chokidar: 4.0.3
-      kleur: 4.1.5
-      typescript: 5.8.3
-      yargs: 17.7.2
-    transitivePeerDependencies:
-      - prettier
-      - prettier-plugin-astro
-
   '@astrojs/check@0.9.4(typescript@5.9.2)':
     dependencies:
       '@astrojs/language-server': 2.15.4(typescript@5.9.2)
@@ -3166,29 +3187,6 @@ snapshots:
   '@astrojs/internal-helpers@0.6.1': {}
 
   '@astrojs/internal-helpers@0.7.1': {}
-
-  '@astrojs/language-server@2.15.4(typescript@5.8.3)':
-    dependencies:
-      '@astrojs/compiler': 2.12.2
-      '@astrojs/yaml2ts': 0.2.2
-      '@jridgewell/sourcemap-codec': 1.5.4
-      '@volar/kit': 2.4.22(typescript@5.8.3)
-      '@volar/language-core': 2.4.22
-      '@volar/language-server': 2.4.22
-      '@volar/language-service': 2.4.22
-      fast-glob: 3.3.3
-      muggle-string: 0.4.1
-      volar-service-css: 0.0.62(@volar/language-service@2.4.22)
-      volar-service-emmet: 0.0.62(@volar/language-service@2.4.22)
-      volar-service-html: 0.0.62(@volar/language-service@2.4.22)
-      volar-service-prettier: 0.0.62(@volar/language-service@2.4.22)
-      volar-service-typescript: 0.0.62(@volar/language-service@2.4.22)
-      volar-service-typescript-twoslash-queries: 0.0.62(@volar/language-service@2.4.22)
-      volar-service-yaml: 0.0.62(@volar/language-service@2.4.22)
-      vscode-html-languageservice: 5.5.1
-      vscode-uri: 3.1.0
-    transitivePeerDependencies:
-      - typescript
 
   '@astrojs/language-server@2.15.4(typescript@5.9.2)':
     dependencies:
@@ -3265,12 +3263,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@astrojs/mdx@4.3.1(astro@5.12.4(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@4.46.1)(typescript@5.8.3)(yaml@2.8.0))':
+  '@astrojs/mdx@4.3.1(astro@5.12.8(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@4.46.1)(typescript@5.9.2)(yaml@2.8.0))':
     dependencies:
       '@astrojs/markdown-remark': 6.3.3
       '@mdx-js/mdx': 3.1.0(acorn@8.15.0)
       acorn: 8.15.0
-      astro: 5.12.4(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@4.46.1)(typescript@5.8.3)(yaml@2.8.0)
+      astro: 5.12.8(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@4.46.1)(typescript@5.9.2)(yaml@2.8.0)
       es-module-lexer: 1.7.0
       estree-util-visit: 2.0.0
       hast-util-to-html: 9.0.5
@@ -3996,6 +3994,8 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
+  '@types/js-yaml@4.0.9': {}
+
   '@types/katex@0.16.7': {}
 
   '@types/mathjax@0.0.40': {}
@@ -4037,15 +4037,6 @@ snapshots:
     optional: true
 
   '@ungap/structured-clone@1.3.0': {}
-
-  '@volar/kit@2.4.22(typescript@5.8.3)':
-    dependencies:
-      '@volar/language-service': 2.4.22
-      '@volar/typescript': 2.4.22
-      typesafe-path: 0.2.2
-      typescript: 5.8.3
-      vscode-languageserver-textdocument: 1.0.12
-      vscode-uri: 3.1.0
 
   '@volar/kit@2.4.22(typescript@5.9.2)':
     dependencies:
@@ -4165,107 +4156,6 @@ snapshots:
       pretty-bytes: 6.1.1
     transitivePeerDependencies:
       - ts-node
-
-  astro@5.12.4(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@4.46.1)(typescript@5.8.3)(yaml@2.8.0):
-    dependencies:
-      '@astrojs/compiler': 2.12.2
-      '@astrojs/internal-helpers': 0.6.1
-      '@astrojs/markdown-remark': 6.3.3
-      '@astrojs/telemetry': 3.3.0
-      '@capsizecss/unpack': 2.4.0
-      '@oslojs/encoding': 1.1.0
-      '@rollup/pluginutils': 5.2.0(rollup@4.46.1)
-      acorn: 8.15.0
-      aria-query: 5.3.2
-      axobject-query: 4.1.0
-      boxen: 8.0.1
-      ci-info: 4.3.0
-      clsx: 2.1.1
-      common-ancestor-path: 1.0.1
-      cookie: 1.0.2
-      cssesc: 3.0.0
-      debug: 4.4.1
-      deterministic-object-hash: 2.0.2
-      devalue: 5.1.1
-      diff: 5.2.0
-      dlv: 1.1.3
-      dset: 3.1.4
-      es-module-lexer: 1.7.0
-      esbuild: 0.25.8
-      estree-walker: 3.0.3
-      flattie: 1.1.1
-      fontace: 0.3.0
-      github-slugger: 2.0.0
-      html-escaper: 3.0.3
-      http-cache-semantics: 4.2.0
-      import-meta-resolve: 4.1.0
-      js-yaml: 4.1.0
-      kleur: 4.1.5
-      magic-string: 0.30.17
-      magicast: 0.3.5
-      mrmime: 2.0.1
-      neotraverse: 0.6.18
-      p-limit: 6.2.0
-      p-queue: 8.1.0
-      package-manager-detector: 1.3.0
-      picomatch: 4.0.3
-      prompts: 2.4.2
-      rehype: 13.0.2
-      semver: 7.7.2
-      shiki: 3.8.1
-      smol-toml: 1.4.1
-      tinyexec: 0.3.2
-      tinyglobby: 0.2.14
-      tsconfck: 3.1.6(typescript@5.8.3)
-      ultrahtml: 1.6.0
-      unifont: 0.5.2
-      unist-util-visit: 5.0.0
-      unstorage: 1.16.1
-      vfile: 6.0.3
-      vite: 6.3.5(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(yaml@2.8.0)
-      vitefu: 1.1.1(vite@6.3.5(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(yaml@2.8.0))
-      xxhash-wasm: 1.1.0
-      yargs-parser: 21.1.1
-      yocto-spinner: 0.2.3
-      zod: 3.25.76
-      zod-to-json-schema: 3.24.6(zod@3.25.76)
-      zod-to-ts: 1.2.0(typescript@5.8.3)(zod@3.25.76)
-    optionalDependencies:
-      sharp: 0.33.5
-    transitivePeerDependencies:
-      - '@azure/app-configuration'
-      - '@azure/cosmos'
-      - '@azure/data-tables'
-      - '@azure/identity'
-      - '@azure/keyvault-secrets'
-      - '@azure/storage-blob'
-      - '@capacitor/preferences'
-      - '@deno/kv'
-      - '@netlify/blobs'
-      - '@planetscale/database'
-      - '@types/node'
-      - '@upstash/redis'
-      - '@vercel/blob'
-      - '@vercel/kv'
-      - aws4fetch
-      - db0
-      - encoding
-      - idb-keyval
-      - ioredis
-      - jiti
-      - less
-      - lightningcss
-      - rollup
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-      - tsx
-      - typescript
-      - uploadthing
-      - yaml
 
   astro@5.12.8(@types/node@24.1.0)(jiti@2.5.1)(lightningcss@1.30.1)(rollup@4.46.1)(typescript@5.9.2)(yaml@2.8.0):
     dependencies:
@@ -4411,7 +4301,7 @@ snapshots:
     dependencies:
       ansi-align: 3.0.1
       camelcase: 8.0.0
-      chalk: 5.4.1
+      chalk: 5.6.0
       cli-boxes: 3.0.0
       string-width: 7.2.0
       type-fest: 4.41.0
@@ -4446,7 +4336,7 @@ snapshots:
 
   ccount@2.0.1: {}
 
-  chalk@5.4.1: {}
+  chalk@5.6.0: {}
 
   character-entities-html4@2.1.0: {}
 
@@ -4530,6 +4420,8 @@ snapshots:
   comma-separated-tokens@2.0.3: {}
 
   commander@13.1.0: {}
+
+  commander@14.0.0: {}
 
   commander@7.2.0: {}
 
@@ -6422,10 +6314,6 @@ snapshots:
 
   trough@2.2.0: {}
 
-  tsconfck@3.1.6(typescript@5.8.3):
-    optionalDependencies:
-      typescript: 5.8.3
-
   tsconfck@3.1.6(typescript@5.9.2):
     optionalDependencies:
       typescript: 5.9.2
@@ -6441,8 +6329,6 @@ snapshots:
   typescript-auto-import-cache@0.3.6:
     dependencies:
       semver: 7.7.2
-
-  typescript@5.8.3: {}
 
   typescript@5.9.2: {}
 
@@ -6817,11 +6703,6 @@ snapshots:
 
   zod-to-json-schema@3.24.6(zod@3.25.76):
     dependencies:
-      zod: 3.25.76
-
-  zod-to-ts@1.2.0(typescript@5.8.3)(zod@3.25.76):
-    dependencies:
-      typescript: 5.8.3
       zod: 3.25.76
 
   zod-to-ts@1.2.0(typescript@5.9.2)(zod@3.25.76):

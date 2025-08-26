@@ -1,0 +1,26 @@
+{
+  "name": "@wordma/cli",
+  "version": "1.0.0",
+  "description": "Wordma CLI tool for managing blog projects",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "wordma": "bin/wordma.js"
+  },
+  "scripts": {
+    "build": "echo \"CLI build complete\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "wordma",
+    "cli",
+    "blog",
+    "astro"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^5.6.0",
+    "commander": "^14.0.0"
+  }
+}

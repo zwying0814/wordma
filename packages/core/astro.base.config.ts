@@ -8,7 +8,7 @@ import codeHighlightIntegration from "./codeHighlight.ts";
 
 const baseConfig = {
     output: 'static',
-    outDir: '../../.deploy',
+    outDir: '../../.deploy/.temp',
     markdown: {
         remarkPlugins: [remarkMath],
         rehypePlugins: [rehypeMathjax, [
