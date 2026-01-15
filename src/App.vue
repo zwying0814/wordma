@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button'
+import CreateSite from '@/components/CreateSite.vue'
 </script>
 
 <template>
-  <div>
-    <Button>Click me</Button>
-  </div>
+  <CreateSite />
 </template>

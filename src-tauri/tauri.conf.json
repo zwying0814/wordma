@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "wordma",
+  "productName": "Wordma",
   "version": "0.1.0",
   "identifier": "life.zwy.wordma",
   "build": {
@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "wordma",
-        "width": 800,
-        "height": 600
+        "title": "Wordma",
+        "width": 960,
+        "height": 640,
+        "minWidth": 960,
+        "minHeight": 640
       }
     ],
     "security": {
