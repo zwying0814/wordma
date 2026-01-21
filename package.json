@@ -29,6 +29,7 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@arco-design/web-vue": "^2.57.0",
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.0.8",
     "@vitejs/plugin-vue": "^5.2.1",

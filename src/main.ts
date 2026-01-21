@@ -1,6 +1,9 @@
 import { createApp } from "vue";
-import "./style.css";
-import 'vue-sonner/style.css';
+import ArcoVue from '@arco-design/web-vue';
 import App from "./App.vue";
-
-createApp(App).mount("#app");
+import "./style.css";
+import './assets/arco.css';
+import 'vue-sonner/style.css';
+const app = createApp(App);
+app.use(ArcoVue);
+app.mount('#app');
