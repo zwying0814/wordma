@@ -1170,9 +1170,9 @@ body {
   --color-warning-light-3: rgb(var(--warning-3));
   --color-warning-light-4: rgb(var(--warning-4));
   --border-radius-none: 0;
-  --border-radius-small: 2px;
-  --border-radius-medium: 4px;
-  --border-radius-large: 8px;
+  --border-radius-small: 6px;
+  --border-radius-medium: 8px;
+  --border-radius-large: 12px;
   --border-radius-circle: 50%;
   --color-tooltip-bg: rgb(var(--gray-10));
   --color-spin-layer-bg: rgba(255, 255, 255, 0.6);
