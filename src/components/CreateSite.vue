@@ -85,7 +85,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     <!-- Main Card -->
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
-        <h1 class="text-xl font-bold text-card-foreground mb-2 tracking-tight">创建你的第一个站点</h1>
+        <h1 class="text-xl font-extrabold text-card-foreground mb-2 tracking-tight font-serif">创建你的第一个站点</h1>
         <p class="text-primary">开启你的写作之旅</p>
       </div>
 

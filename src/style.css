@@ -120,13 +120,22 @@
 }
 
 @font-face {
-  font-family: 'CustomFont';
-  src: url('/font.woff2') format('woff2');
+  font-family: 'CustomSansFont';
+  src: url('/sans.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'CustomSerifFont';
+  src: url('/serif.woff2') format('woff2');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
 
 @theme {
-    --font-sans: "CustomFont", sans-serif;
+    --font-sans: "CustomSansFont", sans-serif;
+    --font-serif: "CustomSerifFont", serif;
 }
