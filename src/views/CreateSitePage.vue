@@ -4,7 +4,9 @@ import { createSite } from '@/lib/db'
 import { open } from '@tauri-apps/plugin-dialog'
 import { Message, ValidatedError } from '@arco-design/web-vue'
 import useLoading from "@/hooks/useLoading";
+import { useRouter } from 'vue-router';
 
+const router = useRouter();
 const { loading, setLoading } = useLoading()
 const createForm = reactive({
   name: '',
@@ -49,6 +51,7 @@ const handleSubmit = async ({
       path: values.path
     })
     Message.success('站点创建成功！已准备好开始创作。');
+    router.push('/');
   } catch (err) {
     errorMessage.value = (err as Error).message;
   } finally {
@@ -107,6 +110,7 @@ const rules = {
               '创建站点'
             }}</a-button>
           </a-form-item>
+          <a-button type="text" long @click="router.push('/')">返回首页</a-button>
         </a-form>
       </a-space>
     </div>

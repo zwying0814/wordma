@@ -22,6 +22,11 @@ const router = createRouter({
             name: 'immersive',
             component: ImmersiveWriterPage,
         },
+        {
+            path: '/create-site',
+            name: 'create-site',
+            component: () => import('@/views/CreateSitePage.vue'),
+        },
     ]
 })
 
