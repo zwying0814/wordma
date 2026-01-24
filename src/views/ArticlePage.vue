@@ -6,6 +6,9 @@ const isSiteMenuOpen = ref(false);
 
 <template>
   <div class="h-screen w-screen flex bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display overflow-hidden">
+    <div class="w-80 lg:w-96">
+        <a-input-search placeholder="Please enter something"/>
+    </div>
     <!-- Sidebar 2: Article List -->
     <div class="w-80 lg:w-96 flex flex-col border-r border-border-light dark:border-slate-800 bg-background-subtle dark:bg-slate-900/50 shrink-0">
       <div class="p-4 border-b border-border-light dark:border-slate-800 flex flex-col gap-3">

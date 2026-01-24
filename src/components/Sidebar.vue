@@ -14,8 +14,10 @@ import { getAllSites, type Site } from '@/lib/db';
 
 const router = useRouter();
 const sites = ref<Site[]>([]);
+const collapsed = ref(false);
 
 const onCollapse = (val: boolean, type: string) => {
+    collapsed.value = val;
     const content = type === 'responsive' ? '触发响应式收缩' : '点击触发收缩';
     Message.info({
         content,
@@ -43,17 +45,17 @@ onMounted(async () => {
 
 <template>
     <div>
-        <div class="m-2 rounded-lg flex items-center justify-between">
+        <div class="m-2 rounded-lg flex items-center transition-all duration-200" :class="collapsed ? 'justify-center' : 'justify-between'">
             <a-dropdown position="bl" @select="handleSelect">
-                <div class="flex items-center justify-between cursor-pointer w-full">
+                <div class="flex items-center cursor-pointer transition-all duration-200" :class="collapsed ? 'justify-center w-auto' : 'justify-between w-full'">
                     <div class="flex items-center gap-3">
                         <a-avatar :style="{ backgroundColor: '#7BC616' }" shape="square" :size="32">我</a-avatar>
-                        <div class="flex flex-col text-left overflow-hidden">
+                        <div v-show="!collapsed" class="flex flex-col text-left overflow-hidden">
                             <span class="text-sm font-bold truncate leading-tight">我的技术博客</span>
                             <span class="text-xs font-medium truncate leading-tight text-slate-500">staticwrite.com</span>
                         </div>
                     </div>
-                    <ChevronDown class="size-4" />
+                    <ChevronDown v-show="!collapsed" class="size-4" />
                 </div>
                 <template #content>
                     <div class="w-64">
