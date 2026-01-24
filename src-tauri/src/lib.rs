@@ -30,14 +30,18 @@ pub fn run() {
     let migrations = vec![
         Migration {
             version: 1,
-            description: "create_site_table",
+            description: "ensure_tables_exist",
             sql: "CREATE TABLE IF NOT EXISTS site (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 description TEXT,
                 path TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )",
+            );
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );",
             kind: MigrationKind::Up,
         }
     ];

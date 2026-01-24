@@ -2,17 +2,15 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ArticlePage from '@/views/ArticlePage.vue'
 import Dashboard from '@/layouts/Dashboard.vue'
 import ImmersiveWriterPage from '@/views/ImmersiveWriterPage.vue'
-import { getAllSites } from '@/lib/db'
+import { getAllSites, getLastSiteId, setLastSiteId } from '@/lib/db'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
         {
             path: '/',
-            name: 'root', // Add a name for clarity
-            redirect: () => {
-                return { name: 'create-site' } // Default fallback, overridden by guard
-            }
+            name: 'root', 
+            component: () => import('@/views/CreateSitePage.vue'), // Fallback component to satisfy router validation
         },
         {
             path: '/site/:siteId',
@@ -39,22 +37,47 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-    if (to.name === 'create-site') {
-        next();
-        return;
-    }
-
+    
     try {
         const sites = await getAllSites();
-        console.log('Loaded sites:', sites);
         
         if (sites.length === 0) {
-            next({ name: 'create-site' });
+            if (to.name !== 'create-site') {
+                next({ name: 'create-site' });
+            } else {
+                next();
+            }
             return;
         }
 
-        // If visiting root, redirect to first site
+        const isInitialLoad = !from.name;
+        // If visiting root, redirect to last opened site or first site
         if (to.path === '/' || to.name === 'root') {
+            const lastSiteId = await getLastSiteId();
+            console.log(lastSiteId);
+    
+            if (lastSiteId) {
+                const siteExists = sites.find(s => s.id === lastSiteId);
+                if (siteExists) {
+                    next({ name: 'article', params: { siteId: lastSiteId } });
+                    return;
+                }
+            }
+            // Fallback to first site
+            next({ name: 'article', params: { siteId: sites[0].id } });
+            return;
+        }
+
+        // Initial load should not stay on create-site if sites already exist
+        if (to.name === 'create-site' && isInitialLoad) {
+            const lastSiteId = await getLastSiteId();
+            if (lastSiteId) {
+                const siteExists = sites.find(s => s.id === lastSiteId);
+                if (siteExists) {
+                    next({ name: 'article', params: { siteId: lastSiteId } });
+                    return;
+                }
+            }
             next({ name: 'article', params: { siteId: sites[0].id } });
             return;
         }
@@ -63,6 +86,12 @@ router.beforeEach(async (to, from, next) => {
     } catch (error) {
         console.error('Route guard error:', error);
         next();
+    }
+});
+
+router.afterEach(async (to) => {
+    if (to.params.siteId) {
+        await setLastSiteId(Number(to.params.siteId));
     }
 });
 

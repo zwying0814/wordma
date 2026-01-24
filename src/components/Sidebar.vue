@@ -29,7 +29,7 @@ const onCollapse = (val: boolean, _type: string) => {
 const handleSelect = (v: string | number | Record<string, any>) => {
     if (v === 'add_new_site') {
         router.push({ name: 'create-site' });
-    } else {
+    } else if (typeof v === 'string' || typeof v === 'number') {
         router.push({ name: 'article', params: { siteId: v } });
     }
 };
@@ -45,18 +45,18 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="h-screen bg-white border-r border-slate-200 flex flex-col transition-all duration-300" 
-         :class="collapsed ? 'w-16' : 'w-64'">
-        <div class="m-2 rounded-lg flex items-center transition-all duration-200"
+    <div class="shrink-0" :class="collapsed ? 'w-16' : 'w-50'">
+        <div class="p-2 rounded-lg flex items-center transition-all duration-200"
             :class="collapsed ? 'justify-center' : 'justify-between'">
             <a-dropdown position="bl" @select="handleSelect">
                 <div class="flex items-center cursor-pointer transition-all duration-200"
                     :class="collapsed ? 'justify-center w-auto' : 'justify-between w-full'">
                     <div class="flex items-center gap-2 flex-1 min-w-0">
-                        <a-avatar :style="{ backgroundColor: '#7BC616' }" shape="square" :size="32">{{ currentSite?.name?.[0] || 'Site' }}</a-avatar>
+                        <a-avatar :style="{ backgroundColor: '#7BC616' }" shape="square" :size="32">{{
+                            currentSite?.name?.[0] || 'Site' }}</a-avatar>
                         <div class="flex flex-col text-left overflow-hidden">
-                            <span v-show="!collapsed" class="font-bold truncate text-base leading-tight">{{ currentSite?.name || '选择站点' }}</span>
-                             <span v-show="!collapsed" class="text-xs text-gray-500 truncate leading-tight">{{ currentSite?.path || '' }}</span>
+                            <div v-show="!collapsed" class="font-bold truncate text-lg leading-tight">{{
+                                currentSite?.name || '选择站点' }}</div>
                         </div>
                     </div>
                     <ChevronDown v-show="!collapsed" class="size-4" />
@@ -67,11 +67,11 @@ onMounted(async () => {
                             <a-doption v-for="site in sites" :key="site.id" :value="site.id">
                                 <div class="flex items-center gap-2 py-4">
                                     <a-avatar :style="{ backgroundColor: '#7BC616' }" shape="square"
-                                        :size="32">我</a-avatar>
+                                        :size="32">{{ site.name?.[0] || 'W' }}</a-avatar>
                                     <div class="flex flex-col text-left overflow-hidden">
                                         <span class="text-sm truncate leading-tight">{{ site.name }}</span>
                                         <span class="text-xs truncate leading-tight text-slate-500">{{ site.path
-                                            }}</span>
+                                        }}</span>
                                     </div>
                                 </div>
                             </a-doption>
@@ -83,7 +83,7 @@ onMounted(async () => {
                 </template>
             </a-dropdown>
         </div>
-        <a-menu class="w-full flex-1" :default-selected-keys="['1']" breakpoint="xl" @collapse="onCollapse">
+        <a-menu class="w-50 flex-1" :default-selected-keys="['1']" breakpoint="xl" @collapse="onCollapse">
             <a-menu-item key="1">
                 <template #icon><icon-file /></template>
                 文章

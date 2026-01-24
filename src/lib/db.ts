@@ -66,3 +66,21 @@ export async function checkSitePathExists(path: string): Promise<boolean> {
   const result = await db.select<{count: number}[]>('SELECT count(*) as count FROM site WHERE path = $1', [path]);
   return result[0].count > 0;
 }
+
+export async function getLastSiteId(): Promise<number | null> {
+  const db = await getDb();
+  const result = await db.select<{value: string}[]>('SELECT value FROM settings WHERE key = $1', ['last_site_id']);
+  if (result.length > 0 && result[0].value) {
+    return Number(result[0].value);
+  }
+  return null;
+}
+
+export async function setLastSiteId(id: number): Promise<void> {
+  const db = await getDb();
+  // SQLite supports INSERT OR REPLACE
+  await db.execute(
+    'INSERT OR REPLACE INTO settings (key, value) VALUES ($1, $2)',
+    ['last_site_id', String(id)]
+  );
+}
