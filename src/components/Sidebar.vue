@@ -45,13 +45,13 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="shrink-0" :class="collapsed ? 'w-16' : 'w-50'">
+    <div class="border-r border-slate-200 shrink-0" :class="collapsed ? '' : 'w-50'">
         <div class="p-2 rounded-lg flex items-center transition-all duration-200"
             :class="collapsed ? 'justify-center' : 'justify-between'">
             <a-dropdown position="bl" @select="handleSelect">
                 <div class="flex items-center cursor-pointer transition-all duration-200"
                     :class="collapsed ? 'justify-center w-auto' : 'justify-between w-full'">
-                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <div class="flex items-center flex-1" :class="collapsed ? '' : 'gap-2'">
                         <a-avatar :style="{ backgroundColor: '#7BC616' }" shape="square" :size="32">{{
                             currentSite?.name?.[0] || 'Site' }}</a-avatar>
                         <div class="flex flex-col text-left overflow-hidden">
@@ -66,12 +66,12 @@ onMounted(async () => {
                         <a-dgroup title="切换站点">
                             <a-doption v-for="site in sites" :key="site.id" :value="site.id">
                                 <div class="flex items-center gap-2 py-4">
-                                    <a-avatar :style="{ backgroundColor: '#7BC616' }" shape="square"
-                                        :size="32">{{ site.name?.[0] || 'W' }}</a-avatar>
+                                    <a-avatar class="shrink-0" :style="{ backgroundColor: '#7BC616' }" shape="square" :size="32">{{
+                                        site.name?.[0] || 'W' }}</a-avatar>
                                     <div class="flex flex-col text-left overflow-hidden">
                                         <span class="text-sm truncate leading-tight">{{ site.name }}</span>
-                                        <span class="text-xs truncate leading-tight text-slate-500">{{ site.description
-                                        }}</span>
+                                        <span class="text-xs truncate leading-tight text-slate-500">{{
+                                            site.description}}</span>
                                     </div>
                                 </div>
                             </a-doption>

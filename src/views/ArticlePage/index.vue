@@ -5,9 +5,11 @@ const isSiteMenuOpen = ref(false);
 </script>
 
 <template>
-  <div class="h-screen w-screen flex bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display overflow-hidden">
-    <div class="w-80 lg:w-96">
-        <a-input-search placeholder="Please enter something"/>
+  <div class="h-screen w-screen flex overflow-hidden">
+    <div class="w-80 shrink-0">
+       <div class="p-4">
+         <a-input-search placeholder="搜索文章..."/>
+       </div>
     </div>
     <!-- Sidebar 2: Article List -->
     <div class="w-80 lg:w-96 flex flex-col border-r border-border-light dark:border-slate-800 bg-background-subtle dark:bg-slate-900/50 shrink-0">

@@ -63,7 +63,7 @@ const handleSubmit = async ({
       description: values.description || '',
     })
     Message.success('站点创建成功！已准备好开始创作。');
-    router.push('/');
+    router.push('/site/' + siteId);
   } catch (err) {
     errorMessage.value = (err as Error).message;
   } finally {
