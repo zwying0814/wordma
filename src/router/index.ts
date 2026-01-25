@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import ArticlePage from '@/views/ArticlePage.vue'
 import Dashboard from '@/layouts/Dashboard.vue'
 import ImmersiveWriterPage from '@/views/ImmersiveWriterPage.vue'
 import { getAllSites, getLastSiteId, setLastSiteId } from '@/lib/db'
+import ArticlePage from '@/views/ArticlePage/index.vue'
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),

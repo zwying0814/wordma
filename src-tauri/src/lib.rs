@@ -4,24 +4,6 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-#[tauri::command]
-fn is_dir_empty(path: &str) -> Result<bool, String> {
-    let path = std::path::Path::new(path);
-    if !path.exists() {
-         return Err("该路径不存在".into());
-    }
-    if !path.is_dir() {
-        return Err("该路径不是文件夹".into());
-    }
-    match std::fs::read_dir(path) {
-        Ok(mut entries) => {
-            // Check if there is at least one entry
-            Ok(entries.next().is_none())
-        },
-        Err(e) => Err(e.to_string()),
-    }
-}
-
 use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -35,13 +17,16 @@ pub fn run() {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 description TEXT,
-                path TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
-            );",
+            );
+            INSERT INTO site (name, description)
+            SELECT '默认站点', '这是初始化创建的站点描述'
+            WHERE NOT EXISTS (SELECT 1 FROM site);
+            ",
             kind: MigrationKind::Up,
         }
     ];
@@ -61,7 +46,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet, is_dir_empty])
+        .invoke_handler(tauri::generate_handler![greet])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

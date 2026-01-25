@@ -70,7 +70,7 @@ onMounted(async () => {
                                         :size="32">{{ site.name?.[0] || 'W' }}</a-avatar>
                                     <div class="flex flex-col text-left overflow-hidden">
                                         <span class="text-sm truncate leading-tight">{{ site.name }}</span>
-                                        <span class="text-xs truncate leading-tight text-slate-500">{{ site.path
+                                        <span class="text-xs truncate leading-tight text-slate-500">{{ site.description
                                         }}</span>
                                     </div>
                                 </div>
