@@ -23,6 +23,20 @@ pub fn run() {
                 key TEXT PRIMARY KEY,
                 value TEXT
             );
+            CREATE TABLE IF NOT EXISTS article (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                content TEXT,
+                type TEXT NOT NULL DEFAULT 'markdown',
+                summary TEXT,
+                cover TEXT,
+                status TEXT DEFAULT 'draft',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO article (title, content, type, summary, status)
+            SELECT '欢迎使用 Wordma', '# Hello Wordma\n\n这是一个示例 Markdown 文章。你可以在这里开始你的写作之旅！', 'markdown', '这是第一篇文章的摘要', 'published'
+            WHERE NOT EXISTS (SELECT 1 FROM article);
             INSERT INTO site (name, description)
             SELECT '默认站点', '这是初始化创建的站点描述'
             WHERE NOT EXISTS (SELECT 1 FROM site);

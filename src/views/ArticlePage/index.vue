@@ -1,24 +1,32 @@
 <script setup lang="ts">
-import { reactive, computed, useTemplateRef } from 'vue';
+import { reactive, computed, useTemplateRef, ref, onMounted } from 'vue';
 import { useElementSize } from '@vueuse/core'
 import { IconPlus } from '@arco-design/web-vue/es/icon';
+import { getAllArticles, type Article } from '@/lib/db';
 
-const names = ['静态网站的未来', '从Wordpress迁移', 'Jamstack简介', '使用Astro构建网站', '性能优化技巧', '内容管理系统比较', 'SEO最佳实践', '边缘计算与网站速度', '无头CMS的优势', '现代前端框架概览'];
+const dataSource = ref<Article[]>([]);
+const loading = ref(false);
 
-const dataSource = new Array(150).fill(null).map((_, index) => {
-  return {
-    index: index,
-    title: names[index % names.length],
-    date: '2023年10月24日',
-    description:
-      'Beijing ByteDance Technology Co., Ltd. is an enterprise located in China. ByteDance has products such as TikTok, Toutiao, volcano video and Douyin (the Chinese version of TikTok).',
-  };
+const fetchData = async () => {
+  loading.value = true;
+  try {
+    dataSource.value = await getAllArticles();
+  } catch (error) {
+    console.error('Failed to fetch articles:', error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchData();
 });
+
 const paginationProps = reactive({
   defaultPageSize: 30,
-  total: dataSource.length,
-  simple:true,
-  showTotal:true,
+  total: computed(() => dataSource.value.length),
+  simple: true,
+  showTotal: true,
   size: 'mini',
 })
 
@@ -41,7 +49,8 @@ const contentHeight = computed(() => boxSize.height.value - headSize.height.valu
           新建文章
         </a-button>
       </div>
-      <a-list :max-height="contentHeight" :scrollbar="true" :bordered="false" :data="dataSource" :pagination-props="paginationProps">
+      <a-list :loading="loading" :max-height="contentHeight" :scrollbar="true" :bordered="false" :data="dataSource"
+        :pagination-props="paginationProps">
         <template #item="{ item }">
           <a-list-item action-layout="vertical" class="border-none">
             <a-list-item-meta>
@@ -50,13 +59,13 @@ const contentHeight = computed(() => boxSize.height.value - headSize.height.valu
               </template>
               <template #description>
                 <div class="flex items-center justify-between mt-2">
-                  <span class="text-xs text-slate-500">{{ item.date }}</span>
-                  <a-tag color="orange">
-                    草稿
+                  <span class="text-xs text-slate-500">{{ new Date(item.created_at).toLocaleDateString() }}</span>
+                  <a-tag size="small" :color="item.status === 'published' ? 'green' : 'orange'">
+                    {{ item.status === 'published' ? '已发布' : '草稿' }}
                   </a-tag>
                 </div>
                 <p class="text-xs text-slate-500 mt-1 line-clamp-2">
-                  {{ item.description }}
+                  {{ item.summary || '暂无摘要' }}
                 </p>
               </template>
             </a-list-item-meta>
@@ -206,38 +215,11 @@ const contentHeight = computed(() => boxSize.height.value - headSize.height.valu
 </template>
 
 <style scoped>
-/* Scoped styles from code.html */
-/* Removing custom scrollbar overrides as they might confuse things, 
-   or keep them if the user wants exact fidelity. 
-   code.html had them in <style> block. 
-   I'll add them here but might need ::v-deep or global. 
-   Since they apply to elements inside, I'll put them in style.css or here.
-*/
-.prose-editor:focus {
-  outline: none;
+:deep(.arco-list-item-meta-content) {
+  width: 100%;
 }
 
-.writing-area:focus {
-  outline: none;
+:deep(.arco-list) {
+  min-height: v-bind(contentHeight+"px");
 }
-
-textarea {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-textarea::-webkit-scrollbar {
-  display: none;
-}
-
-/* Toggle checkbox styles from code.html seems implied but missing CSS. 
-   Ah, I see inputs with toggle-checkbox class. 
-   The code.html didn't include the specific css for toggle-checkbox in the style block.
-   I'll assume it relies on standard Tailwind or external, but looking at it:
-   It references classes like Toggle-checkbox.
-   Wait, code.html creates the toggle using Tailwind utility classes + some custom ones?
-   "w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-300"
-   It seems to be a custom implementation.
-   I will leave as is, might be broken if CSS missing.
-*/
 </style>

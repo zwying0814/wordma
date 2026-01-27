@@ -21,6 +21,18 @@ export interface Site {
   created_at?: string;
 }
 
+export interface Article {
+  id: number;
+  title: string;
+  content: string;
+  type: 'richtext' | 'markdown';
+  summary?: string;
+  cover?: string;
+  status: 'published' | 'draft';
+  created_at: string;
+  updated_at: string;
+}
+
 export async function createSite(site: Omit<Site, 'id' | 'created_at'>): Promise<number> {
   const db = await getDb();
   // Check unique site name only
@@ -51,6 +63,11 @@ export async function checkSiteNameExists(name: string): Promise<boolean> {
   const db = await getDb();
   const result = await db.select<{count: number}[]>('SELECT count(*) as count FROM site WHERE name = $1', [name]);
   return result[0].count > 0;
+}
+
+export async function getAllArticles(): Promise<Article[]> {
+  const db = await getDb();
+  return await db.select<Article[]>('SELECT * FROM article ORDER BY created_at DESC');
 }
 
 export async function getLastSiteId(): Promise<number | null> {
