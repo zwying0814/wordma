@@ -4,6 +4,19 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[tauri::command]
+async fn compile_mdx(content: String) -> Result<String, String> {
+    let options = mdxjs::Options {
+        jsx: false,
+        ..Default::default()
+    };
+    
+    match mdxjs::compile(&content, &options) {
+        Ok(code) => Ok(code),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -60,7 +73,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![greet, compile_mdx])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
