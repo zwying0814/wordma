@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "desktop:dev": "pnpm --filter ./apps/desktop run tauri dev"
-  }
+    "desktop:dev": "bun -F ./apps/desktop tauri dev"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }
