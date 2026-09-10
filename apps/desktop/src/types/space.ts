@@ -45,8 +45,9 @@ export type SpaceResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: SpaceError }
 
-/** 新建空间不再传目录：Rust 侧固定在 %LOCALAPPDATA% 数据目录下按名称创建 */
-export type CreateSpaceInput = { name: string; icon: string }
+/** 新建空间需传入用户选择的文件夹（spaceDir），Rust 侧在其中写入标记文件，
+ *  不再固定创建在 %LOCALAPPDATA% 默认数据目录下（与 wordma-ban 的逻辑一致）。 */
+export type CreateSpaceInput = { spaceDir: string; name: string; icon: string }
 
 export type CreateSpaceData = SpaceSnapshot & { space: SpaceView }
 export type OpenSpaceData = SpaceSnapshot & { space: SpaceView; adopted: boolean }

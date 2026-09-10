@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { FolderOpenIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { validateSpaceName } from "@/lib/space-name"
@@ -30,6 +31,8 @@ export function CreateSpaceDialog({
   const actions = useSpaceActions()
   const pending = useSpacePending()
 
+  // spaceDir 即空间文件夹本身（不再在其下再建一层名称子目录）
+  const [spaceDir, setSpaceDir] = useState("")
   const [name, setName] = useState("")
   const [icon, setIcon] = useState<SpaceIconName>(DEFAULT_SPACE_ICON)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -39,14 +42,23 @@ export function CreateSpaceDialog({
     trimmed.length > 0 ? validateSpaceName(name) : { ok: true as const }
   const nameError = nameValidation.ok ? null : nameValidation.message
 
-  const canSubmit = trimmed.length > 0 && nameValidation.ok && !pending
+  const canSubmit =
+    trimmed.length > 0 && nameValidation.ok && spaceDir.length > 0 && !pending
 
   function handleOpenChange(next: boolean) {
     onOpenChange(next)
     if (!next) {
-      // 关闭：重置名称/图标与提交错误
+      // 关闭：重置名称/图标与提交错误，保留 spaceDir（连续创建时不用反复选位置）
       setName("")
       setIcon(DEFAULT_SPACE_ICON)
+      setSubmitError(null)
+    }
+  }
+
+  async function handleBrowse() {
+    const dir = await actions.pickSpaceDir()
+    if (dir) {
+      setSpaceDir(dir)
       setSubmitError(null)
     }
   }
@@ -54,12 +66,15 @@ export function CreateSpaceDialog({
   async function handleCreate() {
     if (!canSubmit) return
     setSubmitError(null)
-    const result = await actions.createSpace({ name: trimmed, icon })
+    const result = await actions.createSpace({ spaceDir, name: trimmed, icon })
     if (result.ok) {
       handleOpenChange(false)
       return
     }
-    if (result.reason !== "error") return
+    if (result.reason === "cancelled") {
+      // 创建不走系统 dialog，理论上不会到这里；静默保持打开
+      return
+    }
     // 表单类与存储类错误都贴在对话框内（不闪退到全局 banner）
     setSubmitError(result.error.message)
   }
@@ -70,11 +85,37 @@ export function CreateSpaceDialog({
         <DialogHeader>
           <DialogTitle>新建空间</DialogTitle>
           <DialogDescription>
-            空间会创建在系统默认数据目录（%LOCALAPPDATA%）下，无需手动选择位置。
+            选择一个空文件夹，wordma 会在其中创建空间配置文件，将其标记为你的笔记空间。
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4">
+          {/* 位置 */}
+          <div className="grid gap-2">
+            <label htmlFor="space-location" className="text-sm font-medium">
+              位置
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="space-location"
+                value={spaceDir}
+                readOnly
+                placeholder="未选择文件夹"
+                className="flex-1 truncate"
+                title={spaceDir}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBrowse}
+                disabled={pending}
+              >
+                <FolderOpenIcon className="size-4" />
+                浏览…
+              </Button>
+            </div>
+          </div>
+
           {/* 名称 */}
           <div className="grid gap-2">
             <label htmlFor="space-name" className="text-sm font-medium">

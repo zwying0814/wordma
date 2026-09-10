@@ -1,3 +1,4 @@
+mod article;
 mod space;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -13,6 +14,10 @@ pub fn run() {
             space::commands::space_scan,
             space::commands::space_set_active,
             space::commands::space_remove,
+            article::commands::article_create,
+            article::commands::article_list,
+            article::commands::article_delete,
+            article::commands::article_slugify,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

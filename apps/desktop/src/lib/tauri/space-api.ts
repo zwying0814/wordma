@@ -64,6 +64,7 @@ export const spaceApi = {
 
   create: (input: CreateSpaceInput): Promise<SpaceResult<CreateSpaceData>> =>
     call<CreateSpaceData>("space_create", {
+      spaceDir: input.spaceDir,
       name: input.name,
       icon: input.icon,
     }),

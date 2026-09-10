@@ -17,9 +17,8 @@ use super::model::{
 };
 use super::store;
 
-/// 空间根目录（相对 `app_local_data_dir()`，Windows 上即
-/// `%LOCALAPPDATA%\<identifier>`）：新建空间不再要求用户选文件夹，
-/// 一律创建在 `<数据目录>/spaces/<空间名>` 下。
+/// 历史空间根目录（相对 `app_local_data_dir()`）。仅 `space_scan` 仍用它发现
+/// 旧版在默认数据目录下创建的空间；新建空间已改为用户自选任意文件夹（见 `space_create`）。
 const SPACES_ROOT: &str = "spaces";
 
 /// 空间标记文件（相对空间目录）。目录里有它才算一个 wordma 空间。
@@ -119,19 +118,6 @@ fn validate_dir(space_dir: &str) -> Result<PathBuf, SpaceError> {
     Ok(path.to_path_buf())
 }
 
-/// 在默认数据目录下为空间挑选目录名：优先直接用名称；
-/// 重名时追加序号后缀（`笔记-2`、`笔记-3`…）。Windows 文件名大小写不敏感，
-/// 而 `Path::exists()` 判断天然大小写不敏感，这里无需额外处理。
-fn pick_space_dir(root: &Path, name: &str) -> PathBuf {
-    let mut candidate = root.join(name);
-    let mut seq = 2usize;
-    while candidate.exists() {
-        candidate = root.join(format!("{name}-{seq}"));
-        seq += 1;
-    }
-    candidate
-}
-
 // 注意：一律用「索引」而非「返回的 &mut Space」来定位记录。
 // `match find(&mut registry) { None => registry.push(..) }` 会撞上 NLL 的
 // 借用检查限制（match scrutinee 的借用活到整个 match 结束），索引写法没有这个问题。
@@ -184,35 +170,41 @@ pub fn space_list(app: AppHandle) -> Result<SpaceSnapshot, SpaceError> {
     Ok(store::snapshot_of(&registry, &marker_rel_path()))
 }
 
-/// 新建空间：只需名称与图标。目录固定创建在
-/// `%LOCALAPPDATA%\<identifier>\spaces\<空间名>` 下（重名自动加序号后缀），
-/// 写入标记文件后入注册表并激活。
+/// 新建空间：用户选择一个空文件夹（spaceDir），wordma 在其中写入标记文件
+/// `.wordma/space.json` 把它标记为笔记空间，不再固定创建在 %LOCALAPPDATA% 下
+/// （与 wordma-ban 一致：空间位置完全由用户决定）。非空或已在列表中的目录会报错。
 #[tauri::command]
-pub fn space_create(app: AppHandle, name: String, icon: String) -> Result<CreateSpaceData, SpaceError> {
+pub fn space_create(
+    app: AppHandle,
+    space_dir: String,
+    name: String,
+    icon: String,
+) -> Result<CreateSpaceData, SpaceError> {
     let name = validate_name(&name)?;
+    let dir = validate_dir(&space_dir)?;
 
-    let root = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| SpaceError::new(SpaceErrorCode::StoreUnavailable, e.to_string()))?
-        .join(SPACES_ROOT);
-    let dir = pick_space_dir(&root, &name);
-    fs::create_dir_all(&dir)
-        .map_err(|e| super::model::from_io_error(&e, "创建空间目录失败"))?;
-
-    let path_str = dir.to_string_lossy().to_string();
-    let key = store::dedupe_key(&path_str);
-
+    let key = store::dedupe_key(&space_dir);
     let mut registry = store::load(&app)?;
-    // 理论上 pick_space_dir 已避开重名目录；这里防的是
-    // 「同一路径曾被注册、后来目录被手动删掉」的残留记录。
     if index_of_path(&registry, &key).is_some() {
         return Err(SpaceError::new(
             SpaceErrorCode::AlreadyRegistered,
-            "该目录已经是笔记空间了",
+            "该目录已在空间列表中",
         ));
     }
 
+    // 与 wordma-ban 一致：要求所选文件夹为空（含已有 .wordma 标记的目录请用「打开」接入）。
+    let dir_is_empty = fs::read_dir(&dir)
+        .map_err(|e| super::model::from_io_error(&e, "读取文件夹失败"))?
+        .next()
+        .is_none();
+    if !dir_is_empty {
+        return Err(SpaceError::new(
+            SpaceErrorCode::DirNotEmpty,
+            "所选文件夹不是空文件夹，请选择一个空文件夹来创建空间",
+        ));
+    }
+
+    let path_str = dir.to_string_lossy().to_string();
     let now = store::now_millis();
     let id = store::new_id(&path_str);
 
