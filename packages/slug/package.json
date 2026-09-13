@@ -1,0 +1,32 @@
+{
+  "name": "@wordma/slug",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WASM slug 生成器（rslug + 中文拼音转写），供 wordma 前端直接 import 使用",
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    },
+    "./pkg/*": "./pkg/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "pkg",
+    "src",
+    "Cargo.toml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "wasm-pack build --target web --out-dir pkg",
+    "prepare": "node ./scripts/ensure-wasm.mjs",
+    "test": "cargo test"
+  }
+}

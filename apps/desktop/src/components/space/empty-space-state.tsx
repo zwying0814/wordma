@@ -18,7 +18,7 @@ export function BrowserModeNotice() {
       <MonitorIcon className="size-10 text-muted-foreground/60" />
       <h1 className="text-lg font-medium">浏览器预览模式</h1>
       <p className="max-w-sm text-sm text-muted-foreground">
-        笔记空间功能依赖桌面端的本地文件夹能力，请在桌面应用中使用「新建空间」与「打开文件夹」。
+        笔记库是一个本地数据库文件，依赖桌面端的文件读写能力。请在桌面应用中使用「新建空间」。
       </p>
     </div>
   )
@@ -45,21 +45,17 @@ export function SpaceErrorState() {
 
 /** 无空间引导页 */
 export function EmptySpaceState() {
-  const actions = useSpaceActions()
   const [createOpen, setCreateOpen] = useState(false)
+
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
       <FolderOpenIcon className="size-10 text-muted-foreground/60" />
       <h1 className="text-lg font-medium">还没有笔记空间</h1>
       <p className="max-w-sm text-sm text-muted-foreground">
-        创建一个本地文件夹作为你的笔记空间，或打开一个已有的文件夹。
+        所有空间都存在同一个笔记库里，新建一个空间即可开始。
       </p>
       <div className="flex gap-2">
-        <Button onClick={() => void actions.openSpace()}>
-          <FolderOpenIcon className="size-4" />
-          打开文件夹…
-        </Button>
-        <Button variant="outline" onClick={() => setCreateOpen(true)}>
+        <Button onClick={() => setCreateOpen(true)}>
           <PlusIcon className="size-4" />
           新建空间
         </Button>

@@ -1,23 +1,29 @@
 import { invoke, isTauri } from "@tauri-apps/api/core"
 
-import { slugify as slugifyLocal } from "@/lib/article-name"
 import type {
+  ArticleData,
   ArticleError,
-  ArticleListData,
+  ArticlePageData,
+  ArticleRecord,
   ArticleResult,
-  ArticleSlugifyData,
-  CreateArticleData,
   CreateArticleInput,
+  PageArticlesInput,
+  SearchArticlesInput,
+  SetPinnedInput,
+  UpdateArticleInput,
 } from "@/types/article"
 
 /**
- * Tauri 侧文章能力的唯一出口——替代已随 Electron 移除的 `lib/electron-bridge`。
+ * Tauri 侧文章能力的唯一出口。
  *
  * 设计要点：
  *  - 业务命令一律走 `invoke` 调 Rust（`src-tauri/src/article/commands.rs`），
- *    命令名 `article_*`；参数由 Tauri 自动做驼峰转换（`spacePath` → `space_path`）。
+ *    命令名 `article_*`；参数由 Tauri 自动做驼峰转换（`spaceId` → `space_id`）。
  *  - **命令绝不 reject**：Rust 的 `Err(ArticleError)` 被还原成 `{ ok:false, error }`，
  *    与 space 模块保持同一套信封语义，store / 组件层无需感知底层。
+ *  - `spaceId` 是**空间记录的 id**（`Space.id`）。整个应用只有一个库，
+ *    文章靠 `space_id` 归属，所以不再有「空间文件路径」这种东西。
+ *  - 列表是**服务端分页**：只取当前页，`total` 用于算总页数。
  */
 const NOT_AVAILABLE: ArticleError = {
   code: "UNKNOWN",
@@ -51,34 +57,73 @@ async function call<T>(
 }
 
 export const articleApi = {
-  /** 新建文章：写入 `<spacePath>/content/<slug>.mdx`。slug 重复会返回 ARTICLE_EXISTS 错误 */
-  create: (input: CreateArticleInput): Promise<ArticleResult<CreateArticleData>> =>
-    call<CreateArticleData>("article_create", {
-      spacePath: input.spacePath,
-      title: input.title,
-      slug: input.slug,
+  /**
+   * 分页取文章：置顶优先 → 日期倒序 → slug 升序。
+   * 排序与分页由 SQL 完成，不再有「重新扫描目录」这回事。
+   */
+  page: (input: PageArticlesInput): Promise<ArticleResult<ArticlePageData>> =>
+    call<ArticlePageData>("article_page", {
+      spaceId: input.spaceId,
+      page: input.page,
+      pageSize: input.pageSize,
     }),
 
-  /** 列出空间下全部文章（遍历 content/*.mdx） */
-  list: (spacePath: string): Promise<ArticleResult<ArticleListData>> =>
-    call<ArticleListData>("article_list", { spacePath }),
+  /**
+   * 全文检索，分页语义与 `page` 完全一致，可直接复用列表 UI。
+   *
+   * ⚠️ 索引用的是 trigram 分词器（为中文选的），**少于 3 个字符的词检索不到**：
+   * 搜「锂电池」有效，搜「电池」无效。短词由后端退回 `LIKE` 兜底。
+   */
+  search: (input: SearchArticlesInput): Promise<ArticleResult<ArticlePageData>> =>
+    call<ArticlePageData>("article_search", {
+      spaceId: input.spaceId,
+      query: input.query,
+      page: input.page,
+      pageSize: input.pageSize,
+    }),
 
-  /** 删除文章：成功返回刷新后的列表 */
-  remove: (spacePath: string, slug: string): Promise<ArticleResult<ArticleListData>> =>
-    call<ArticleListData>("article_delete", { spacePath, slug }),
+  /** 取单篇（含正文）。打开编辑器时用 */
+  get: (spaceId: string, slug: string): Promise<ArticleResult<ArticleRecord>> =>
+    call<ArticleRecord>("article_get", { spaceId, slug }),
 
-  /** 由标题生成 slug（后端用 rslug 转写汉字/符号）。结果空串时前端也能兜住 */
-  slugify: (title: string): Promise<ArticleResult<ArticleSlugifyData>> =>
-    call<ArticleSlugifyData>("article_slugify", { title }),
-}
+  /** 新建文章：往 `articles` 表插一行。本空间内 slug 重复会返回 ARTICLE_EXISTS */
+  create: (input: CreateArticleInput): Promise<ArticleResult<ArticleData>> =>
+    call<ArticleData>("article_create", {
+      spaceId: input.spaceId,
+      title: input.title,
+      slug: input.slug,
+      tags: input.tags,
+      date: input.date,
+    }),
 
-/**
- * 标题 → 合法文件名 slug 的高层封装：
- * 优先走 Tauri 后端（`rslug` 转写，汉字→拼音/ASCII）；
- * 非 Tauri 预览模式或后端返回空时，回退到本地 `slugify`。
- */
-export async function generateArticleSlug(title: string): Promise<string> {
-  const res = await articleApi.slugify(title.trim())
-  if (res.ok && res.data.slug.length > 0) return res.data.slug
-  return slugifyLocal(title) // 浏览器预览 / 兜底
+  /** 保存正文（编辑器「保存」）。只更新 body；索引与时间戳由后端一并刷新 */
+  update: (input: UpdateArticleInput): Promise<ArticleResult<ArticleData>> =>
+    call<ArticleData>("article_update", {
+      spaceId: input.spaceId,
+      slug: input.slug,
+      body: input.body,
+    }),
+
+  /** 置顶/取消置顶 */
+  setPinned: (input: SetPinnedInput): Promise<ArticleResult<ArticleData>> =>
+    call<ArticleData>("article_set_pinned", {
+      spaceId: input.spaceId,
+      slug: input.slug,
+      pinned: input.pinned,
+    }),
+
+  /** 删除文章。删除会改变 total/页码，调用方应重新拉取当前页 */
+  remove: (spaceId: string, slug: string): Promise<ArticleResult<null>> =>
+    call<null>("article_delete", { spaceId, slug }),
+
+  /**
+   * 把一篇文章导出成 `.mdx` 文件，返回写出的绝对路径。
+   * 这是数据库化之后把内容落回文件系统的唯一出口。
+   */
+  export: (
+    spaceId: string,
+    slug: string,
+    destDir: string,
+  ): Promise<ArticleResult<string>> =>
+    call<string>("article_export", { spaceId, slug, destDir }),
 }

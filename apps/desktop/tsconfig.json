@@ -2,7 +2,9 @@
   "compilerOptions": {
     // TypeScript 7 已移除 baseUrl；paths 改为相对本 tsconfig 解析
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      // 工作区 wasm 包 @wordma/slug：指向源码包的类型声明（运行时由 vite 别名指向 index.js）
+      "@wordma/slug": ["../../packages/slug/index.d.ts"]
     },
     "target": "ES2020",
     "useDefineForClassFields": true,

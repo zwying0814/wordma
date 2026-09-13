@@ -1,8 +1,14 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { LoaderCircleIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { validateArticleSlug } from "@/lib/article-name"
-import { generateArticleSlug } from "@/lib/tauri/article-api"
+import {
+  MAX_ARTICLE_NAME_LENGTH,
+  SLUG_CHARSET_HINT,
+  sanitizeSlugInput,
+  validateArticleSlug,
+} from "@/lib/article-name"
+import { generateArticleSlug, warmUpSlug } from "@/lib/slug"
 import { useArticleActions, useArticlePending } from "@/stores/article-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,19 +24,30 @@ import {
 export function CreateArticleDialog({
   open,
   onOpenChange,
-  spacePath,
+  spaceId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** 当前空间绝对路径，文章将写入其 content 子目录 */
-  spacePath: string
+  /** 当前空间 id（`Space.id`）——文章靠它归属，写进同库 `articles` 表的一行 */
+  spaceId: string
 }) {
   const actions = useArticleActions()
   const pending = useArticlePending()
 
   const [title, setTitle] = useState("")
   const [slug, setSlug] = useState("")
+  const [tagsInput, setTagsInput] = useState("")
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [generatingSlug, setGeneratingSlug] = useState(false)
+  // 中文输入法合成期间不干预输入框内容（否则会打断候选词输入），
+  // 合成结束时再统一清洗。
+  const [composing, setComposing] = useState(false)
+
+  // 对话框一打开就预热 slug wasm（9.5MB，读盘+编译需数百毫秒）。
+  // 用户填写标题的这几秒钟足够加载完，点按钮时基本是即时返回。
+  useEffect(() => {
+    if (open) warmUpSlug()
+  }, [open])
 
   const trimmedTitle = title.trim()
   const trimmedSlug = slug.trim()
@@ -48,7 +65,10 @@ export function CreateArticleDialog({
       // 关闭：重置所有字段与提交错误，便于下次重新填写
       setTitle("")
       setSlug("")
+      setTagsInput("")
       setSubmitError(null)
+      setGeneratingSlug(false)
+      setComposing(false)
     }
   }
 
@@ -57,19 +77,42 @@ export function CreateArticleDialog({
     setTitle(value)
   }
 
-  // 根据标题生成 slug（经后端 rslug 转写汉字/符号），点击按钮才触发
+  // slug 输入：白名单外的字符直接丢弃（如空格、中文、全角符号）。
+  // 输入法合成期间不管，避免打断候选词；合成结束再清洗一次。
+  function handleSlugChange(value: string) {
+    setSlug(composing ? value : sanitizeSlugInput(value))
+  }
+
+  function handleSlugCompositionEnd(value: string) {
+    setComposing(false)
+    setSlug(sanitizeSlugInput(value))
+  }
+
+  // 根据标题生成 slug（前端 wasm 包 @wordma/slug：rslug + 拼音转写），点击按钮才触发。
+  // 加 generatingSlug 状态：即使 wasm 尚未就绪，也能给用户明确的「处理中」反馈，
+  // 而不是看起来像卡住。
   async function handleGenerateFromTitle() {
-    const s = await generateArticleSlug(title)
-    setSlug(s)
+    if (generatingSlug) return
+    setGeneratingSlug(true)
+    try {
+      const s = await generateArticleSlug(title)
+      // 兜底清洗：生成结果同样必须落在白名单内
+      setSlug(sanitizeSlugInput(s))
+    } finally {
+      setGeneratingSlug(false)
+    }
   }
 
   async function handleCreate() {
     if (!canSubmit) return
     setSubmitError(null)
     const result = await actions.create({
-      spacePath,
+      spaceId,
       title: trimmedTitle,
       slug: trimmedSlug,
+      tags: parseTags(tagsInput),
+      // 日期用前端本地时间：后端拿不到本地时区，入库更准
+      date: todayLocalDate(),
     })
     if (result.ok) {
       handleOpenChange(false)
@@ -88,8 +131,8 @@ export function CreateArticleDialog({
         <DialogHeader>
           <DialogTitle>新建文章</DialogTitle>
           <DialogDescription>
-            文章以 MDX 格式保存到当前空间的 content 目录下。标题写入 frontmatter，
-            自定义 slug 作为文件名，slug 必须唯一。
+            文章保存进当前空间的笔记库。slug 是它在空间内的唯一标识（同一空间内不可重复），
+            标题与正文一并入库；需要文件时随时可导出为 MDX。
           </DialogDescription>
         </DialogHeader>
 
@@ -118,8 +161,13 @@ export function CreateArticleDialog({
               <Input
                 id="article-slug"
                 value={slug}
-                onChange={(e) => setSlug(e.target.value)}
+                onChange={(e) => handleSlugChange(e.target.value)}
+                onCompositionStart={() => setComposing(true)}
+                onCompositionEnd={(e) => handleSlugCompositionEnd(e.currentTarget.value)}
                 placeholder="例如：my-first-article"
+                maxLength={MAX_ARTICLE_NAME_LENGTH}
+                autoComplete="off"
+                spellCheck={false}
                 aria-invalid={slugError ? true : undefined}
                 className={cn(slugError && "border-destructive")}
               />
@@ -128,17 +176,35 @@ export function CreateArticleDialog({
                 variant="outline"
                 size="sm"
                 onClick={handleGenerateFromTitle}
-                disabled={trimmedTitle.length === 0}
-                title="根据标题用 rslug 生成"
+                disabled={trimmedTitle.length === 0 || generatingSlug}
+                title="根据标题生成 slug"
               >
-                根据标题生成
+                {generatingSlug && <LoaderCircleIcon className="animate-spin" />}
+                {generatingSlug ? "生成中…" : "根据标题生成"}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              文件将保存为 <code className="text-foreground">{slug || "slug"}.mdx</code>
-              ；可手动改成任意合法文件名。
+              {SLUG_CHARSET_HINT}；导出时将保存为{" "}
+              <code className="text-foreground">{slug || "slug"}.mdx</code>
             </p>
             {slugError && <p className="text-xs text-destructive">{slugError}</p>}
+          </div>
+
+          <div className="grid gap-2">
+            <label htmlFor="article-tags" className="text-sm font-medium">
+              标签
+              <span className="ml-1 font-normal text-muted-foreground">（可选）</span>
+            </label>
+            <Input
+              id="article-tags"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              placeholder="例如：Gridea Pro, 入门"
+              autoComplete="off"
+            />
+            <p className="text-xs text-muted-foreground">
+              用逗号或空格分隔，最多 10 个。
+            </p>
           </div>
 
           {submitError && (
@@ -164,4 +230,31 @@ export function CreateArticleDialog({
       </DialogContent>
     </Dialog>
   )
+}
+
+/**
+ * 解析标签输入框：逗号（中英文）或空白分隔，去空、去重（大小写不敏感），
+ * 上限与后端 `MAX_TAGS` 对齐。后端还会再规范化一次——永不信任前端。
+ */
+function parseTags(input: string): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of input.split(/[,，\s]+/)) {
+    const tag = raw.trim()
+    if (tag.length === 0) continue
+    const key = tag.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(tag)
+    if (out.length >= 10) break
+  }
+  return out
+}
+
+/** 今天（本地时区）格式化为 `YYYY-MM-DD`，作为文章日期入库。 */
+function todayLocalDate(): string {
+  const d = new Date()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${d.getFullYear()}-${m}-${day}`
 }

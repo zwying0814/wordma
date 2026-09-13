@@ -1,48 +1,23 @@
-//! 空间注册表持久化。
+//! `spaces` 表的读写。
 //!
-//! 注册表落盘为 `<app_config_dir>/spaces.json`，写文件用「临时文件 + rename」的
-//! 原子替换，避免中途崩溃留下半截 JSON 导致整个空间列表读不出来。
+//! 这一层只跟数据库打交道——**没有任何文件系统操作**。旧版的注册表层要处理
+//! 「路径规范化 / 去重 / 文件是否还在 / 目录还是文件」这一堆问题，随着
+//! 「空间 = 一行记录」全部消失。
 
-use std::fs;
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use rusqlite::Connection;
 
-use super::model::{Space, SpaceError, SpaceErrorCode, SpaceSnapshot, SpaceView};
+use super::model::{Space, SpaceError, SpaceSnapshot};
+use crate::db;
 
-const REGISTRY_FILE: &str = "spaces.json";
-const REGISTRY_VERSION: u32 = 1;
+const META_ACTIVE_SPACE: &str = "active_space_id";
 
-/// 注册表整体结构。`version` 为后续迁移留口子。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Registry {
-    pub version: u32,
-    pub spaces: Vec<Space>,
-    pub active_space_id: Option<String>,
-}
+/// 时间戳统一走 `crate::time`；在这里再导出一次，方便 `commands` 直接 `store::now_millis()`。
+pub use crate::time::now_millis;
 
-impl Default for Registry {
-    fn default() -> Self {
-        Self {
-            version: REGISTRY_VERSION,
-            spaces: Vec::new(),
-            active_space_id: None,
-        }
-    }
-}
-
-pub fn now_millis() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
-}
-
-/// 生成稳定 id：FNV-1a(路径 + 纳秒时间戳 + 进程内自增计数)。
+/// 生成稳定 id：FNV-1a(种子 + 纳秒时间戳 + 进程内自增计数)。
 /// 不引入 uuid crate，靠「时间 + 计数」保证同进程内不撞、跨进程几乎不可能撞。
 static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -62,84 +37,138 @@ pub fn new_id(seed: &str) -> String {
     format!("sp_{hash:016x}")
 }
 
-fn registry_path(app: &AppHandle) -> Result<PathBuf, SpaceError> {
-    let dir = app
-        .path()
-        .app_config_dir()
-        .map_err(|e| SpaceError::new(SpaceErrorCode::StoreUnavailable, e.to_string()))?;
-    Ok(dir.join(REGISTRY_FILE))
+const SELECT_SPACES: &str =
+    "SELECT id, name, icon, description, created_at, last_opened_at
+     FROM spaces ORDER BY created_at ASC, id ASC";
+
+/// 时间戳一律按 i64 读写：rusqlite 的 FromSql/ToSql 不覆盖 u64
+///（SQLite 整数是有符号 64 位，u64 可能溢出），转一道最省心。
+fn map_space(row: &rusqlite::Row<'_>) -> rusqlite::Result<Space> {
+    Ok(Space {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        icon: row.get(2)?,
+        description: row.get(3)?,
+        created_at: row.get::<_, i64>(4)? as u64,
+        last_opened_at: row.get::<_, i64>(5)? as u64,
+    })
 }
 
-/// 读注册表。文件不存在 / 内容损坏都退回空注册表，
-/// 绝不因为一份坏掉的 JSON 让整个应用卡在错误页。
-pub fn load(app: &AppHandle) -> Result<Registry, SpaceError> {
-    let path = registry_path(app)?;
+pub fn load_spaces(conn: &Connection) -> Result<Vec<Space>, SpaceError> {
+    let mut stmt = conn.prepare(SELECT_SPACES).map_err(SpaceError::from)?;
+    let rows = stmt.query_map([], map_space).map_err(SpaceError::from)?;
 
-    if !path.exists() {
-        return Ok(Registry::default());
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(SpaceError::from)?);
     }
+    Ok(out)
+}
 
-    let raw = fs::read_to_string(&path)
-        .map_err(|e| super::model::from_io_error(&e, "读取空间列表失败"))?;
+pub fn find_by_id(conn: &Connection, id: &str) -> Result<Option<Space>, SpaceError> {
+    Ok(load_spaces(conn)?.into_iter().find(|s| s.id == id))
+}
 
-    match serde_json::from_str::<Registry>(&raw) {
-        Ok(registry) => Ok(registry),
-        Err(e) => {
-            eprintln!("[wordma] 空间注册表解析失败，已重置：{e}");
-            Ok(Registry::default())
-        }
+/// 该 id 是否存在。文章命令每条都要问一次，所以用 `count(*)` 而不是 `load_spaces`。
+pub fn exists(conn: &Connection, id: &str) -> Result<bool, SpaceError> {
+    let n: i64 = conn
+        .query_row("SELECT count(*) FROM spaces WHERE id = ?1", [id], |row| {
+            row.get(0)
+        })
+        .map_err(SpaceError::from)?;
+    Ok(n > 0)
+}
+
+/// 按名字找（大小写不敏感）。用于「空间名不能重复」的校验。
+pub fn find_by_name(conn: &Connection, name: &str) -> Result<Option<Space>, SpaceError> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, icon, description, created_at, last_opened_at
+             FROM spaces WHERE name = ?1 COLLATE NOCASE",
+        )
+        .map_err(SpaceError::from)?;
+    let mut rows = stmt.query([name]).map_err(SpaceError::from)?;
+    match rows.next().map_err(SpaceError::from)? {
+        Some(row) => Ok(Some(map_space(row).map_err(SpaceError::from)?)),
+        None => Ok(None),
     }
 }
 
-/// 写注册表：先写 .tmp 再 rename，保证落盘的永远是完整 JSON。
-pub fn save(app: &AppHandle, registry: &Registry) -> Result<(), SpaceError> {
-    let path = registry_path(app)?;
-
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| super::model::from_io_error(&e, "创建配置目录失败"))?;
-    }
-
-    let json = serde_json::to_string_pretty(registry)
-        .map_err(|e| SpaceError::new(SpaceErrorCode::Unknown, format!("序列化空间列表失败：{e}")))?;
-
-    let tmp = path.with_extension("json.tmp");
-    fs::write(&tmp, json).map_err(|e| super::model::from_io_error(&e, "写入空间列表失败"))?;
-
-    // Windows 上 rename 不允许覆盖已存在文件，先删再改名
-    if path.exists() {
-        fs::remove_file(&path).map_err(|e| super::model::from_io_error(&e, "替换空间列表失败"))?;
-    }
-    fs::rename(&tmp, &path).map_err(|e| super::model::from_io_error(&e, "替换空间列表失败"))?;
-
+/// 插入一个新空间。
+pub fn insert_space(conn: &Connection, space: &Space) -> Result<(), SpaceError> {
+    conn.execute(
+        "INSERT INTO spaces (id, name, icon, description, created_at, last_opened_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![
+            space.id,
+            space.name,
+            space.icon,
+            space.description,
+            space.created_at as i64,
+            space.last_opened_at as i64,
+        ],
+    )
+    .map_err(SpaceError::from)?;
     Ok(())
 }
 
-/// 去重键：同一目录的不同写法（`C:\a\b` / `\\?\C:\a\b` / 末尾斜杠）必须判为同一个空间。
-/// 只对「能解析的真实路径」做规范化，解析失败就退回原串——用于比较，绝不回写展示路径。
-pub fn dedupe_key(path: &str) -> String {
-    let p = Path::new(path);
-    fs::canonicalize(p)
-        .map(|c| c.to_string_lossy().to_string())
-        .unwrap_or_else(|_| path.trim_end_matches(['/', '\\']).to_string())
+/// 刷新「最后打开时间」。
+pub fn touch(conn: &Connection, id: &str, now: u64) -> Result<(), SpaceError> {
+    conn.execute(
+        "UPDATE spaces SET last_opened_at = ?2 WHERE id = ?1",
+        rusqlite::params![id, now as i64],
+    )
+    .map_err(SpaceError::from)?;
+    Ok(())
 }
 
-/// 目录是否仍是一个有效空间：目录存在且标记文件完好。
-pub fn space_exists(path: &str, marker_rel: &Path) -> bool {
-    let dir = Path::new(path);
-    dir.is_dir() && dir.join(marker_rel).is_file()
+/// 删除空间。**这会连带删掉该空间的全部文章与标签**（`ON DELETE CASCADE`，
+/// 依赖连接上的 `PRAGMA foreign_keys = ON`，见 `crate::db::tune`）。
+///
+/// 旧版这里是「只删注册表记录、不动磁盘文件」，所以删除是安全的；现在内容就在
+/// 同一个库里，删除即销毁。调用方（命令层/前端）必须先让用户明确确认。
+pub fn delete_space(conn: &Connection, id: &str) -> Result<bool, SpaceError> {
+    let n = conn
+        .execute("DELETE FROM spaces WHERE id = ?1", [id])
+        .map_err(SpaceError::from)?;
+    Ok(n > 0)
 }
 
-pub fn to_view(space: &Space, marker_rel: &Path) -> SpaceView {
-    SpaceView {
-        space: space.clone(),
-        exists: space_exists(&space.path, marker_rel),
+/// 该空间下还有多少篇文章——删除前给用户看「将删除 N 篇」用。
+pub fn article_count(conn: &Connection, id: &str) -> Result<u64, SpaceError> {
+    let n: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM articles WHERE space_id = ?1",
+            [id],
+            |row| row.get(0),
+        )
+        .map_err(SpaceError::from)?;
+    Ok(n.max(0) as u64)
+}
+
+pub fn active_space_id(conn: &Connection) -> Result<Option<String>, SpaceError> {
+    match db::get_meta(conn, META_ACTIVE_SPACE) {
+        Ok(v) => Ok(v),
+        Err(e) => Err(SpaceError::from(e)),
     }
 }
 
-pub fn snapshot_of(registry: &Registry, marker_rel: &Path) -> SpaceSnapshot {
+/// 设置当前激活空间；传 None 表示清空。
+pub fn set_active(conn: &Connection, id: Option<&str>) -> Result<(), SpaceError> {
+    match id {
+        Some(id) => db::set_meta(conn, META_ACTIVE_SPACE, id).map_err(SpaceError::from),
+        None => db::remove_meta(conn, META_ACTIVE_SPACE).map_err(SpaceError::from),
+    }
+}
+
+pub fn snapshot_of(
+    spaces: &[Space],
+    active: Option<String>,
+    db_path: String,
+) -> SpaceSnapshot {
     SpaceSnapshot {
-        spaces: registry.spaces.iter().map(|s| to_view(s, marker_rel)).collect(),
-        active_space_id: registry.active_space_id.clone(),
+        spaces: spaces.to_vec(),
+        active_space_id: active,
+        db_path,
     }
 }

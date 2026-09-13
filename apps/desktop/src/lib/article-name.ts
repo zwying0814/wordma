@@ -9,8 +9,15 @@ export type NameValidation =
   | { ok: true }
   | { ok: false; code: ArticleErrorCode; message: string }
 
-const ILLEGAL_CHARS = /[\\/:*?"<>|]/
-const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
+/**
+ * slug 允许的字符集：ASCII 字母、数字、连字符、下划线。
+ *
+ * 收窄到白名单而非列举非法字符，是为了让 slug 与文件名彻底解耦于平台差异：
+ * 路径分隔符、控制字符、`.`/`..`、结尾点/空格、全角字符、中文等一律不在集合内，
+ * 由此天然排除路径穿越与非 ASCII 文件名在跨平台/URL 场景下的转义问题。
+ */
+const ALLOWED_CHARS = /^[A-Za-z0-9_-]+$/
+const DISALLOWED_CHARS = /[^A-Za-z0-9_-]/g
 
 // Windows 保留设备名（大小写不敏感），`CON.mdx` 之类在 Windows 上打不开
 const RESERVED_WINDOWS_NAMES = new Set([
@@ -20,6 +27,9 @@ const RESERVED_WINDOWS_NAMES = new Set([
 ])
 
 export const MAX_ARTICLE_NAME_LENGTH = 128
+
+/** 字符集说明，供 UI 文案与校验提示共用，避免两处措辞漂移 */
+export const SLUG_CHARSET_HINT = "只能包含字母、数字、- 和 _"
 
 export function validateArticleSlug(raw: string): NameValidation {
   const slug = raw.trim()
@@ -34,18 +44,15 @@ export function validateArticleSlug(raw: string): NameValidation {
       message: `slug 不能超过 ${MAX_ARTICLE_NAME_LENGTH} 个字符`,
     }
   }
-  if (ILLEGAL_CHARS.test(slug)) {
+  if (!ALLOWED_CHARS.test(slug)) {
+    // 指出具体是哪些字符不合法，比只说"只能包含…"更容易纠正
+    const bad = Array.from(new Set(slug.match(DISALLOWED_CHARS) ?? []))
+    const shown = bad.slice(0, 5).map((c) => `“${c}”`).join("、")
     return {
       ok: false,
       code: "INVALID_NAME",
-      message: "slug 不能包含 \\ / : * ? \" < > | 等字符",
+      message: `slug ${SLUG_CHARSET_HINT}；不支持 ${shown}${bad.length > 5 ? " 等" : ""}`,
     }
-  }
-  if (CONTROL_CHARS.test(slug)) {
-    return { ok: false, code: "INVALID_NAME", message: "slug 不能包含控制字符" }
-  }
-  if (slug === "." || slug === "..") {
-    return { ok: false, code: "INVALID_NAME", message: "slug 不能为 . 或 .." }
   }
   if (RESERVED_WINDOWS_NAMES.has(slug.toUpperCase())) {
     return {
@@ -54,29 +61,33 @@ export function validateArticleSlug(raw: string): NameValidation {
       message: `“${slug}” 是系统保留名，不可用作文件名`,
     }
   }
-  // Windows 会静默截断以 "." / 空格结尾的名称，导致记录的路径与磁盘实际路径不一致
-  if (slug.endsWith(".") || slug.endsWith(" ")) {
-    return {
-      ok: false,
-      code: "INVALID_NAME",
-      message: "slug 不能以点或空格结尾",
-    }
-  }
 
   return { ok: true }
 }
 
 /**
- * 由文章标题生成合法 slug：过滤非法文件名字符、空白压成连字符、去掉首尾标点。
- * 保留 CJK（中文 slug 作为文件名是合法的）；仅当结果为空时回退到 "untitled"。
+ * 输入框实时清洗：丢掉所有不在白名单内的字符。
+ * 与 `validateArticleSlug` 共用同一字符集，保证「打不出来的字符」与
+ * 「校验不过的字符」永远一致。用于 onChange（输入阶段）。
+ */
+export function sanitizeSlugInput(value: string): string {
+  return value.replace(DISALLOWED_CHARS, "")
+}
+
+/**
+ * 由文章标题生成合法 slug：仅当最终没有可用字符时回退到 "untitled"。
+ *
+ * 注意：这是 **浏览器预览 / wasm 不可用时的降级实现**，无法做汉字转拼音，
+ * 中文标题会被过滤到只剩分隔符从而落到 "untitled"。
+ * 正常路径由 `@wordma/slug`（Rust + pinyin-converter）负责，中文可转成拼音。
  */
 export function slugify(title: string): string {
   const replaced = title
     .trim()
-    .replace(/[\\/:*?"<>|]/g, "-") // 非法文件名字符 → 连字符
-    .replace(/\s+/g, "-") // 空白 → 连字符
+    .normalize("NFKD") // é → e + 组合音标
+    .replace(/[\u0300-\u036f]/g, "") // 去掉组合音标，Latin 重音字符还原为 ASCII
+    .replace(/[^A-Za-z0-9_]+/g, "-") // 其余（含中文、空白、符号）统一折叠为连字符
     .replace(/-+/g, "-") // 合并连续连字符
-    .replace(/^[-.]+/, "") // 去掉开头非法起始符
-    .replace(/[-.]+$/, "") // 去掉结尾标点/点
+    .replace(/^-+|-+$/g, "") // 去掉首尾连字符
   return replaced.length > 0 ? replaced : "untitled"
 }

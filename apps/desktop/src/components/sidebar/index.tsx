@@ -21,7 +21,6 @@ import {
   EmptySpaceState,
   SpaceErrorState,
 } from "@/components/space/empty-space-state"
-import { SpaceMissingBanner } from "@/components/space/space-missing-banner"
 import {
   useActiveSpace,
   useSpaceActions,
@@ -63,13 +62,8 @@ export default function AppLayout({ children }: { children: ReactNode }): ReactE
   // 面包屑第一段 = 当前空间名；异常态（有列表但无激活空间）退化为首个空间名
   const breadcrumbRoot = activeSpace ? activeSpace.name : (spaces[0]?.name ?? "笔记空间")
 
-  // 内容区：当前激活空间目录失效时，业务页照常渲染，顶部加失效横幅
-  const content: ReactNode = (
-    <>
-      {activeSpace && !activeSpace.exists && <SpaceMissingBanner />}
-      {children}
-    </>
-  )
+  // 内容区：空间是库里的一行，「目录失效」这种状态已不存在，直接渲染业务页
+  const content: ReactNode = <>{children}</>
 
   return (
     <SidebarProvider>

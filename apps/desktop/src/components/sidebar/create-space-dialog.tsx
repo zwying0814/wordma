@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { FolderOpenIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { validateSpaceName } from "@/lib/space-name"
@@ -21,6 +20,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+/**
+ * 新建空间。
+ *
+ * 旧版这里有一个「保存位置」选择器——因为那时一个空间就是一个 `.db` 文件，用户得先
+ * 决定这个文件放哪、叫什么名字。现在整个应用只有一个库，空间只是库里的一行，
+ * 所以这个对话框**只剩名称和图标**。
+ */
 export function CreateSpaceDialog({
   open,
   onOpenChange,
@@ -31,8 +37,6 @@ export function CreateSpaceDialog({
   const actions = useSpaceActions()
   const pending = useSpacePending()
 
-  // spaceDir 即空间文件夹本身（不再在其下再建一层名称子目录）
-  const [spaceDir, setSpaceDir] = useState("")
   const [name, setName] = useState("")
   const [icon, setIcon] = useState<SpaceIconName>(DEFAULT_SPACE_ICON)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -42,23 +46,14 @@ export function CreateSpaceDialog({
     trimmed.length > 0 ? validateSpaceName(name) : { ok: true as const }
   const nameError = nameValidation.ok ? null : nameValidation.message
 
-  const canSubmit =
-    trimmed.length > 0 && nameValidation.ok && spaceDir.length > 0 && !pending
+  const canSubmit = trimmed.length > 0 && nameValidation.ok && !pending
 
   function handleOpenChange(next: boolean) {
     onOpenChange(next)
     if (!next) {
-      // 关闭：重置名称/图标与提交错误，保留 spaceDir（连续创建时不用反复选位置）
+      // 关闭：重置名称/图标与提交错误
       setName("")
       setIcon(DEFAULT_SPACE_ICON)
-      setSubmitError(null)
-    }
-  }
-
-  async function handleBrowse() {
-    const dir = await actions.pickSpaceDir()
-    if (dir) {
-      setSpaceDir(dir)
       setSubmitError(null)
     }
   }
@@ -66,7 +61,7 @@ export function CreateSpaceDialog({
   async function handleCreate() {
     if (!canSubmit) return
     setSubmitError(null)
-    const result = await actions.createSpace({ spaceDir, name: trimmed, icon })
+    const result = await actions.createSpace({ name: trimmed, icon })
     if (result.ok) {
       handleOpenChange(false)
       return
@@ -75,7 +70,7 @@ export function CreateSpaceDialog({
       // 创建不走系统 dialog，理论上不会到这里；静默保持打开
       return
     }
-    // 表单类与存储类错误都贴在对话框内（不闪退到全局 banner）
+    // 重名一类的错误贴在对话框内（不闪退到全局 banner）
     setSubmitError(result.error.message)
   }
 
@@ -85,37 +80,12 @@ export function CreateSpaceDialog({
         <DialogHeader>
           <DialogTitle>新建空间</DialogTitle>
           <DialogDescription>
-            选择一个空文件夹，wordma 会在其中创建空间配置文件，将其标记为你的笔记空间。
+            空间是笔记的一个分组，用来把不同主题的笔记分开。
+            所有空间都存在同一个笔记库里，不占额外的文件。
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4">
-          {/* 位置 */}
-          <div className="grid gap-2">
-            <label htmlFor="space-location" className="text-sm font-medium">
-              位置
-            </label>
-            <div className="flex gap-2">
-              <Input
-                id="space-location"
-                value={spaceDir}
-                readOnly
-                placeholder="未选择文件夹"
-                className="flex-1 truncate"
-                title={spaceDir}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleBrowse}
-                disabled={pending}
-              >
-                <FolderOpenIcon className="size-4" />
-                浏览…
-              </Button>
-            </div>
-          </div>
-
           {/* 名称 */}
           <div className="grid gap-2">
             <label htmlFor="space-name" className="text-sm font-medium">
@@ -129,6 +99,9 @@ export function CreateSpaceDialog({
               autoFocus
               aria-invalid={nameError ? true : undefined}
               className={cn(nameError && "border-destructive")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCreate()
+              }}
             />
             {nameError && (
               <p className="text-xs text-destructive">{nameError}</p>

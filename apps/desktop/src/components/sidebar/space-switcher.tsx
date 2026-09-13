@@ -5,7 +5,6 @@ import {
   MonitorIcon,
   PlusIcon,
   Settings2Icon,
-  TriangleAlertIcon,
 } from "lucide-react"
 
 import { SpaceIcon } from "@/components/space/space-icon"
@@ -124,11 +123,7 @@ export function SpaceSwitcher() {
                 {current?.name ?? "笔记空间"}
               </span>
               <span className="truncate text-xs">
-                {current
-                  ? current.exists
-                    ? "空间已就绪"
-                    : "空间不可用"
-                  : "笔记空间"}
+                {current ? "空间已就绪" : "笔记空间"}
               </span>
             </div>
             <ChevronsUpDownIcon className="ml-auto" />
@@ -153,9 +148,6 @@ export function SpaceSwitcher() {
                     <SpaceIcon name={space.icon} className="size-4" />
                   </div>
                   <span className="flex-1 truncate">{space.name}</span>
-                  {!space.exists && (
-                    <TriangleAlertIcon className="size-4 shrink-0 text-destructive" />
-                  )}
                   {space.id === activeSpace?.id && (
                     <CheckIcon className="size-4 shrink-0" />
                   )}

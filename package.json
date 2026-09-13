@@ -1,12 +1,12 @@
 {
   "name": "wordma",
   "version": "1.0.0",
+  "private": true,
   "description": "",
+  "packageManager": "pnpm@12.4.1",
   "scripts": {
-    "desktop:dev": "bun -F ./apps/desktop tauri dev"
-  },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ]
+    "desktop:dev": "pnpm -F ./apps/desktop tauri dev",
+    "desktop:build": "pnpm -F ./apps/desktop tauri build",
+    "slug:build": "pnpm -F @wordma/slug build"
+  }
 }

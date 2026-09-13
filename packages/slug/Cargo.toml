@@ -1,0 +1,25 @@
+[package]
+name = "wordma-slug"
+version = "0.1.0"
+edition = "2021"
+description = "WASM slug 生成器（rslug + 中文拼音转写），供 wordma 前端直接调用"
+license = "MIT"
+
+# crate-type 同时产出 cdylib（给 wasm）与 rlib（便于原生单测/复用）
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+# 成熟的 Rust slug 库：负责小写化、非字母数字折叠、重复分隔符合并、截断
+rslug = "0.3.0"
+# 中文 → 拼音（词典最长匹配分词、去声调、`-` 连接）。
+# 注意：crates.io 包名为 `pinyin-converter`，但其 [lib] name = "pinyin"，
+# 故 Rust 侧以 `pinyin::` 导入。
+pinyin-converter = "0.1.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

@@ -2,19 +2,25 @@
 //!
 //! 两边字段与错误码必须严格一一对应——JSON 序列化结果就是 IPC 契约本身，
 //! 改这里必须同步改 TS，反之亦然。`rename_all = "camelCase"` 保证前端拿到驼峰字段。
+//!
+//! 存储形态已收敛为**整个应用一个库**（`<app_config_dir>/wordma.db`），
+//! 空间只是其中 `spaces` 表的一行。于是 `Space` 上**没有 `path` 了**——
+//! 空间不再对应磁盘上的任何路径，「文件被挪走 / 找不到空间」这类状态随之消失。
 
 use serde::{Deserialize, Serialize};
 
-/// 落盘记录：只含可序列化原语（绝不存 Date / PathBuf / 组件引用）。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use crate::db::DbError;
+
+/// 空间记录 = `spaces` 表的一行。
+///
+/// 只含可序列化原语（绝不存 Date / PathBuf / 组件引用）。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Space {
-    /// 稳定 key：由 [`super::store::new_id`] 生成，永不随路径或名称变化
+    /// 稳定 key：由 [`super::store::new_id`] 生成，永不随名称变化
     pub id: String,
-    /// 显示名，默认取自文件夹名
+    /// 显示名，空间内唯一（大小写不敏感）
     pub name: String,
-    /// 绝对路径，业务唯一键（去重靠它）
-    pub path: String,
     /// 稳定字符串 key（见 `src/lib/space-icons.ts`），不是图标组件
     pub icon: String,
     pub description: String,
@@ -23,21 +29,15 @@ pub struct Space {
     pub last_opened_at: u64,
 }
 
-/// IPC 返回的视图对象 = 落盘记录 + 运行时派生态。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SpaceView {
-    #[serde(flatten)]
-    pub space: Space,
-    /// 目录仍是有效空间（目录存在且标记文件完好），不落盘
-    pub exists: bool,
-}
-
+/// 空间列表快照。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceSnapshot {
-    pub spaces: Vec<SpaceView>,
+    pub spaces: Vec<Space>,
     pub active_space_id: Option<String>,
+    /// 应用库文件的绝对路径。前端用它做「在文件管理器中显示」与备份落点提示——
+    /// 以前这个信息在 `Space.path` 上，现在整个应用只有这一个文件。
+    pub db_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,55 +45,24 @@ pub struct SpaceSnapshot {
 pub struct CreateSpaceData {
     #[serde(flatten)]
     pub snapshot: SpaceSnapshot,
-    pub space: SpaceView,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OpenSpaceData {
-    #[serde(flatten)]
-    pub snapshot: SpaceSnapshot,
-    pub space: SpaceView,
-    /// true = 首次接入该目录；false = 目录已在列表中，本次只是切过去
-    pub adopted: bool,
-}
-
-/// 扫描默认数据目录得到的候选空间（`space_scan` 命令返回项）。
-/// 与 `Space` 不同：路径来自磁盘遍历而非注册表，`registered` 标记
-/// 该目录是否已被注册表收录，前端据此决定「打开」还是「已在列表中」。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScannedSpace {
-    pub id: String,
-    pub name: String,
-    pub icon: String,
-    pub description: String,
-    pub path: String,
-    pub created_at: u64,
-    pub registered: bool,
+    pub space: Space,
 }
 
 /// 错误码。字面量必须与 TS `SpaceErrorCode` 联合类型完全一致。
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SpaceErrorCode {
-    #[serde(rename = "CANCELLED")]
-    Cancelled,
     #[serde(rename = "INVALID_NAME")]
     InvalidName,
     #[serde(rename = "INVALID_PATH")]
     InvalidPath,
     #[serde(rename = "NOT_FOUND")]
     NotFound,
-    #[serde(rename = "NOT_A_DIRECTORY")]
-    NotADirectory,
-    #[serde(rename = "DIR_EXISTS")]
-    DirExists,
-    #[serde(rename = "DIR_NOT_EMPTY")]
-    DirNotEmpty,
-    #[serde(rename = "ALREADY_REGISTERED")]
-    AlreadyRegistered,
-    #[serde(rename = "NOT_WORDMA_SPACE")]
-    NotWordmaSpace,
+    #[serde(rename = "DUPLICATE_NAME")]
+    DuplicateName,
+    /// 目标位置已有同名文件（备份落点用）——不是路径非法，只是需要换个名字
+    #[serde(rename = "ALREADY_EXISTS")]
+    AlreadyExists,
+    /// 库结构损坏或版本无法识别
     #[serde(rename = "INVALID_SPACE_FILE")]
     InvalidSpaceFile,
     #[serde(rename = "PERMISSION_DENIED")]
@@ -121,13 +90,31 @@ impl SpaceError {
     }
 }
 
-/// 把 `std::io::Error` 归一化为 SpaceError，避免把原始 OS 错误串直接抛给前端。
-pub fn from_io_error(e: &std::io::Error, context: &str) -> SpaceError {
-    let code = match e.kind() {
-        std::io::ErrorKind::NotFound => SpaceErrorCode::NotFound,
-        std::io::ErrorKind::PermissionDenied => SpaceErrorCode::PermissionDenied,
-        std::io::ErrorKind::AlreadyExists => SpaceErrorCode::DirExists,
-        _ => SpaceErrorCode::Unknown,
-    };
-    SpaceError::new(code, format!("{context}：{e}"))
+/// 直接吃 `rusqlite::Error`：`store` / `commands` 里大量 `map_err(SpaceError::from)`
+/// 作用在 `rusqlite::Result` 上，有这一个 impl 才不用每次手动包一层 `DbError`。
+impl From<rusqlite::Error> for SpaceError {
+    fn from(e: rusqlite::Error) -> Self {
+        Self::from(DbError::Sqlite(e))
+    }
+}
+
+/// 把数据库错误翻译成用户能看懂的空间错误。
+///
+/// 原则：**底层措辞不外泄**。SQLite 的技术细节对用户统一是
+/// 「笔记库操作失败」，而不是原始错误串。
+impl From<DbError> for SpaceError {
+    fn from(e: DbError) -> Self {
+        match &e {
+            DbError::Corrupt(msg) => Self::new(SpaceErrorCode::InvalidSpaceFile, msg.clone()),
+            DbError::Unavailable(msg) => Self::new(SpaceErrorCode::StoreUnavailable, msg.clone()),
+            DbError::Sqlite(_) => {
+                let text = e.to_string();
+                if text.contains("permission denied") || text.contains("readonly") {
+                    Self::new(SpaceErrorCode::PermissionDenied, "没有读写笔记数据的权限")
+                } else {
+                    Self::new(SpaceErrorCode::Unknown, format!("笔记库操作失败：{text}"))
+                }
+            }
+        }
+    }
 }

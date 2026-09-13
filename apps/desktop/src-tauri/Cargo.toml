@@ -23,6 +23,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rslug = "0.3.0"
-pinyin-converter = "0.1.0"
+# bundled：把 SQLite 源码一起编进二进制，不依赖系统 libsqlite3，
+# 同时自带 FTS5（空间库的全文检索靠它）。打包体积多约 1~2MB，换来零环境依赖。
+rusqlite = { version = "0.32", features = ["bundled"] }
 
