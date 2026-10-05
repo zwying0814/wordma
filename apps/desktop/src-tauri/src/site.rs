@@ -16,6 +16,9 @@ pub struct Site {
 /// settings 表中记录当前激活站点的键
 pub const ACTIVE_SITE_KEY: &str = "active_site_id";
 
+/// 每站点激活主题的设置键前缀（由 theme.rs 使用）
+pub const ACTIVE_THEME_KEY_PREFIX: &str = "active_theme:";
+
 fn row_to_site(row: &rusqlite::Row) -> rusqlite::Result<Site> {
     Ok(Site {
         id: row.get(0)?,
@@ -38,6 +41,12 @@ pub fn insert_site(
         params![name, description],
     )?;
     let id = conn.last_insert_rowid();
+    // 新站点显式启用内置默认主题
+    let _ = set_setting(
+        conn,
+        &format!("{}{id}", ACTIVE_THEME_KEY_PREFIX),
+        crate::theme::DEFAULT_THEME_NAME,
+    );
     conn.query_row(
         "SELECT id, name, description, created_at FROM sites WHERE id = ?1",
         params![id],
@@ -49,6 +58,35 @@ pub fn get_all_sites(conn: &Connection) -> Result<Vec<Site>, rusqlite::Error> {
     let mut stmt = conn.prepare("SELECT id, name, description, created_at FROM sites ORDER BY id")?;
     let rows = stmt.query_map([], row_to_site)?;
     rows.collect()
+}
+
+pub fn get_site(conn: &Connection, id: i64) -> Result<Site, String> {
+    conn.query_row(
+        "SELECT id, name, description, created_at FROM sites WHERE id = ?1",
+        params![id],
+        row_to_site,
+    )
+    .map_err(|_| format!("站点不存在: {id}"))
+}
+
+/// 更新站点信息（名称/描述）；空白描述存为 NULL
+pub fn update_site(
+    conn: &Connection,
+    id: i64,
+    name: &str,
+    description: Option<&str>,
+) -> Result<Site, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("站点名称不能为空".into());
+    }
+    let description = description.map(str::trim).filter(|d| !d.is_empty());
+    conn.execute(
+        "UPDATE sites SET name = ?1, description = ?2 WHERE id = ?3",
+        params![name, description, id],
+    )
+    .map_err(|e| format!("更新站点失败: {e}"))?;
+    get_site(conn, id)
 }
 
 pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>, rusqlite::Error> {
@@ -135,14 +173,27 @@ pub fn set_active_site(db: State<Db>, site_id: i64) -> Result<(), String> {
     set_active_site_id(&conn, site_id)
 }
 
+#[tauri::command]
+pub fn update_site_cmd(
+    db: State<Db>,
+    site_id: i64,
+    name: String,
+    description: Option<String>,
+) -> Result<Site, String> {
+    let conn = db
+        .0
+        .lock()
+        .map_err(|e| format!("数据库连接不可用: {e}"))?;
+    update_site(&conn, site_id, &name, description.as_deref())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::MIGRATIONS;
-
+    
     fn mem_db() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(MIGRATIONS).unwrap();
+        crate::db::run_migrations(&conn).unwrap();
         conn
     }
 

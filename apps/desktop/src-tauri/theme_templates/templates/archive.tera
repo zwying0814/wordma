@@ -1,0 +1,16 @@
+{% extends "base.tera" %}
+{% block title %}归档 · {{ site.name }}{% endblock %}
+{% block content %}
+<h1 class="page-title">归档</h1>
+{% for group in archive %}
+<h2 class="archive-year">{{ group.year }}</h2>
+<ul class="archive-list">
+  {% for post in group.posts %}
+  <li><span class="archive-date">{{ post.date }}</span><a href="{{ post.url }}">{{ post.title }}</a></li>
+  {% endfor %}
+</ul>
+{% endfor %}
+{% if archive | length == 0 %}
+<p class="empty">还没有文章。</p>
+{% endif %}
+{% endblock %}

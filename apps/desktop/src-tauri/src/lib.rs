@@ -1,6 +1,10 @@
 mod article;
 mod db;
+mod pages;
+mod routing;
 mod site;
+mod taxonomy;
+mod theme;
 
 use tauri::Manager;
 
@@ -21,11 +25,36 @@ pub fn run() {
             site::create_site,
             site::get_active_site,
             site::set_active_site,
+            site::update_site_cmd,
             article::list_articles,
             article::get_article_cmd,
             article::create_article,
             article::update_article_cmd,
-            article::delete_article_cmd
+            article::delete_article_cmd,
+            taxonomy::list_tags,
+            taxonomy::create_tag,
+            taxonomy::rename_tag_cmd,
+            taxonomy::delete_tag_cmd,
+            taxonomy::list_categories,
+            taxonomy::create_category,
+            taxonomy::rename_category_cmd,
+            taxonomy::delete_category_cmd,
+            routing::get_routing_rules_cmd,
+            routing::set_routing_rules_cmd,
+            routing::validate_routing_cmd,
+            pages::list_pages,
+            pages::get_page_cmd,
+            pages::create_page,
+            pages::update_page_cmd,
+            pages::delete_page_cmd,
+            theme::list_themes_cmd,
+            theme::set_active_theme_cmd,
+            theme::render_site_cmd,
+            theme::open_preview_cmd,
+            theme::open_themes_dir_cmd,
+            theme::delete_theme_cmd,
+            theme::get_preview_port_cmd,
+            theme::set_preview_port_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

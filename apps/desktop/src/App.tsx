@@ -21,6 +21,11 @@ function App() {
           },
           Menu: {
             itemBg: "transparent",
+            // vertical/inline 菜单根元素右侧的默认边线（activeBarBorderWidth 的唯一用途）
+            activeBarBorderWidth: 0,
+            // lucide 图标为 16px；antd 按 iconSize 计算 label 可用宽度，需对齐
+            // （否则带 extra 的条目会溢出 2px，行尾被裁成省略号）
+            iconSize: 16,
           },
         },
       }}

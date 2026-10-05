@@ -10,23 +10,25 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@ant-design/icons": "^6.3.4",
-    "@stylexjs/atoms": "^0.19.1",
-    "@stylexjs/stylex": "^0.19.1",
+    "@stylexjs/atoms": "catalog:",
+    "@stylexjs/stylex": "catalog:",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
-    "antd": "^6.6.5",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "@wordma/editor": "workspace:*",
+    "@wordma/ui": "workspace:*",
+    "antd": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
     "wouter": "^3.13.0"
   },
   "devDependencies": {
-    "@stylexjs/unplugin": "^0.19.1",
+    "@stylexjs/unplugin": "catalog:",
     "@tauri-apps/cli": "^2",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "^6.0.2",
-    "typescript": "~6.0.3",
+    "typescript": "catalog:",
     "vite": "^8.0.16"
   }
 }

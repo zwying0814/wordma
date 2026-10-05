@@ -1,0 +1,11 @@
+{% extends "base.tera" %}
+{% block title %}{{ post.title }} · {{ site.name }}{% endblock %}
+{% block content %}
+<article class="post">
+  <h1 class="post-title">{{ post.title }}</h1>
+  <div class="post-meta">
+    {{ post.date }}{% if post.categoriesText %} · {{ post.categoriesText }}{% endif %}{% if post.tagsText %} · {{ post.tagsText }}{% endif %} · 约 {{ post.wordCount }} 字
+  </div>
+  <div class="post-content">{{ post.contentHtml | safe }}</div>
+</article>
+{% endblock %}

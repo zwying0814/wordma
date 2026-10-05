@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { App as AntdApp, Button, Empty, Input, Popconfirm, Segmented, Spin, Tag } from "antd";
-import { DeleteOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
+import { Plus, Search, Trash2 } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import x from "@stylexjs/atoms";
 import { useLocation } from "wouter";
@@ -12,100 +12,7 @@ import {
   type ArticleStatus,
 } from "../lib/article";
 import { countWords, fmtDate } from "../lib/words";
-
-// 布局对应设计稿 .view（滚动容器）+ .card/.rowitem（卡片行列表）
-const styles = stylex.create({
-  view: {
-    height: "100%",
-    overflowY: "auto",
-    padding: "28px 36px 48px",
-  },
-  pageHead: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 20,
-  },
-  pageTitle: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: "var(--ant-color-text)",
-  },
-  pageSub: {
-    fontSize: 13,
-    marginTop: 2,
-    color: "var(--ant-color-text-tertiary)",
-  },
-  filterRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 14,
-  },
-  searchBox: {
-    width: 220,
-    maxWidth: "44%",
-    marginLeft: "auto",
-  },
-  card: {
-    backgroundColor: "var(--ant-color-bg-container)",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "var(--ant-color-border-secondary)",
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  row: {
-    display: "flex",
-    alignItems: "center",
-    gap: 14,
-    width: "100%",
-    padding: "13px 18px",
-    cursor: "pointer",
-    textAlign: "left",
-    backgroundColor: {
-      default: "transparent",
-      ":hover": "var(--ant-color-fill-quaternary)",
-    },
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "var(--ant-color-border-secondary)",
-  },
-  rowMain: {
-    flex: 1,
-    minWidth: 0,
-    display: "flex",
-    flexDirection: "column",
-  },
-  rowTitle: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: "var(--ant-color-text)",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-  rowMeta: {
-    fontSize: 12,
-    marginTop: 3,
-    color: "var(--ant-color-text-tertiary)",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-  rowSide: {
-    flexShrink: 0,
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-  },
-  emptyBox: {
-    padding: "48px 0",
-  },
-});
+import { pageStyles } from "../styles/page.stylex";
 
 function ArticleRow({
   article,
@@ -118,6 +25,16 @@ function ArticleRow({
 }) {
   const [, navigate] = useLocation();
   const published = article.status === "published";
+  // 与设计稿 articleMeta 一致：分类 · 标签 · 日期 · 字数
+  const meta = [
+    article.categories.map((c) => c.name).join("、") || null,
+    article.tags.map((t) => t.name).join("、") || null,
+    fmtDate(article.updatedAt),
+    `约 ${countWords(article.content)} 字`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <div
       role="button"
@@ -126,18 +43,20 @@ function ArticleRow({
       onKeyDown={(e) => {
         if (e.key === "Enter") navigate(`/editor/${article.id}`);
       }}
-      {...stylex.props(styles.row, showBorder && styles.rowBorder)}
+      {...stylex.props(
+        pageStyles.row,
+        pageStyles.rowClickable,
+        showBorder && pageStyles.rowBorder,
+      )}
     >
-      <div {...stylex.props(styles.rowMain)}>
-        <span {...stylex.props(styles.rowTitle)}>
+      <div {...stylex.props(pageStyles.rowMain)}>
+        <span {...stylex.props(pageStyles.rowTitle)}>
           {article.title || "（无标题）"}
         </span>
-        <span {...stylex.props(styles.rowMeta)}>
-          {fmtDate(article.updatedAt)} · 约 {countWords(article.content)} 字
-        </span>
+        <span {...stylex.props(pageStyles.rowMeta)}>{meta}</span>
       </div>
-      <div {...stylex.props(styles.rowSide)}>
-        <Tag bordered={false} color={published ? "success" : undefined}>
+      <div {...stylex.props(pageStyles.rowSide)}>
+        <Tag variant="filled" color={published ? "success" : undefined}>
           {published ? "已发布" : "草稿"}
         </Tag>
         <Popconfirm
@@ -152,7 +71,7 @@ function ArticleRow({
             type="text"
             size="small"
             danger
-            icon={<DeleteOutlined />}
+            icon={<Trash2 size={14} />}
             aria-label={`删除「${article.title || "无标题"}」`}
             onClick={(e) => e.stopPropagation()}
           />
@@ -204,17 +123,17 @@ export default function ArticlesPage() {
   };
 
   return (
-    <div {...stylex.props(styles.view)}>
-      <div {...stylex.props(styles.pageHead)}>
+    <div {...stylex.props(pageStyles.view)}>
+      <div {...stylex.props(pageStyles.pageHead)}>
         <div>
-          <div {...stylex.props(styles.pageTitle)}>文章</div>
-          <div {...stylex.props(styles.pageSub)}>
+          <div {...stylex.props(pageStyles.pageTitle)}>文章</div>
+          <div {...stylex.props(pageStyles.pageSub)}>
             共 {articles.length} 篇 · {activeSite.name}
           </div>
         </div>
         <Button
           type="primary"
-          icon={<PlusOutlined />}
+          icon={<Plus size={14} />}
           loading={creating}
           onClick={handleCreate}
         >
@@ -222,7 +141,7 @@ export default function ArticlesPage() {
         </Button>
       </div>
 
-      <div {...stylex.props(styles.filterRow)}>
+      <div {...stylex.props(pageStyles.filterRow)}>
         <Segmented
           value={statusFilter}
           onChange={(v) => setStatusFilter(v as "all" | ArticleStatus)}
@@ -235,10 +154,10 @@ export default function ArticlesPage() {
         <Input
           allowClear
           placeholder="搜索标题…"
-          prefix={<SearchOutlined />}
+          prefix={<Search size={14} />}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          {...stylex.props(styles.searchBox)}
+          {...stylex.props(pageStyles.searchBox)}
         />
       </div>
 
@@ -253,7 +172,7 @@ export default function ArticlesPage() {
           <Spin />
         </div>
       ) : filtered.length === 0 ? (
-        <div {...stylex.props(styles.card, styles.emptyBox)}>
+        <div {...stylex.props(pageStyles.card, pageStyles.emptyBox)}>
           <Empty
             description={
               articles.length === 0
@@ -262,14 +181,14 @@ export default function ArticlesPage() {
             }
           >
             {articles.length === 0 && (
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              <Button type="primary" icon={<Plus size={14} />} onClick={handleCreate}>
                 写一篇文章
               </Button>
             )}
           </Empty>
         </div>
       ) : (
-        <div {...stylex.props(styles.card)}>
+        <div {...stylex.props(pageStyles.card)}>
           {filtered.map((a, i) => (
             <ArticleRow
               key={a.id}

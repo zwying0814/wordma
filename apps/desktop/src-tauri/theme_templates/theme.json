@@ -1,0 +1,17 @@
+{
+  "name": "default",
+  "displayName": "默认主题",
+  "version": "0.1.0",
+  "author": "Wordma",
+  "description": "Wordma 内置默认主题：安静的浅色写作风格。",
+  "layout": "single",
+  "tags": ["单栏", "浅色", "衬线"],
+  "preview": {
+    "bg": "#FFFFFF",
+    "chromeBg": "#FBFBFC",
+    "ink": "#1F2328",
+    "muted": "#6B7280",
+    "line": "#E5E7EB",
+    "accent": "#3563D9"
+  }
+}

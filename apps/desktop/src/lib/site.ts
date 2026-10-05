@@ -25,3 +25,11 @@ export function getActiveSite(): Promise<number | null> {
 export function setActiveSite(siteId: number): Promise<void> {
   return invoke("set_active_site", { siteId });
 }
+
+export function updateSite(
+  siteId: number,
+  name: string,
+  description: string | null,
+): Promise<Site> {
+  return invoke("update_site_cmd", { siteId, name, description });
+}

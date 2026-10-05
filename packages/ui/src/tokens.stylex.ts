@@ -8,6 +8,8 @@
 // - stylex.create 的组件样式：直接引用 tokens.xxx（类型安全）
 // - atoms 一次性样式：用原始变量字符串，如 x.color["var(--ant-color-text)"]
 //   （StyleXVar 类型进不了 atoms 动态调用的 (value: string | number) 签名）
+//
+// 注意：defineVars 文件只能有这一个具名导出（StyleX 约束）。
 import * as stylex from "@stylexjs/stylex";
 
 export const tokens = stylex.defineVars({

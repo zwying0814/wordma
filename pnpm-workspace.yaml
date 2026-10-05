@@ -1,3 +1,21 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# 跨包共享的依赖版本唯一来源；包内用 "catalog:" 引用。
+# 仅收录被多个包使用的依赖；单包内部的版本联动（如 editor 的 tiptap 全家桶）
+# 在该包 package.json 里用精确版本锁定，不进 catalog。
+catalog:
+  react: ^19.3.0
+  react-dom: ^19.3.0
+  antd: ^6.6.5
+  lucide-react: ^1.52.0
+  "@stylexjs/stylex": ^0.19.1
+  "@stylexjs/atoms": ^0.19.1
+  "@stylexjs/unplugin": ^0.19.1
+  typescript: ~6.0.3
+  "@types/react": ^19.1.8
+  "@types/react-dom": ^19.1.6
+
+minimumReleaseAgeExclude:
+  - lucide-react@1.52.0

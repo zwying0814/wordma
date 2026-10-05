@@ -21,8 +21,17 @@ body {
   overflow: hidden;
 }
 
-/* 键盘焦点可见性（设计稿同款），无边框输入框依赖它呈现焦点态 */
+/* 键盘焦点可见性（设计稿同款），按钮/菜单等自定义可交互元素依赖它呈现焦点态 */
 :focus-visible {
   outline: 2px solid #3563d9;
   outline-offset: 2px;
+}
+
+/* 文本编辑类元素以光标作为焦点指示，不画描边
+   （contenteditable 按规范在鼠标点击时也命中 :focus-visible，需一并豁免） */
+input:focus-visible,
+textarea:focus-visible,
+[contenteditable]:focus,
+[contenteditable]:focus-visible {
+  outline: none;
 }

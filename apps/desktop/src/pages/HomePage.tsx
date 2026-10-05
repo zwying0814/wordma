@@ -14,9 +14,21 @@ import {
   type Site,
 } from "../lib/site";
 import { listArticles, type Article } from "../lib/article";
+import {
+  listCategories,
+  listTags,
+  type Category,
+  type Tag,
+} from "../lib/taxonomy";
+import { listPages, type SitePage } from "../lib/pages";
 import ArticlesPage from "./ArticlesPage";
 import ArticleEditorPage from "./ArticleEditorPage";
 import DashboardPage from "./DashboardPage";
+import { CategoriesPage, TagsPage } from "./TaxonomyPage";
+import PagesPage from "./PagesPage";
+import PageEditorPage from "./PageEditorPage";
+import ThemePage from "./ThemePage";
+import SettingsPage from "./SettingsPage";
 
 const { Sider, Content } = Layout;
 
@@ -32,6 +44,11 @@ export default function HomePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [articles, setArticles] = useState<Article[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(true);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [taxonomyLoading, setTaxonomyLoading] = useState(true);
+  const [pages, setPages] = useState<SitePage[]>([]);
+  const [pagesLoading, setPagesLoading] = useState(true);
 
   useEffect(() => {
     // 启动检查：没有站点时进入欢迎页；有站点时恢复上次激活的站点
@@ -74,14 +91,67 @@ export default function HomePage() {
     reloadArticles();
   }, [reloadArticles]);
 
+  const reloadTaxonomy = useCallback(() => {
+    if (activeSite == null) return;
+    setTaxonomyLoading(true);
+    Promise.all([listTags(activeSite.id), listCategories(activeSite.id)])
+      .then(([t, c]) => {
+        setTags(t);
+        setCategories(c);
+      })
+      .catch((e) => message.error(`标签/分类加载失败：${String(e)}`))
+      .finally(() => setTaxonomyLoading(false));
+  }, [activeSite, message]);
+
+  useEffect(() => {
+    reloadTaxonomy();
+  }, [reloadTaxonomy]);
+
+  const reloadPages = useCallback(() => {
+    if (activeSite == null) return;
+    setPagesLoading(true);
+    listPages(activeSite.id)
+      .then(setPages)
+      .catch((e) => message.error(`页面加载失败：${String(e)}`))
+      .finally(() => setPagesLoading(false));
+  }, [activeSite, message]);
+
+  useEffect(() => {
+    reloadPages();
+  }, [reloadPages]);
+
   // 必须在所有早退 return 之前调用（Rules of Hooks）；
   // activeSite 就绪前值为 null，Provider 只在就绪分支渲染
   const siteContextValue = useMemo(
     () =>
       activeSite
-        ? { activeSite, articles, articlesLoading, reloadArticles }
+        ? {
+            activeSite,
+            articles,
+            articlesLoading,
+            reloadArticles,
+            tags,
+            categories,
+            taxonomyLoading,
+            reloadTaxonomy,
+            pages,
+            pagesLoading,
+            reloadPages,
+          }
         : null,
-    [activeSite, articles, articlesLoading, reloadArticles],
+    [
+      activeSite,
+      articles,
+      articlesLoading,
+      reloadArticles,
+      tags,
+      categories,
+      taxonomyLoading,
+      reloadTaxonomy,
+      pages,
+      pagesLoading,
+      reloadPages,
+    ],
   );
 
   if (sites === null || activeSite === null) {
@@ -186,6 +256,12 @@ export default function HomePage() {
           <Switch>
             <Route path="/articles" component={ArticlesPage} />
             <Route path="/editor/:id" component={ArticleEditorPage} />
+            <Route path="/tags" component={TagsPage} />
+            <Route path="/categories" component={CategoriesPage} />
+            <Route path="/pages" component={PagesPage} />
+            <Route path="/pages/edit/:id" component={PageEditorPage} />
+            <Route path="/themes" component={ThemePage} />
+            <Route path="/settings" component={SettingsPage} />
             <Route component={DashboardPage} />
           </Switch>
         </Content>

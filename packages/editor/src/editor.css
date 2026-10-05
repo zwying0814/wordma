@@ -1,0 +1,93 @@
+/* ProseMirror 生成内容的排版样式。
+   StyleX 只能作用于受控元素，无法表达 ".wm-editor h1" 这类嵌套选择器，
+   因此编辑区排版用普通 CSS，统一以 .wm-editor 作用域隔离；
+   颜色一律引用 --ant-* 变量以跟随主题。 */
+.wm-editor {
+  outline: none;
+  min-height: 100%;
+  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ant-color-text);
+}
+
+.wm-editor p {
+  margin: 0 0 0.6em;
+}
+
+.wm-editor h1,
+.wm-editor h2,
+.wm-editor h3 {
+  margin: 0.9em 0 0.4em;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.wm-editor h1 {
+  font-size: 1.7em;
+}
+
+.wm-editor h2 {
+  font-size: 1.4em;
+}
+
+.wm-editor h3 {
+  font-size: 1.18em;
+}
+
+.wm-editor ul,
+.wm-editor ol {
+  margin: 0 0 0.6em;
+  padding-inline-start: 1.6em;
+}
+
+.wm-editor li {
+  margin: 0.15em 0;
+}
+
+.wm-editor blockquote {
+  margin: 0 0 0.6em;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--ant-color-border);
+  color: var(--ant-color-text-secondary);
+}
+
+.wm-editor pre {
+  margin: 0 0 0.6em;
+  padding: 12px 14px;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.wm-editor code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.wm-editor pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.wm-editor hr {
+  border: none;
+  border-top: 1px solid var(--ant-color-border-secondary);
+  margin: 1.2em 0;
+}
+
+/* Placeholder 扩展：空文档首行显示占位文字 */
+.wm-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ant-color-text-quaternary);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

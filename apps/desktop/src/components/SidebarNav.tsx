@@ -1,12 +1,5 @@
 import { App as AntdApp, Menu } from "antd";
-import {
-  BgColorsOutlined,
-  DashboardOutlined,
-  FileTextOutlined,
-  FolderOutlined,
-  SettingOutlined,
-  TagsOutlined,
-} from "@ant-design/icons";
+import { FileText, FileStack, Folder, LayoutDashboard, Palette, Settings, Tags } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import { useLocation } from "wouter";
 import { useSite } from "../context/SiteContext";
@@ -27,33 +20,47 @@ export default function SidebarNav() {
   const { message } = AntdApp.useApp();
   const [location, navigate] = useLocation();
 
-  const selectedKey =
-    location.startsWith("/articles") || location.startsWith("/editor")
-      ? "/articles"
-      : "/";
+  const selectedKey = location.startsWith("/articles") || location.startsWith("/editor")
+    ? "/articles"
+    : location.startsWith("/pages")
+      ? "/pages"
+      : location.startsWith("/themes")
+        ? "/themes"
+        : location.startsWith("/settings")
+          ? "/settings"
+          : "/";
 
   const items = [
-    { key: "/", icon: <DashboardOutlined />, label: "仪表盘" },
+    { key: "/", icon: <LayoutDashboard size={16} />, label: "仪表盘" },
     {
       key: "/articles",
-      icon: <FileTextOutlined />,
+      icon: <FileText size={16} />,
       label: "文章",
       // antd v6 MenuItem 的 extra 槽：靠右对齐（对应设计稿 .nav-count）
       extra: <span {...stylex.props(styles.countPill)}>{articles.length}</span>,
     },
-    { key: "/tags", icon: <TagsOutlined />, label: "标签" },
-    { key: "/categories", icon: <FolderOutlined />, label: "分类" },
-    { key: "/themes", icon: <BgColorsOutlined />, label: "主题" },
-    { key: "/settings", icon: <SettingOutlined />, label: "设置" },
+    { key: "/tags", icon: <Tags size={16} />, label: "标签" },
+    { key: "/categories", icon: <Folder size={16} />, label: "分类" },
+    { key: "/pages", icon: <FileStack size={16} />, label: "页面" },
+    { key: "/themes", icon: <Palette size={16} />, label: "主题" },
+    { key: "/settings", icon: <Settings size={16} />, label: "设置" },
   ];
 
   return (
     <Menu
-      mode="vertical"
+      mode="inline"
       selectedKeys={[selectedKey]}
       items={items}
       onClick={({ key }) => {
-        if (key === "/" || key === "/articles") {
+        if (
+          key === "/" ||
+          key === "/articles" ||
+          key === "/tags" ||
+          key === "/categories" ||
+          key === "/pages" ||
+          key === "/themes" ||
+          key === "/settings"
+        ) {
           navigate(key);
           return;
         }

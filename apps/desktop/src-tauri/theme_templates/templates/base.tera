@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ site.name }}{% endblock %}</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap head-row">
+    <a class="site-name" href="/">{{ site.name }}</a>
+    <nav class="site-nav">
+      {% for p in pages %}{% if p.showInNav %}<a href="{{ p.url }}">{{ p.title }}</a>{% endif %}{% endfor %}
+      <a href="{{ urls.archive }}">归档</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap">{% block content %}{% endblock %}</main>
+<footer class="site-foot"><div class="wrap">{{ site.description }}</div></footer>
+</body>
+</html>

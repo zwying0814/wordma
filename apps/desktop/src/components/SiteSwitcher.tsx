@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from "react";
 import { Avatar, Dropdown } from "antd";
-import { CheckOutlined, DownOutlined, PlusOutlined } from "@ant-design/icons";
+import { Check, ChevronDown, Plus } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import x from "@stylexjs/atoms";
 import type { Site } from "../lib/site";
@@ -57,7 +57,6 @@ const styles = stylex.create({
   },
   chevron: {
     flexShrink: 0,
-    fontSize: 10,
     color: "var(--ant-color-text-tertiary)",
     transition: "transform 0.2s ease-out",
   },
@@ -144,7 +143,7 @@ export default function SiteSwitcher({ sites, activeId, onSelect, onCreate }: Pr
             <span {...stylex.props(styles.itemDesc)}>{s.description || "暂无介绍"}</span>
           </span>
           {s.id === active.id && (
-            <CheckOutlined {...stylex.props(styles.itemCheck)} />
+            <Check size={14} {...stylex.props(styles.itemCheck)} />
           )}
         </span>
       ),
@@ -152,7 +151,7 @@ export default function SiteSwitcher({ sites, activeId, onSelect, onCreate }: Pr
     { type: "divider" as const },
     {
       key: "create",
-      icon: <PlusOutlined />,
+      icon: <Plus size={14} />,
       label: (
         <span {...stylex.props(styles.itemInfo)}>
           <span {...stylex.props(styles.itemName)}>新建站点</span>
@@ -190,7 +189,8 @@ export default function SiteSwitcher({ sites, activeId, onSelect, onCreate }: Pr
             <span {...stylex.props(styles.name)}>{active.name}</span>
             <span {...stylex.props(styles.sub)}>{active.description || "暂无介绍"}</span>
           </span>
-          <DownOutlined
+          <ChevronDown
+            size={12}
             {...stylex.props(styles.chevron, open && styles.chevronOpen)}
           />
         </div>

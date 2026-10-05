@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { App as AntdApp, Button, Spin } from "antd";
-import { ArrowLeftOutlined } from "@ant-design/icons";
+import { App as AntdApp, Button, Select, Spin } from "antd";
+import { ArrowLeft, Eye } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import x from "@stylexjs/atoms";
+import { editorStyles } from "../styles/editor.stylex";
+import { WordmaEditor } from "@wordma/editor";
 import { useLocation } from "wouter";
 import { useSite } from "../context/SiteContext";
 import {
@@ -11,62 +13,11 @@ import {
   type Article,
   type ArticleStatus,
 } from "../lib/article";
+import { openPreview, renderSite } from "../lib/theme";
 import { countWords, fmtDate } from "../lib/words";
 
 // 布局对应设计稿 .editor（顶栏 + 居中窄栏编辑区）
 const styles = stylex.create({
-  editor: {
-    display: "flex",
-    flexDirection: "column",
-    height: "100%",
-    minHeight: 0,
-    backgroundColor: "var(--ant-color-bg-container)",
-  },
-  editorTop: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "12px 20px",
-    flexShrink: 0,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "var(--ant-color-border-secondary)",
-  },
-  saveHint: {
-    fontSize: 12,
-    color: "var(--ant-color-text-tertiary)",
-  },
-  editorBody: {
-    flex: 1,
-    minHeight: 0,
-    display: "flex",
-    justifyContent: "center",
-    overflowY: "auto",
-  },
-  editorCol: {
-    width: "100%",
-    maxWidth: 780,
-    padding: "28px 32px 64px",
-    display: "flex",
-    flexDirection: "column",
-    minWidth: 0,
-  },
-  titleInput: {
-    width: "100%",
-    borderStyle: "none",
-    background: "transparent",
-    padding: "0 0 6px",
-    fontSize: 26,
-    fontWeight: 700,
-    lineHeight: 1.4,
-    color: "var(--ant-color-text)",
-    minWidth: 0,
-  },
-  fieldError: {
-    fontSize: 12,
-    color: "var(--ant-color-error)",
-    marginBottom: 4,
-  },
   editorMeta: {
     display: "flex",
     alignItems: "center",
@@ -79,21 +30,25 @@ const styles = stylex.create({
   },
   wordCount: {
     fontSize: 12,
+    marginLeft: "auto",
     color: "var(--ant-color-text-tertiary)",
   },
-  contentInput: {
-    flex: 1,
-    width: "100%",
-    minWidth: 0,
+  slugInput: {
+    width: 120,
     borderStyle: "none",
-    background: "transparent",
-    padding: 0,
-    fontFamily:
-    '"Noto Serif SC", "Songti SC", "SimSun", serif',
-    fontSize: 15,
-    lineHeight: 1.9,
-    color: "var(--ant-color-text)",
-    resize: "none",
+    background: "var(--ant-color-fill-tertiary)",
+    borderRadius: 6,
+    padding: "3px 8px",
+    fontSize: 12,
+    color: "var(--ant-color-text-secondary)",
+    outlineStyle: "none",
+  },
+  metaSelect: {
+    minWidth: 130,
+  },
+  metaTags: {
+    minWidth: 180,
+    maxWidth: 300,
   },
 });
 
@@ -102,7 +57,7 @@ export default function ArticleEditorPage({
 }: {
   params: { id: string };
 }) {
-  const { reloadArticles } = useSite();
+  const { activeSite, reloadArticles, tags, categories } = useSite();
   const { message } = AntdApp.useApp();
   const [, navigate] = useLocation();
   const [article, setArticle] = useState<Article | null>(null);
@@ -110,8 +65,12 @@ export default function ArticleEditorPage({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [status, setStatus] = useState<ArticleStatus>("draft");
+  const [categoryIds, setCategoryIds] = useState<number[]>([]);
+  const [tagIds, setTagIds] = useState<number[]>([]);
+  const [slug, setSlug] = useState("");
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [titleError, setTitleError] = useState(false);
 
   useEffect(() => {
@@ -123,6 +82,9 @@ export default function ArticleEditorPage({
         setTitle(a.title);
         setContent(a.content);
         setStatus(a.status);
+        setCategoryIds(a.categories.map((c) => c.id));
+        setTagIds(a.tags.map((t) => t.id));
+        setSlug(a.slug);
         setSavedAt(a.updatedAt);
       })
       .catch((e) => {
@@ -146,6 +108,9 @@ export default function ArticleEditorPage({
         title: title.trim(),
         content,
         status: next,
+        slug: slug.trim(),
+        categoryIds,
+        tagIds,
       });
       setArticle(saved);
       setStatus(saved.status);
@@ -157,6 +122,30 @@ export default function ArticleEditorPage({
       message.error(String(e));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // 保存当前状态 → 渲染站点 → 打开浏览器预览
+  const handlePreview = async () => {
+    if (!article) return;
+    setPreviewing(true);
+    try {
+      await updateArticle(article.id, {
+        title: title.trim(),
+        content,
+        status,
+        slug: slug.trim(),
+        categoryIds,
+        tagIds,
+      });
+      reloadArticles();
+      await renderSite(activeSite.id);
+      // 跳转到当前文章的预览页（草稿也会渲染详情页）
+      await openPreview(activeSite.id, article.id);
+    } catch (e) {
+      message.error(String(e));
+    } finally {
+      setPreviewing(false);
     }
   };
 
@@ -172,7 +161,7 @@ export default function ArticleEditorPage({
           x.height["100%"],
         )}
       >
-        <span {...stylex.props(styles.saveHint)}>{loadError}</span>
+        <span {...stylex.props(editorStyles.saveHint)}>{loadError}</span>
         <Button onClick={() => navigate("/articles")}>返回列表</Button>
       </div>
     );
@@ -194,22 +183,30 @@ export default function ArticleEditorPage({
   }
 
   return (
-    <div {...stylex.props(styles.editor)}>
-      <div {...stylex.props(styles.editorTop)}>
+    <div {...stylex.props(editorStyles.shell)}>
+      <div {...stylex.props(editorStyles.topBar)}>
         <Button
           type="text"
           size="small"
-          icon={<ArrowLeftOutlined />}
+          icon={<ArrowLeft size={14} />}
           onClick={() => navigate("/articles")}
         >
           返回列表
         </Button>
-        <span {...stylex.props(styles.saveHint)}>
+        <span {...stylex.props(editorStyles.saveHint)}>
           {status === "published" ? "已发布" : "草稿"}
           {savedAt ? ` · ${fmtDate(savedAt)}` : ""}
         </span>
         <div {...stylex.props(x.flex[1])} />
-        <Button size="small" disabled={saving} onClick={() => handleSave("draft")}>
+        <Button
+          size="small"
+          icon={<Eye size={14} />}
+          loading={previewing}
+          onClick={handlePreview}
+        >
+          预览
+        </Button>
+        <Button size="small" disabled={saving || previewing} onClick={() => handleSave("draft")}>
           存为草稿
         </Button>
         <Button
@@ -221,32 +218,56 @@ export default function ArticleEditorPage({
           {status === "published" ? "更新发布" : "发布"}
         </Button>
       </div>
-      <div {...stylex.props(styles.editorBody)}>
-        <div {...stylex.props(styles.editorCol)}>
+      <div {...stylex.props(editorStyles.body)}>
+        <div {...stylex.props(editorStyles.col)}>
           <input
-            {...stylex.props(styles.titleInput)}
+            {...stylex.props(editorStyles.titleInput)}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="标题…"
             aria-label="文章标题"
           />
           {titleError && (
-            <span {...stylex.props(styles.fieldError)}>
+            <span {...stylex.props(editorStyles.fieldError)}>
               发布前需要先写一个标题
             </span>
           )}
           <div {...stylex.props(styles.editorMeta)}>
+            <input
+              {...stylex.props(styles.slugInput)}
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              placeholder="slug"
+              aria-label="文章 slug"
+              spellCheck={false}
+            />
+            <Select
+              mode="multiple"
+              variant="borderless"
+              placeholder="添加分类"
+              value={categoryIds}
+              onChange={(v) => setCategoryIds(v)}
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+              {...stylex.props(styles.metaSelect)}
+            />
+            <Select
+              mode="multiple"
+              variant="borderless"
+              placeholder="添加标签"
+              value={tagIds}
+              onChange={(v) => setTagIds(v)}
+              options={tags.map((t) => ({ value: t.id, label: t.name }))}
+              {...stylex.props(styles.metaTags)}
+            />
             <span {...stylex.props(styles.wordCount)}>
               约 {countWords(content)} 字
             </span>
           </div>
-          {/* 编辑器占位：先使用 textarea，后续再接入正式编辑器 */}
-          <textarea
-            {...stylex.props(styles.contentInput)}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
+          <WordmaEditor
+            key={article.id}
+            initialValue={content}
+            onChange={setContent}
             placeholder="正文支持 Markdown：## 小标题、- 列表、> 引用、**加粗**…"
-            aria-label="文章正文"
           />
         </div>
       </div>
