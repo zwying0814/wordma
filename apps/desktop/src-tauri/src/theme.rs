@@ -94,17 +94,71 @@ pub fn preview_root(app: &AppHandle) -> Result<PathBuf, String> {
 /// 内置默认主题落盘：逐文件检查缺失才写入（保留用户对已有文件的修改，
 /// 同时让老安装能拿到新增的模板文件）
 pub fn extract_builtin_theme(themes_dir: &Path) -> Result<(), String> {
+    use sha2::{Digest, Sha256};
+
+    fn sha256_hex(data: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(data.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    #[derive(Debug, Default, Serialize, Deserialize)]
+    struct BuiltinManifest {
+        #[serde(default)]
+        hashes: HashMap<String, String>,
+    }
+
     let dir = themes_dir.join(DEFAULT_THEME_NAME);
-    for (rel, content) in BUILTIN_FILES {
+    let manifest_path = dir.join(".builtin-manifest.json");
+    let mut manifest: BuiltinManifest = fs::read_to_string(&manifest_path)
+        .ok()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default();
+
+    for (rel, builtin) in BUILTIN_FILES {
         let path = dir.join(rel);
-        if path.exists() {
-            continue;
-        }
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {e}"))?;
         }
-        fs::write(&path, content).map_err(|e| format!("写入主题文件失败: {e}"))?;
+        let builtin_hash = sha256_hex(builtin);
+        let on_disk = fs::read_to_string(&path).ok();
+        let recorded = manifest.hashes.get(*rel).cloned();
+
+        let should_write = match on_disk.as_deref() {
+            // 文件缺失：写入
+            None => true,
+            Some(disk) => {
+                let disk_hash = sha256_hex(disk);
+                match recorded.as_deref() {
+                    // 无 manifest 的历史安装：与内置版本不同则覆盖迁移
+                    None => disk != *builtin,
+                    // 上次提取后未被用户修改：内置更新则覆盖
+                    Some(rh) => {
+                        if disk_hash == *rh {
+                            builtin_hash != *rh
+                        } else {
+                            // 用户改过：保留其修改
+                            false
+                        }
+                    }
+                }
+            }
+        };
+        if should_write {
+            fs::write(&path, builtin).map_err(|e| format!("写入主题文件失败: {e}"))?;
+            manifest.hashes.insert(rel.to_string(), builtin_hash);
+        } else if !manifest.hashes.contains_key(*rel) {
+            // 未覆盖但补记录，后续内置更新才能识别"未被用户修改"
+            if let Some(disk) = &on_disk {
+                manifest.hashes.insert(rel.to_string(), sha256_hex(disk));
+            }
+        }
     }
+    fs::write(
+        &manifest_path,
+        serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| format!("写入主题清单失败: {e}"))?;
     Ok(())
 }
 
@@ -1153,6 +1207,44 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         run_migrations(&conn).unwrap();
         conn
+    }
+
+    #[test]
+    fn builtin_update_overwrites_unmodified_and_keeps_user_edits() {
+        let tmp = std::env::temp_dir().join(format!("wordma-theme-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let themes_dir = tmp.join("themes");
+
+        // 首次落盘
+        extract_builtin_theme(&themes_dir).unwrap();
+        let base = themes_dir.join("default").join("templates").join("base.tera");
+        let original = fs::read_to_string(&base).unwrap();
+
+        // 用户修改 base.tera → 再次落盘应保留
+        fs::write(&base, "用户自定义的模板").unwrap();
+        extract_builtin_theme(&themes_dir).unwrap();
+        assert_eq!(fs::read_to_string(&base).unwrap(), "用户自定义的模板");
+
+        // 删除新模板文件（模拟老安装缺少新增文件）→ 补写
+        let taxonomies = themes_dir.join("default").join("templates").join("taxonomies.tera");
+        fs::remove_file(&taxonomies).unwrap();
+        extract_builtin_theme(&themes_dir).unwrap();
+        assert!(taxonomies.is_file());
+
+        // manifest 记录被改回内置指纹（模拟"未被用户修改"）→ 内置内容覆盖
+        let manifest_path = themes_dir.join("default").join(".builtin-manifest.json");
+        let manifest = fs::read_to_string(&manifest_path).unwrap();
+        let mut value: serde_json::Value = serde_json::from_str(&manifest).unwrap();
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update("用户自定义的模板".as_bytes());
+        value["hashes"]["templates/base.tera"] =
+            serde_json::Value::String(format!("{:x}", hasher.finalize()));
+        fs::write(&manifest_path, serde_json::to_string(&value).unwrap()).unwrap();
+        extract_builtin_theme(&themes_dir).unwrap();
+        assert_eq!(fs::read_to_string(&base).unwrap(), original);
+
+        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]
