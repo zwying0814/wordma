@@ -16,20 +16,24 @@ import { pageStyles } from "../styles/page.stylex";
 
 const ROUTE_LABELS: Record<string, string> = {
   index: "首页",
+  indexPagination: "首页分页",
   post: "文章",
   page: "页面",
   category: "分类",
   tag: "标签",
   archive: "归档",
+  feed: "Feed",
 };
 
 const DEFAULT_RULES: RoutingRules = {
   index: "/",
+  indexPagination: "/page/[num]/",
   post: "/post/[slug].html",
   page: "/[slug].html",
   category: "/category/[slug]/",
   tag: "/tag/[slug]/",
   archive: "/archive/",
+  feed: "/feed.xml",
 };
 
 const styles = stylex.create({

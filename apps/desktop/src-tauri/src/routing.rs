@@ -16,35 +16,41 @@ const RULES_KEY_PREFIX: &str = "routing_rules:";
 #[serde(default, rename_all = "camelCase")]
 pub struct RoutingRules {
     pub index: String,
+    pub index_pagination: String,
     pub post: String,
     pub page: String,
     pub category: String,
     pub tag: String,
     pub archive: String,
+    pub feed: String,
 }
 
 impl Default for RoutingRules {
     fn default() -> Self {
         Self {
             index: "/".into(),
+            index_pagination: "/page/[num]/".into(),
             post: "/post/[slug].html".into(),
             page: "/[slug].html".into(),
             category: "/category/[slug]/".into(),
             tag: "/tag/[slug]/".into(),
             archive: "/archive/".into(),
+            feed: "/feed.xml".into(),
         }
     }
 }
 
 impl RoutingRules {
-    pub fn iter(&self) -> [(&'static str, &String); 6] {
+    pub fn iter(&self) -> [(&'static str, &String); 8] {
         [
             ("index", &self.index),
+            ("indexPagination", &self.index_pagination),
             ("post", &self.post),
             ("page", &self.page),
             ("category", &self.category),
             ("tag", &self.tag),
             ("archive", &self.archive),
+            ("feed", &self.feed),
         ]
     }
 }
@@ -53,7 +59,8 @@ impl RoutingRules {
 fn allowed_vars(route: &str) -> &'static [&'static str] {
     match route {
         "post" => &["slug", "id", "year", "month", "day"],
-        "page" | "category" | "tag" => &["slug"],
+        "page" | "category" | "tag" => &["slug", "id"],
+        "indexPagination" => &["num"],
         _ => &[],
     }
 }
@@ -97,6 +104,13 @@ pub fn validate_pattern(route: &str, pattern: &str) -> Result<(), String> {
     }
     if is_reserved_prefix(pattern) {
         return Err("assets 为主题资源保留目录，不能作为内容路径前缀".into());
+    }
+
+    if route == "indexPagination" && !extract_vars(pattern).contains(&"num".to_string()) {
+        return Err("分页路由必须包含 [num]".into());
+    }
+    if route == "feed" && !extract_vars(pattern).is_empty() {
+        return Err("feed 路由不支持占位符".into());
     }
 
     let allowed = allowed_vars(route);
@@ -265,7 +279,7 @@ mod tests {
         assert!(validate_pattern("post", "/post//[slug]").is_err()); // 空段
         assert!(validate_pattern("index", "/").is_ok());
         assert!(validate_pattern("index", "/home").is_err()); // 首页必须是 /
-        assert!(validate_pattern("page", "/[id]").is_err()); // page 只允许 slug
+        assert!(validate_pattern("page", "/[year]").is_err()); // page 只允许 slug/id
     }
 
     #[test]

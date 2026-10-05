@@ -1,0 +1,16 @@
+{% extends "base.tera" %}
+{% block title %}{{ taxonomy.kind }} · {{ site.name }}{% endblock %}
+{% block content %}
+<h1 class="page-title">{{ taxonomy.kind }}</h1>
+<ul class="taxonomy-list">
+  {% for t in items %}
+  <li>
+    <a href="{{ t.url }}">{{ t.name }}</a>
+    <span class="taxonomy-count">{{ t.count }} 篇文章</span>
+  </li>
+  {% endfor %}
+  {% if items | length == 0 %}
+  <p class="empty">暂无内容。</p>
+  {% endif %}
+</ul>
+{% endblock %}

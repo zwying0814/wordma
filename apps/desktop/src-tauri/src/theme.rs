@@ -17,9 +17,17 @@ use crate::article::{get_articles_by_site, Article, STATUS_PUBLISHED};
 use crate::db::Db;
 use crate::pages::get_pages_by_site;
 use crate::routing::{generate_path, get_routing_rules};
+use crate::taxonomy::{get_categories_by_site, get_tags_by_site};
 use crate::site::{get_setting, get_site, set_setting, ACTIVE_THEME_KEY_PREFIX};
 
 pub const DEFAULT_THEME_NAME: &str = "default";
+/// 首页每页文章数（分页）
+pub const INDEX_PAGE_SIZE: usize = 10;
+const WEEKDAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 const PREVIEW_PORT_KEY: &str = "preview_port";
 const PREVIEW_PORT_DEFAULT: u16 = 12739;
 
@@ -48,6 +56,10 @@ const BUILTIN_FILES: &[(&str, &str)] = &[
     (
         "templates/archive.tera",
         include_str!("../theme_templates/templates/archive.tera"),
+    ),
+    (
+        "templates/taxonomies.tera",
+        include_str!("../theme_templates/templates/taxonomies.tera"),
     ),
     (
         "templates/page.tera",
@@ -79,14 +91,15 @@ pub fn preview_root(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-/// 内置默认主题落盘（已存在则不动，保留用户修改）
+/// 内置默认主题落盘：逐文件检查缺失才写入（保留用户对已有文件的修改，
+/// 同时让老安装能拿到新增的模板文件）
 pub fn extract_builtin_theme(themes_dir: &Path) -> Result<(), String> {
     let dir = themes_dir.join(DEFAULT_THEME_NAME);
-    if dir.join("theme.json").exists() {
-        return Ok(());
-    }
     for (rel, content) in BUILTIN_FILES {
         let path = dir.join(rel);
+        if path.exists() {
+            continue;
+        }
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {e}"))?;
         }
@@ -292,6 +305,54 @@ fn post_vars(a: &Article) -> HashMap<String, String> {
     vars
 }
 
+/// RSS pubDate（RFC 822）时间格式；输入为 ISO UTC 字符串
+fn rfc2822_date(iso: &str) -> String {
+    let num = |r: std::ops::Range<usize>| iso.get(r).and_then(|v| v.parse::<i64>().ok());
+    let (Some(y), Some(mo), Some(d)) = (num(0..4), num(5..7), num(8..10)) else {
+        return iso.to_string();
+    };
+    let (h, mi, s) = (
+        num(11..13).unwrap_or(0),
+        num(14..16).unwrap_or(0),
+        num(17..19).unwrap_or(0),
+    );
+    // Howard Hinnant 的 civil_from_days：从 Unix 纪元推算星期
+    let days = {
+        let (y, m) = if mo <= 2 { (y - 1, mo + 12) } else { (y, mo) };
+        let era = if y >= 0 { y } else { y - 399 } / 400;
+        let yoe = y - era * 400;
+        let doy = (153 * (m - 3) + 2) / 5 + d - 1;
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        era * 146097 + doe - 719468
+    };
+    let weekday = WEEKDAYS[days.rem_euclid(7) as usize];
+    format!(
+        "{weekday}, {d:02} {} {y:04} {h:02}:{mi:02}:{s:02} GMT",
+        MONTHS[(mo - 1).clamp(0, 11) as usize]
+    )
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+/// 分类/标签的 slug 推导：ASCII 名称转小写中划线，中文名称回退为 id
+fn taxonomy_slug(name: &str, id: i64) -> String {
+    let slug: String = name.trim().to_lowercase().replace(' ', "-");
+    if !slug.is_empty()
+        && slug
+            .split('-')
+            .all(|seg| !seg.is_empty() && seg.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()))
+    {
+        slug
+    } else {
+        id.to_string()
+    }
+}
+
 /// URL -> dist 内相对路径；目录式路径补 index.html
 fn url_to_rel_fs(url: &str) -> Result<String, String> {
     let rel = url.trim_start_matches('/');
@@ -405,6 +466,7 @@ pub fn render_site_to(
     theme_name: &str,
     site_id: i64,
     include_drafts: bool,
+    base_url: &str,
 ) -> Result<RenderReport, String> {
     let rules = get_routing_rules(conn, site_id)?;
     let site = get_site(conn, site_id)?;
@@ -417,10 +479,42 @@ pub fn render_site_to(
 
     let articles = get_articles_by_site(conn, site_id)?;
     let pages = get_pages_by_site(conn, site_id)?;
+    let tags = get_tags_by_site(conn, site_id)?;
+    let categories = get_categories_by_site(conn, site_id)?;
+    let category_urls: HashMap<i64, String> = categories
+        .iter()
+        .map(|c| {
+            Ok((
+                c.id,
+                generate_path(
+                    &rules.category,
+                    &HashMap::from([
+                        ("id".to_string(), c.id.to_string()),
+                        ("slug".to_string(), taxonomy_slug(&c.name, c.id)),
+                    ]),
+                )?,
+            ))
+        })
+        .collect::<Result<HashMap<_, _>, String>>()?;
+    let tag_urls: HashMap<i64, String> = tags
+        .iter()
+        .map(|t| {
+            Ok((
+                t.id,
+                generate_path(
+                    &rules.tag,
+                    &HashMap::from([
+                        ("id".to_string(), t.id.to_string()),
+                        ("slug".to_string(), taxonomy_slug(&t.name, t.id)),
+                    ]),
+                )?,
+            ))
+        })
+        .collect::<Result<HashMap<_, _>, String>>()?;
     // 标签/分类列表暂未进入模板上下文（列表页待做），先不查询
 
     // 独立页面：路径 + 导航上下文
-    let mut used: HashSet<String> = HashSet::new();
+        let mut used: HashSet<String> = HashSet::new();
     let mut pages_ctx: Vec<serde_json::Value> = Vec::new();
     let mut page_renders: Vec<(String, serde_json::Value)> = Vec::new();
     for p in &pages {
@@ -444,11 +538,18 @@ pub fn render_site_to(
         ));
     }
 
-    // 文章：公开列表仅含已发布；预览模式（include_drafts）额外渲染草稿详情页
+    // 文章：公开列表仅含已发布；预览模式（include_drafts）额外渲染草稿详情页。
+    // 列表按创建时间倒序（平局按 id）
     let published: Vec<&Article> = articles
         .iter()
         .filter(|a| a.status == STATUS_PUBLISHED)
         .collect();
+    let mut published_sorted = published.clone();
+    published_sorted.sort_by(|a, b| {
+        b.created_at
+            .cmp(&a.created_at)
+            .then_with(|| b.id.cmp(&a.id))
+    });
     let renderable: Vec<&Article> = if include_drafts {
         articles.iter().collect()
     } else {
@@ -456,6 +557,7 @@ pub fn render_site_to(
     };
     let mut posts_ctx: Vec<serde_json::Value> = Vec::new();
     let mut post_renders: Vec<(String, serde_json::Value)> = Vec::new();
+    let mut post_urls: HashMap<i64, String> = HashMap::new();
     for a in &renderable {
         let url = generate_path(&rules.post, &post_vars(a))?;
         if !used.insert(url.clone()) {
@@ -464,6 +566,21 @@ pub fn render_site_to(
                 a.title
             ));
         }
+        post_urls.insert(a.id, url.clone());
+        let category_links: Vec<serde_json::Value> = a
+            .categories
+            .iter()
+            .map(|c| {
+                serde_json::json!({ "name": c.name, "url": category_urls.get(&c.id).cloned().unwrap_or_default() })
+            })
+            .collect();
+        let tag_links: Vec<serde_json::Value> = a
+            .tags
+            .iter()
+            .map(|t| {
+                serde_json::json!({ "name": t.name, "url": tag_urls.get(&t.id).cloned().unwrap_or_default() })
+            })
+            .collect();
         let (content_html, word_count) = markdown_to_html(&a.content);
         let date = a.created_at.get(0..10).unwrap_or("").to_string();
         let categories_text = a
@@ -484,6 +601,8 @@ pub fn render_site_to(
                 "title": a.title,
                 "url": url,
                 "date": date,
+                "categories": category_links,
+                "tags": tag_links,
                 "categoriesText": categories_text,
                 "tagsText": tags_text,
                 "wordCount": word_count,
@@ -495,6 +614,8 @@ pub fn render_site_to(
                 "title": a.title,
                 "date": date,
                 "contentHtml": content_html,
+                "categories": category_links,
+                "tags": tag_links,
                 "categoriesText": categories_text,
                 "tagsText": tags_text,
                 "wordCount": word_count,
@@ -517,10 +638,155 @@ pub fn render_site_to(
     archive_groups.sort_by(|a, b| b.0.cmp(&a.0));
 
     let site_ctx = serde_json::json!({
-        "site": { "name": site.name, "description": site.description.clone().unwrap_or_default() },
-        "urls": { "archive": rules.archive },
+        "site": {
+            "name": site.name,
+            "description": site.description.clone().unwrap_or_default(),
+            "url": base_url,
+        },
+        "urls": {
+            "archive": rules.archive,
+            "categories": "/categories/",
+            "tags": "/tags/",
+        },
         "pages": pages_ctx,
     });
+
+    // ===== 分类/标签列表页 =====
+    let mut taxonomy_renders: Vec<(String, serde_json::Value)> = Vec::new();
+    let taxonomies: Vec<(&str, &str, &str, i64)> = categories
+        .iter()
+        .map(|c| ("分类", c.name.as_str(), "category", c.id))
+        .chain(
+            tags.iter()
+                .map(|t| ("标签", t.name.as_str(), "tag", t.id)),
+        )
+        .collect();
+    for (kind, name, rule, id) in &taxonomies {
+        let url = generate_path(
+            if *rule == "category" { &rules.category } else { &rules.tag },
+            &HashMap::from([
+                ("id".to_string(), id.to_string()),
+                ("slug".to_string(), taxonomy_slug(name, *id)),
+            ]),
+        )?;
+        if !used.insert(url.clone()) {
+            return Err(format!("路径冲突: {url}（{kind}「{name}」），请修改路由规则"));
+        }
+        let posts: Vec<serde_json::Value> = published_sorted
+            .iter()
+            .filter(|a| {
+                (a.categories.iter().any(|c| c.id == *id) && *rule == "category")
+                    || (a.tags.iter().any(|t| t.id == *id) && *rule == "tag")
+            })
+            .map(|a| {
+                let word_count = a.content.chars().filter(|c| !c.is_whitespace()).count();
+                let category_links: Vec<serde_json::Value> = a
+                    .categories
+                    .iter()
+                    .map(|c| {
+                        serde_json::json!({
+                            "name": c.name,
+                            "url": category_urls.get(&c.id).cloned().unwrap_or_default(),
+                        })
+                    })
+                    .collect();
+                let tag_links: Vec<serde_json::Value> = a
+                    .tags
+                    .iter()
+                    .map(|t| {
+                        serde_json::json!({
+                            "name": t.name,
+                            "url": tag_urls.get(&t.id).cloned().unwrap_or_default(),
+                        })
+                    })
+                    .collect();
+                serde_json::json!({
+                    "title": a.title,
+                    "url": post_urls.get(&a.id).cloned().unwrap_or_default(),
+                    "date": a.created_at.get(0..10).unwrap_or(""),
+                    "categories": category_links,
+                    "tags": tag_links,
+                    "wordCount": word_count,
+                })
+            })
+            .collect();
+        taxonomy_renders.push((
+            url_to_rel_fs(&url)?,
+            serde_json::json!({
+                "taxonomy": { "kind": kind, "name": name },
+                "posts": posts,
+                // 列表页无分页：给默认值避免模板访问未定义变量
+                "pagination": { "current": 1, "total": 1, "prevUrl": null, "nextUrl": null },
+            }),
+        ));
+    }
+
+    // ===== 首页分页 =====
+    let total_pages = published_sorted.len().div_ceil(INDEX_PAGE_SIZE).max(1);
+    let page_url = |num: usize| -> Result<String, String> {
+        if num <= 1 {
+            Ok(rules.index.clone())
+        } else {
+            generate_path(
+                &rules.index_pagination,
+                &HashMap::from([("num".to_string(), num.to_string())]),
+            )
+        }
+    };
+    let mut index_renders: Vec<(String, serde_json::Value)> = Vec::new();
+    for page_num in 1..=total_pages {
+        let url = page_url(page_num)?;
+        if !used.insert(url.clone()) {
+            return Err(format!("路径冲突: {url}（首页第 {page_num} 页），请检查分页路由规则"));
+        }
+        let start = (page_num - 1) * INDEX_PAGE_SIZE;
+        let posts_slice: Vec<serde_json::Value> = posts_ctx
+            .iter()
+            .skip(start)
+            .take(INDEX_PAGE_SIZE)
+            .cloned()
+            .collect();
+        let prev_url = if page_num > 1 { Some(page_url(page_num - 1)) } else { None };
+        let next_url = if page_num < total_pages { Some(page_url(page_num + 1)) } else { None };
+        index_renders.push((
+            url_to_rel_fs(&url)?,
+            serde_json::json!({
+                "posts": posts_slice,
+                "pagination": {
+                    "current": page_num,
+                    "total": total_pages,
+                    "prevUrl": prev_url.transpose().ok().flatten(),
+                    "nextUrl": next_url.transpose().ok().flatten(),
+                },
+            }),
+        ));
+    }
+
+    // ===== RSS feed =====
+    let mut feed = String::from(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rss version=\"2.0\"><channel>",
+    );
+    feed.push_str(&format!(
+        "<title>{}</title><link>{}</link><description>{}</description>",
+        xml_escape(&site.name),
+        xml_escape(base_url),
+        xml_escape(site.description.as_deref().unwrap_or("")),
+    ));
+    for a in &published {
+        let url = post_urls.get(&a.id).cloned().unwrap_or_default();
+        let html = markdown_to_html(&a.content).0;
+        let link = format!("{base_url}{url}");
+        feed.push_str(&format!(
+            "<item><title>{}</title><link>{}</link><guid>{}</guid><pubDate>{}</pubDate><description><![CDATA[{}]]></description></item>",
+            xml_escape(&a.title),
+            xml_escape(&link),
+            xml_escape(&link),
+            rfc2822_date(&a.created_at),
+            html,
+        ));
+    }
+    feed.push_str("</channel></rss>");
+    let feed_rel = url_to_rel_fs(&rules.feed)?;
 
     let mut files = 0usize;
 
@@ -536,14 +802,17 @@ pub fn render_site_to(
         files += write_file(dist, rel, &html)?;
     }
 
-    // 首页（全部已发布文章的列表）
-    let html = render_page(
-        &tera,
-        "index.tera",
-        &site_ctx,
-        &serde_json::json!({ "posts": posts_ctx }),
-    )?;
-    files += write_file(dist, "index.html", &html)?;
+    // 首页（分页：第 1 页走 index 规则，第 2 页起走分页规则）
+    for (rel, extra) in &index_renders {
+        let html = render_page(&tera, "index.tera", &site_ctx, extra)?;
+        files += write_file(dist, rel, &html)?;
+    }
+
+    // 分类/标签列表页
+    for (rel, extra) in &taxonomy_renders {
+        let html = render_page(&tera, "index.tera", &site_ctx, extra)?;
+        files += write_file(dist, rel, &html)?;
+    }
 
     // 归档
     let archive_ctx = serde_json::json!({
@@ -554,6 +823,51 @@ pub fn render_site_to(
     });
     let html = render_page(&tera, "archive.tera", &site_ctx, &archive_ctx)?;
     files += write_file(dist, &url_to_rel_fs(&rules.archive)?, &html)?;
+
+    // 分类/标签总览页（固定路径，导航入口）：每类一张，列出全部条目
+    for (kind, rel) in [("分类", "/categories/"), ("标签", "/tags/")] {
+        let is_cat = kind == "分类";
+        let items_json: Vec<serde_json::Value> = if is_cat {
+            categories
+                .iter()
+                .map(|c| {
+                    let count = published_sorted
+                        .iter()
+                        .filter(|a| a.categories.iter().any(|x| x.id == c.id))
+                        .count();
+                    serde_json::json!({
+                        "name": c.name,
+                        "url": category_urls.get(&c.id).cloned().unwrap_or_default(),
+                        "count": count,
+                    })
+                })
+                .collect()
+        } else {
+            tags
+                .iter()
+                .map(|t| {
+                    let count = published_sorted
+                        .iter()
+                        .filter(|a| a.tags.iter().any(|x| x.id == t.id))
+                        .count();
+                    serde_json::json!({
+                        "name": t.name,
+                        "url": tag_urls.get(&t.id).cloned().unwrap_or_default(),
+                        "count": count,
+                    })
+                })
+                .collect()
+        };
+        let ctx = serde_json::json!({
+            "taxonomy": { "kind": kind },
+            "items": items_json,
+        });
+        let html = render_page(&tera, "taxonomies.tera", &site_ctx, &ctx)?;
+        files += write_file(dist, &url_to_rel_fs(rel)?, &html)?;
+    }
+
+    // RSS feed
+    files += write_file(dist, &feed_rel, &feed)?;
 
     // 主题资源（取激活主题自己的 assets，不回退默认主题的资源）
     let assets = themes_dir.join(theme_name).join("assets");
@@ -815,8 +1129,10 @@ pub fn render_site_cmd(
     extract_builtin_theme(&themes_dir)?;
     let conn = db.0.lock().map_err(|e| format!("数据库连接不可用: {e}"))?;
     let active = get_active_theme_name(&conn, site_id)?;
+    let port = get_preview_port(&conn)?;
+    let base_url = format!("http://127.0.0.1:{port}");
     let dist = preview_root(&app)?.join(site_id.to_string());
-    let report = render_site_to(&conn, &dist, &themes_dir, &active, site_id, true)?;
+    let report = render_site_to(&conn, &dist, &themes_dir, &active, site_id, true, &base_url)?;
     if let Ok(mut dir) = PREVIEW_DIR.write() {
         *dir = Some(dist);
     }
@@ -831,7 +1147,7 @@ mod tests {
     use crate::pages::insert_page;
     use crate::routing::RoutingRules;
     use crate::site::insert_site;
-    use crate::taxonomy::insert_tag;
+    use crate::taxonomy::{insert_category, insert_tag};
 
     fn mem_db() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
@@ -844,6 +1160,7 @@ mod tests {
         let conn = mem_db();
         let site = insert_site(&conn, "我的博客", Some("安静写作")).unwrap();
         let tag = insert_tag(&conn, site.id, "徒步").unwrap();
+        let cat = insert_category(&conn, site.id, "户外").unwrap();
         let a = insert_article(&conn, site.id, "山中一日").unwrap();
         update_article(
             &conn,
@@ -852,7 +1169,7 @@ mod tests {
             Some("## 山\n\n**出发**了。"),
             Some(STATUS_PUBLISHED),
             None,
-            &[],
+            &[cat.id],
             &[tag.id],
         )
         .unwrap();
@@ -865,7 +1182,7 @@ mod tests {
         extract_builtin_theme(&themes_dir).unwrap();
         let dist = tmp.join("preview").join(site.id.to_string());
 
-        let report = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false).unwrap();
+        let report = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false, "http://127.0.0.1:12739").unwrap();
         assert!(report.files >= 5);
 
         // 首页：含发布文章与站点名，不含草稿；导航含独立页面
@@ -886,6 +1203,17 @@ mod tests {
         let page_html = fs::read_to_string(dist.join("about.html")).unwrap();
         assert!(page_html.contains("关于我"));
 
+        // 导航含分类/标签入口，总览页列出条目并可跳转
+        assert!(index.contains("/categories/"));
+        assert!(index.contains("/tags/"));
+        let categories_page =
+            fs::read_to_string(dist.join("categories").join("index.html")).unwrap();
+        assert!(categories_page.contains("户外"));
+        assert!(categories_page.contains("/category/1/"));
+        let tags_page = fs::read_to_string(dist.join("tags").join("index.html")).unwrap();
+        assert!(tags_page.contains("徒步"));
+        assert!(tags_page.contains("/tag/1/"));
+
         // 归档与主题资源
         let archive =
             fs::read_to_string(dist.join("archive").join("index.html")).unwrap();
@@ -894,7 +1222,7 @@ mod tests {
 
         // 预览模式渲染草稿详情页，但列表仍只显示已发布
         let dist2 = tmp.join("preview2");
-        render_site_to(&conn, &dist2, &themes_dir, "default", site.id, true).unwrap();
+        render_site_to(&conn, &dist2, &themes_dir, "default", site.id, true, "http://127.0.0.1:12739").unwrap();
         let draft_html =
             fs::read_to_string(dist2.join("post").join("post-2.html")).unwrap();
         assert!(draft_html.contains("草稿箱里的文章"));
@@ -907,7 +1235,7 @@ mod tests {
             .unwrap();
         let rules = RoutingRules { post: "/[year]/[month].html".into(), ..Default::default() };
         crate::routing::set_routing_rules(&conn, site.id, &rules).unwrap();
-        let err = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false).unwrap_err();
+        let err = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false, "http://127.0.0.1:12739").unwrap_err();
         assert!(err.contains("路径冲突"));
 
         let _ = fs::remove_dir_all(&tmp);

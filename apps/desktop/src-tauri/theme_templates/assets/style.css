@@ -107,3 +107,24 @@ main.wrap { padding-top: 32px; padding-bottom: 56px; }
   padding: 14px 0 20px;
 }
 .empty { color: #9AA1AC; }
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+  font-size: 13px;
+}
+.pager-info { color: #9AA1AC; font-variant-numeric: tabular-nums; }
+
+.taxonomy-list { list-style: none; margin: 0 0 18px; padding: 0; }
+.taxonomy-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px dashed #E5E7EB;
+}
+.taxonomy-count { font-size: 12px; color: #9AA1AC; }

@@ -12,6 +12,8 @@
     <a class="site-name" href="/">{{ site.name }}</a>
     <nav class="site-nav">
       {% for p in pages %}{% if p.showInNav %}<a href="{{ p.url }}">{{ p.title }}</a>{% endif %}{% endfor %}
+      <a href="{{ urls.categories }}">分类</a>
+      <a href="{{ urls.tags }}">标签</a>
       <a href="{{ urls.archive }}">归档</a>
     </nav>
   </div>

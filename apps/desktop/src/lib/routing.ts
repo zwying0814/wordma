@@ -3,11 +3,13 @@ import { invoke } from "@tauri-apps/api/core";
 /** 路由规则表：占位符语法 [var]（post 支持 slug/id/year/month/day，其余仅 slug） */
 export interface RoutingRules {
   index: string;
+  indexPagination: string;
   post: string;
   page: string;
   category: string;
   tag: string;
   archive: string;
+  feed: string;
 }
 
 /** 单条路由校验结果（供设置页可视化） */
