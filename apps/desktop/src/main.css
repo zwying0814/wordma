@@ -1,0 +1,28 @@
+/* 全局基础样式；组件样式一律写在 StyleX 里。
+   取值与 design/styles.css 一致。 */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1f2328;
+  background: #f4f5f7;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* 键盘焦点可见性（设计稿同款），无边框输入框依赖它呈现焦点态 */
+:focus-visible {
+  outline: 2px solid #3563d9;
+  outline-offset: 2px;
+}
