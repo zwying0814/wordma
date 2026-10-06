@@ -6,6 +6,7 @@ import x from "@stylexjs/atoms";
 import { WordmaEditor } from "@wordma/editor";
 import { useLocation } from "wouter";
 import { getPage, updatePage } from "../lib/pages";
+import { previewMarkdownHtml } from "../lib/theme";
 import { editorStyles } from "../styles/editor.stylex";
 
 const styles = stylex.create({
@@ -48,6 +49,7 @@ export default function PageEditorPage({
   const [content, setContent] = useState("");
   const [showInNav, setShowInNav] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,6 +70,17 @@ export default function PageEditorPage({
       cancelled = true;
     };
   }, [params.id]);
+
+  // 实时预览：内容变化后防抖走 Rust 渲染管线（与发布同引擎）
+  useEffect(() => {
+    if (!page) return;
+    const timer = setTimeout(() => {
+      previewMarkdownHtml(page.siteId, content)
+        .then(setPreviewHtml)
+        .catch(() => {});
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [page, content]);
 
   const handleSave = async () => {
     if (!page) return;
@@ -176,7 +189,7 @@ export default function PageEditorPage({
             key={page.id}
             initialValue={content}
             onChange={setContent}
-            placeholder="页面内容支持 Markdown…"
+            previewHtml={previewHtml ?? undefined}
           />
         </div>
       </div>

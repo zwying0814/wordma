@@ -13,8 +13,7 @@ import {
   type Article,
   type ArticleStatus,
 } from "../lib/article";
-import { openPreview, renderSite } from "../lib/theme";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { openPreview, previewMarkdownHtml, renderSite } from "../lib/theme";
 import {
   listMedia,
   uploadMedia,
@@ -100,6 +99,17 @@ export default function ArticleEditorPage({
     [activeSite.id, reloadMedia],
   );
 
+  // 实时预览：内容变化后防抖走 Rust 渲染管线（与发布同引擎）
+  useEffect(() => {
+    if (!article) return;
+    const timer = setTimeout(() => {
+      previewMarkdownHtml(activeSite.id, content)
+        .then(setPreviewHtml)
+        .catch(() => {});
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [content, activeSite.id, article]);
+
   // 站点媒体清单变化时刷新 filename → path 映射（编辑器挂载前必须就绪）
   useEffect(() => {
     setMediaReady(false);
@@ -112,16 +122,6 @@ export default function ArticleEditorPage({
       .catch(() => {})
       .finally(() => setMediaReady(true));
   }, [activeSite.id]);
-
-  const handleResolveImageUrl = useCallback(
-    (src: string) => {
-      if (!src.startsWith("/media/")) return src;
-      const filename = src.slice("/media/".length);
-      const path = mediaPathsRef.current[filename];
-      return path ? convertFileSrc(path) : src;
-    },
-    [],
-  );
 
   // 工具栏“插入图片”：打开媒体库选择
   const handlePickImage = useCallback(
@@ -141,6 +141,7 @@ export default function ArticleEditorPage({
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [titleError, setTitleError] = useState(false);
 
   useEffect(() => {
@@ -339,8 +340,7 @@ export default function ArticleEditorPage({
             onChange={setContent}
             onPasteImage={handlePasteImage}
             onPickImage={handlePickImage}
-            onResolveImageUrl={handleResolveImageUrl}
-            placeholder="正文支持 Markdown：## 小标题、- 列表、> 引用、**加粗**…"
+            previewHtml={previewHtml ?? undefined}
           />
           <MediaPickerModal open={pickerOpen} onClose={closePicker} />
         </div>

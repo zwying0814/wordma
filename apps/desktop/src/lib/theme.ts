@@ -94,3 +94,8 @@ export const setThemeSettings = (
   name: string,
   values: Record<string, unknown>,
 ): Promise<void> => invoke("set_theme_settings_cmd", { siteId, name, values });
+
+export const previewMarkdownHtml = (
+  siteId: number,
+  markdown: string,
+): Promise<string> => invoke("preview_markdown_html_cmd", { siteId, markdown });
