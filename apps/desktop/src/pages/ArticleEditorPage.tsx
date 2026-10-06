@@ -103,7 +103,7 @@ export default function ArticleEditorPage({
   useEffect(() => {
     if (!article) return;
     const timer = setTimeout(() => {
-      previewMarkdownHtml(activeSite.id, content)
+      previewMarkdownHtml(activeSite.id, content, true)
         .then(setPreviewHtml)
         .catch((e) =>
           setPreviewHtml(

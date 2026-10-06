@@ -1332,6 +1332,7 @@ pub fn preview_markdown_html_cmd(
     db: State<Db>,
     site_id: i64,
     markdown: String,
+    content_only: bool,
 ) -> Result<String, String> {
     let themes_dir = themes_root(&app)?;
     extract_builtin_theme(&themes_dir)?;
@@ -1364,22 +1365,30 @@ pub fn preview_markdown_html_cmd(
             }))
         })
         .collect::<Result<Vec<_>, String>>()?;
-    let site_ctx = serde_json::json!({
-        "site": { "name": site.name, "description": site.description.clone().unwrap_or_default() },
-        "urls": { "archive": rules.archive, "categories": "/categories/", "tags": "/tags/" },
-        "pages": pages_ctx,
-        "theme": theme_values,
-        "post": { "title": "", "date": "", "contentHtml": content_html, "wordCount": word_count },
-    });
-    let html = render_page(&tera, "post.tera", &site_ctx, &serde_json::json!({}))?;
-
-    // srcDoc iframe 无站点根：主题样式内联、媒体图片内联为 data URL
-    let css = fs::read_to_string(theme_dir.join("assets").join("style.css"))
-        .unwrap_or_default();
-    let mut out = html.replace(
-        r#"<link rel="stylesheet" href="/assets/style.css">"#,
-        &format!("<style>{css}</style>"),
-    );
+    // srcDoc iframe 无站点根：主题样式内联、媒体图片内联为 data URL。
+    // content_only 模式只输出正文（编辑器分栏），否则渲染完整站点骨架
+    let mut out = if content_only {
+        let css = fs::read_to_string(theme_dir.join("assets").join("style.css"))
+            .unwrap_or_default();
+        format!(
+            "<style>{css}</style><div class=\"post-content\">{content_html}</div>"
+        )
+    } else {
+        let site_ctx = serde_json::json!({
+            "site": { "name": site.name, "description": site.description.clone().unwrap_or_default() },
+            "urls": { "archive": rules.archive, "categories": "/categories/", "tags": "/tags/" },
+            "pages": pages_ctx,
+            "theme": theme_values,
+            "post": { "title": "", "date": "", "contentHtml": content_html, "wordCount": word_count },
+        });
+        let html = render_page(&tera, "post.tera", &site_ctx, &serde_json::json!({}))?;
+        let css = fs::read_to_string(theme_dir.join("assets").join("style.css"))
+            .unwrap_or_default();
+        html.replace(
+            r#"<link rel="stylesheet" href="/assets/style.css">"#,
+            &format!("<style>{css}</style>"),
+        )
+    };
     let media_dir = media_root(&app)?.join(site_id.to_string());
     if let Ok(entries) = fs::read_dir(&media_dir) {
         use base64::Engine as _;

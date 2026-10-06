@@ -98,4 +98,5 @@ export const setThemeSettings = (
 export const previewMarkdownHtml = (
   siteId: number,
   markdown: string,
-): Promise<string> => invoke("preview_markdown_html_cmd", { siteId, markdown });
+  contentOnly: boolean,
+): Promise<string> => invoke("preview_markdown_html_cmd", { siteId, markdown, contentOnly });

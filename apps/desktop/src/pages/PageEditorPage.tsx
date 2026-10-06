@@ -75,7 +75,7 @@ export default function PageEditorPage({
   useEffect(() => {
     if (!page) return;
     const timer = setTimeout(() => {
-      previewMarkdownHtml(page.siteId, content)
+      previewMarkdownHtml(page.siteId, content, true)
         .then(setPreviewHtml)
         .catch((e) =>
           setPreviewHtml(
