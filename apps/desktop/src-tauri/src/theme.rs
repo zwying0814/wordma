@@ -1319,6 +1319,99 @@ pub fn set_theme_settings_cmd(
         .map_err(|e| format!("保存主题设置失败: {e}"))
 }
 
+/// 编辑器实时预览用：单篇 markdown → HTML（同发布渲染引擎）
+#[tauri::command]
+pub fn markdown_to_html_cmd(markdown: String) -> Result<String, String> {
+    Ok(markdown_to_html(&markdown).0)
+}
+
+/// 渲染单篇文章预览页：完整 HTML（内联主题样式与媒体图片，供 iframe srcDoc）
+#[tauri::command]
+pub fn preview_markdown_html_cmd(
+    app: AppHandle,
+    db: State<Db>,
+    site_id: i64,
+    markdown: String,
+) -> Result<String, String> {
+    let themes_dir = themes_root(&app)?;
+    extract_builtin_theme(&themes_dir)?;
+    let conn = db.0.lock().map_err(|e| format!("数据库连接不可用: {e}"))?;
+    let active = get_active_theme_name(&conn, site_id)?;
+    let rules = get_routing_rules(&conn, site_id)?;
+    let site = get_site(&conn, site_id)?;
+    let pages = get_pages_by_site(&conn, site_id)?;
+    let theme_values = resolve_theme_settings(
+        &load_theme_settings(&themes_dir, &active),
+        get_setting(&conn, &theme_settings_key(site_id, &active))
+            .map_err(|e| format!("读取主题设置失败: {e}"))?
+            .as_deref(),
+    );
+    let theme_dir = themes_dir.join(&active);
+    let mut tera = build_tera(&themes_dir, &active)?;
+    tera.autoescape_on(vec![".html"]);
+    let (content_html, word_count) = markdown_to_html(&markdown);
+    let pages_ctx: Vec<serde_json::Value> = pages
+        .iter()
+        .filter(|p| p.show_in_nav)
+        .map(|p| {
+            Ok(serde_json::json!({
+                "title": p.title,
+                "url": generate_path(
+                    &rules.page,
+                    &HashMap::from([("slug".to_string(), p.slug.clone())]),
+                )?,
+                "showInNav": true,
+            }))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let site_ctx = serde_json::json!({
+        "site": { "name": site.name, "description": site.description.clone().unwrap_or_default() },
+        "urls": { "archive": rules.archive, "categories": "/categories/", "tags": "/tags/" },
+        "pages": pages_ctx,
+        "theme": theme_values,
+        "post": { "title": "", "date": "", "contentHtml": content_html, "wordCount": word_count },
+    });
+    let html = render_page(&tera, "post.html", &site_ctx, &serde_json::json!({}))?;
+
+    // srcDoc iframe 无站点根：主题样式内联、媒体图片内联为 data URL
+    let css = fs::read_to_string(theme_dir.join("assets").join("style.css"))
+        .unwrap_or_default();
+    let mut out = html.replace(
+        r#"<link rel="stylesheet" href="/assets/style.css">"#,
+        &format!("<style>{css}</style>"),
+    );
+    let media_dir = media_root(&app)?.join(site_id.to_string());
+    if let Ok(entries) = fs::read_dir(&media_dir) {
+        use base64::Engine as _;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let filename = entry.file_name().to_string_lossy().to_string();
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            let mime = match ext.as_str() {
+                "png" => "image/png",
+                "jpg" | "jpeg" => "image/jpeg",
+                "gif" => "image/gif",
+                "webp" => "image/webp",
+                "svg" => "image/svg+xml",
+                _ => continue,
+            };
+            if let Ok(data) = fs::read(&path) {
+                use base64::engine::general_purpose::STANDARD as BASE64;
+                let data_url = format!("data:{mime};base64,{}", BASE64.encode(&data));
+                out = out.replace(&format!("/media/{filename}"), &data_url);
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[tauri::command]
 pub fn list_themes_cmd(
     app: AppHandle,

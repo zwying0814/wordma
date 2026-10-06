@@ -77,7 +77,11 @@ export default function PageEditorPage({
     const timer = setTimeout(() => {
       previewMarkdownHtml(page.siteId, content)
         .then(setPreviewHtml)
-        .catch(() => {});
+        .catch((e) =>
+          setPreviewHtml(
+            `<p style="color:#d64545;font-family:system-ui">预览失败：${String(e)}</p>`,
+          ),
+        );
     }, 400);
     return () => clearTimeout(timer);
   }, [page, content]);
