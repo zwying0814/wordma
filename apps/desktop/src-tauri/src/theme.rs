@@ -41,34 +41,34 @@ static PREVIEW_LISTENER: Mutex<Option<(TcpListener, Arc<AtomicBool>)>> =
 // ===== 内置默认主题（编译进二进制，首次运行落盘，用户可直接改） =====
 
 const BUILTIN_FILES: &[(&str, &str)] = &[
-    ("theme.yaml", include_str!("../theme_templates/theme.yaml")),
+    ("theme.yaml", include_str!("../../../../themes/default/theme.yaml")),
     (
         "templates/base.tera",
-        include_str!("../theme_templates/templates/base.tera"),
+        include_str!("../../../../themes/default/templates/base.tera"),
     ),
     (
         "templates/index.tera",
-        include_str!("../theme_templates/templates/index.tera"),
+        include_str!("../../../../themes/default/templates/index.tera"),
     ),
     (
         "templates/post.tera",
-        include_str!("../theme_templates/templates/post.tera"),
+        include_str!("../../../../themes/default/templates/post.tera"),
     ),
     (
         "templates/archive.tera",
-        include_str!("../theme_templates/templates/archive.tera"),
+        include_str!("../../../../themes/default/templates/archive.tera"),
     ),
     (
         "templates/taxonomies.tera",
-        include_str!("../theme_templates/templates/taxonomies.tera"),
+        include_str!("../../../../themes/default/templates/taxonomies.tera"),
     ),
     (
         "templates/page.tera",
-        include_str!("../theme_templates/templates/page.tera"),
+        include_str!("../../../../themes/default/templates/page.tera"),
     ),
     (
         "assets/style.css",
-        include_str!("../theme_templates/assets/style.css"),
+        include_str!("../../../../themes/default/assets/style.css"),
     ),
 ];
 
