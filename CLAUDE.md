@@ -35,8 +35,8 @@ cargo test <test_name>      # 单个测试，如 cargo test active_site_roundtri
 
 ## 主题与静态渲染
 
-- **主题包**：`app_data_dir/themes/<name>/`（`theme.yaml` + `templates/*.html` + `assets/`）；内置默认主题源文件在项目根 `themes/default/`（与 apps/ 同级，随 include_str! 打进二进制），落盘走 manifest 指纹增量更新（未被用户修改的文件随内置版本覆盖，用户修改保留，见 `extract_builtin_theme`）。
-- **模板引擎 Tera 2**：`Tera::new()` 是空构造，模板用 `add_template_files` 加载（模板名 = templates 下相对路径，`extends` 按名引用）；对 `.html` 开启 autoescape，正文 HTML 用 `| safe`。
+- **主题包**：`app_data_dir/themes/<name>/`（`theme.yaml` + `templates/*.tera` + `assets/`）；内置默认主题源文件在项目根 `themes/default/`（与 apps/ 同级，随 include_str! 打进二进制），落盘走 manifest 指纹增量更新（未被用户修改的文件随内置版本覆盖，用户修改保留，见 `extract_builtin_theme`）。
+- **模板引擎 Tera 2**：`Tera::new()` 是空构造，模板用 `add_template_files` 加载（模板名 = templates 下相对路径，`extends` 按名引用）；对 `.tera` 开启 autoescape，正文 HTML 用 `| safe`。
 - **渲染管线**（`theme.rs` `render_site_to`）：路由规则（`routing.rs`，存 settings 键 `routing_rules:{site_id}`）→ `generate_path` 算每篇文章/页面的输出路径（冲突即整体报错）→ pulldown-cmark 转 HTML → 写入 `app_data_dir/preview/{site_id}/`。只有 `published` 文章进入公开站点。
 - **预览**：`127.0.0.1:12739` 的本地静态服务（惰性启动，按请求读文件，重渲染后无需重启），`open_preview_cmd` 用 opener 插件打开浏览器。
 

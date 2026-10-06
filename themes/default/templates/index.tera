@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.tera" %}
 {% block content %}
 {% if taxonomy %}
 <h1 class="page-title">{{ taxonomy.kind }}「{{ taxonomy.name }}」</h1>

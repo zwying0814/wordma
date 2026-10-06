@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.tera" %}
 {% block title %}{{ page.title }} · {{ site.name }}{% endblock %}
 {% block content %}
 <article class="post">

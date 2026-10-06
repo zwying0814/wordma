@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.tera" %}
 {% block title %}{{ taxonomy.kind }} · {{ site.name }}{% endblock %}
 {% block content %}
 <h1 class="page-title">{{ taxonomy.kind }}</h1>

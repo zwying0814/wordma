@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.tera" %}
 {% block title %}归档 · {{ site.name }}{% endblock %}
 {% block content %}
 <h1 class="page-title">归档</h1>

@@ -43,28 +43,28 @@ static PREVIEW_LISTENER: Mutex<Option<(TcpListener, Arc<AtomicBool>)>> =
 const BUILTIN_FILES: &[(&str, &str)] = &[
     ("theme.yaml", include_str!("../../../../themes/default/theme.yaml")),
     (
-        "templates/base.html",
-        include_str!("../../../../themes/default/templates/base.html"),
+        "templates/base.tera",
+        include_str!("../../../../themes/default/templates/base.tera"),
     ),
     (
-        "templates/index.html",
-        include_str!("../../../../themes/default/templates/index.html"),
+        "templates/index.tera",
+        include_str!("../../../../themes/default/templates/index.tera"),
     ),
     (
-        "templates/post.html",
-        include_str!("../../../../themes/default/templates/post.html"),
+        "templates/post.tera",
+        include_str!("../../../../themes/default/templates/post.tera"),
     ),
     (
-        "templates/archive.html",
-        include_str!("../../../../themes/default/templates/archive.html"),
+        "templates/archive.tera",
+        include_str!("../../../../themes/default/templates/archive.tera"),
     ),
     (
-        "templates/taxonomies.html",
-        include_str!("../../../../themes/default/templates/taxonomies.html"),
+        "templates/taxonomies.tera",
+        include_str!("../../../../themes/default/templates/taxonomies.tera"),
     ),
     (
-        "templates/page.html",
-        include_str!("../../../../themes/default/templates/page.html"),
+        "templates/page.tera",
+        include_str!("../../../../themes/default/templates/page.tera"),
     ),
     (
         "assets/style.css",
@@ -635,7 +635,7 @@ fn collect_templates(
         let path = entry.path();
         if path.is_dir() {
             collect_templates(&path, base, out)?;
-        } else if path.extension().is_some_and(|ext| ext == "html") {
+        } else if path.extension().is_some_and(|ext| ext == "tera") {
             let rel = path
                 .strip_prefix(base)
                 .map_err(|e| format!("解析模板路径失败: {e}"))?
@@ -666,7 +666,7 @@ fn build_tera(themes_dir: &Path, theme_name: &str) -> Result<Tera, String> {
     let mut tera = Tera::new();
     tera.add_template_files(files.iter().map(|(p, n)| (p, Some(n))))
         .map_err(|e| format!("解析模板失败: {e}"))?;
-    tera.autoescape_on(vec![".html"]);
+    tera.autoescape_on(vec![".tera"]);
     Ok(tera)
 }
 
@@ -1043,25 +1043,25 @@ pub fn render_site_to(
 
     // 文章详情
     for (rel, extra) in &post_renders {
-        let html = render_page(&tera, "post.html", &site_ctx, extra)?;
+        let html = render_page(&tera, "post.tera", &site_ctx, extra)?;
         files += write_file(dist, rel, &html)?;
     }
 
     // 独立页面
     for (rel, extra) in &page_renders {
-        let html = render_page(&tera, "page.html", &site_ctx, extra)?;
+        let html = render_page(&tera, "page.tera", &site_ctx, extra)?;
         files += write_file(dist, rel, &html)?;
     }
 
     // 首页（分页：第 1 页走 index 规则，第 2 页起走分页规则）
     for (rel, extra) in &index_renders {
-        let html = render_page(&tera, "index.html", &site_ctx, extra)?;
+        let html = render_page(&tera, "index.tera", &site_ctx, extra)?;
         files += write_file(dist, rel, &html)?;
     }
 
     // 分类/标签列表页
     for (rel, extra) in &taxonomy_renders {
-        let html = render_page(&tera, "index.html", &site_ctx, extra)?;
+        let html = render_page(&tera, "index.tera", &site_ctx, extra)?;
         files += write_file(dist, rel, &html)?;
     }
 
@@ -1072,7 +1072,7 @@ pub fn render_site_to(
             .map(|(year, posts)| serde_json::json!({ "year": year, "posts": posts }))
             .collect::<Vec<_>>(),
     });
-    let html = render_page(&tera, "archive.html", &site_ctx, &archive_ctx)?;
+    let html = render_page(&tera, "archive.tera", &site_ctx, &archive_ctx)?;
     files += write_file(dist, &url_to_rel_fs(&rules.archive)?, &html)?;
 
     // 分类/标签总览页（固定路径，导航入口）：每类一张，列出全部条目
@@ -1113,7 +1113,7 @@ pub fn render_site_to(
             "taxonomy": { "kind": kind },
             "items": items_json,
         });
-        let html = render_page(&tera, "taxonomies.html", &site_ctx, &ctx)?;
+        let html = render_page(&tera, "taxonomies.tera", &site_ctx, &ctx)?;
         files += write_file(dist, &url_to_rel_fs(rel)?, &html)?;
     }
 
@@ -1473,7 +1473,7 @@ mod tests {
 
         // 首次落盘
         extract_builtin_theme(&themes_dir).unwrap();
-        let base = themes_dir.join("default").join("templates").join("base.html");
+        let base = themes_dir.join("default").join("templates").join("base.tera");
         let original = fs::read_to_string(&base).unwrap();
 
         // 用户修改 base.tera → 再次落盘应保留
@@ -1482,7 +1482,7 @@ mod tests {
         assert_eq!(fs::read_to_string(&base).unwrap(), "用户自定义的模板");
 
         // 删除新模板文件（模拟老安装缺少新增文件）→ 补写
-        let taxonomies = themes_dir.join("default").join("templates").join("taxonomies.html");
+        let taxonomies = themes_dir.join("default").join("templates").join("taxonomies.tera");
         fs::remove_file(&taxonomies).unwrap();
         extract_builtin_theme(&themes_dir).unwrap();
         assert!(taxonomies.is_file());
@@ -1501,7 +1501,7 @@ mod tests {
         use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update("用户自定义的模板".as_bytes());
-        value["hashes"]["templates/base.html"] =
+        value["hashes"]["templates/base.tera"] =
             serde_json::Value::String(format!("{:x}", hasher.finalize()));
         fs::write(&manifest_path, serde_json::to_string(&value).unwrap()).unwrap();
         extract_builtin_theme(&themes_dir).unwrap();
