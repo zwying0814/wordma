@@ -1371,7 +1371,7 @@ pub fn preview_markdown_html_cmd(
         let css = fs::read_to_string(theme_dir.join("assets").join("style.css"))
             .unwrap_or_default();
         format!(
-            "<style>{css}</style><div class=\"post-content\">{content_html}</div>"
+            "<style>{css}</style><article class=\"post\"><div class=\"post-content\">{content_html}</div></article>"
         )
     } else {
         let site_ctx = serde_json::json!({

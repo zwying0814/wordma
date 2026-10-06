@@ -13,15 +13,19 @@
     "windows": [
       {
         "title": "desktop",
-        "width": 800,
-        "height": 600
+        "width": 1440,
+        "height": 960,
+        "minWidth": 1440,
+        "minHeight": 960
       }
     ],
     "security": {
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/media/**"]
+        "scope": [
+          "$APPDATA/media/**"
+        ]
       }
     }
   },

@@ -33,7 +33,6 @@ export const editorStyles = stylex.create({
   },
   col: {
     width: "100%",
-    maxWidth: 780,
     padding: "28px 32px 64px",
     display: "flex",
     flexDirection: "column",
