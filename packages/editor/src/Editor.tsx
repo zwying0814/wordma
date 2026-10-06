@@ -82,20 +82,40 @@ export function WordmaEditor({
     },
     editorProps: {
       handlePaste: (_view, event) => {
-        const files = Array.from(event.clipboardData?.files ?? []).filter(
-          (f) => f.type.startsWith("image/"),
+        const clipboard = event.clipboardData;
+
+        // 1) 剪贴板里有图片文件：上传后插入
+        const files = Array.from(clipboard?.files ?? []).filter((f) =>
+          f.type.startsWith("image/"),
         );
-        if (files.length === 0 || !pasteRef.current) return false;
-        event.preventDefault();
-        const upload = pasteRef.current;
-        for (const file of files) {
-          upload(file).then((url) => {
-            if (url && editor) {
-              editor.chain().focus().setImage({ src: url }).run();
-            }
-          });
+        if (files.length > 0 && pasteRef.current) {
+          event.preventDefault();
+          const upload = pasteRef.current;
+          for (const file of files) {
+            upload(file).then((url) => {
+              if (url && editor) {
+                editor.chain().focus().setImage({ src: url }).run();
+              }
+            });
+          }
+          return true;
         }
-        return true;
+
+        // 2) 粘贴的文本包含图片语法：按 markdown 解析后插入
+        //    （媒体库"复制 Markdown 引用" → 粘贴到文章的路径）
+        const text = clipboard?.getData("text/plain") ?? "";
+        if (text && /!\[[^\]]*\]\([^)]+\)/.test(text)) {
+          // Markdown 扩展在 Editor 上挂载的解析器（见 @tiptap/markdown 的接口增强）
+          const manager = editor.markdown;
+          if (manager) {
+            event.preventDefault();
+            const doc = manager.parse(text);
+            editor.chain().focus().insertContent(doc.content ?? []).run();
+            return true;
+          }
+        }
+
+        return false;
       },
       handleDrop: (_view, event, _slice, moved) => {
         if (moved) return false;
