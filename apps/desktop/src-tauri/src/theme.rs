@@ -1348,7 +1348,7 @@ pub fn preview_markdown_html_cmd(
     );
     let theme_dir = themes_dir.join(&active);
     let mut tera = build_tera(&themes_dir, &active)?;
-    tera.autoescape_on(vec![".html"]);
+    tera.autoescape_on(vec![".tera"]);
     let (content_html, word_count) = markdown_to_html(&markdown);
     let pages_ctx: Vec<serde_json::Value> = pages
         .iter()
@@ -1371,7 +1371,7 @@ pub fn preview_markdown_html_cmd(
         "theme": theme_values,
         "post": { "title": "", "date": "", "contentHtml": content_html, "wordCount": word_count },
     });
-    let html = render_page(&tera, "post.html", &site_ctx, &serde_json::json!({}))?;
+    let html = render_page(&tera, "post.tera", &site_ctx, &serde_json::json!({}))?;
 
     // srcDoc iframe 无站点根：主题样式内联、媒体图片内联为 data URL
     let css = fs::read_to_string(theme_dir.join("assets").join("style.css"))
