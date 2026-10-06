@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { App as AntdApp, Button, Popconfirm, Spin } from "antd";
-import { Check, Eye, FolderOpen, RefreshCw, Trash2 } from "lucide-react";
+import { Check, Eye, FolderOpen, RefreshCw, Settings2, Trash2 } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import x from "@stylexjs/atoms";
 import { useSite } from "../context/SiteContext";
@@ -14,6 +14,7 @@ import {
   type ThemeMeta,
   type ThemePreview,
 } from "../lib/theme";
+import ThemeSettingsModal from "../components/ThemeSettingsModal";
 import { pageStyles } from "../styles/page.stylex";
 
 // 与设计稿 .theme-grid / .theme-card / .theme-thumb 对齐
@@ -286,6 +287,7 @@ export default function ThemePage() {
   const { activeSite } = useSite();
   const [themes, setThemes] = useState<ThemeMeta[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [settingsTheme, setSettingsTheme] = useState<ThemeMeta | null>(null);
 
   const reload = useCallback(() => {
     listThemes(activeSite.id)
@@ -424,6 +426,15 @@ export default function ThemePage() {
                     </div>
                   )}
                   <div {...stylex.props(styles.foot)}>
+                    {theme.active && usable && theme.settings.length > 0 && (
+                      <Button
+                        size="small"
+                        icon={<Settings2 size={14} />}
+                        onClick={() => setSettingsTheme(theme)}
+                      >
+                        设置
+                      </Button>
+                    )}
                     {theme.invalidMessage ? (
                       <Button size="small" disabled>
                         主题结构异常
@@ -477,6 +488,12 @@ export default function ThemePage() {
           })}
         </div>
       )}
+
+      <ThemeSettingsModal
+        siteId={activeSite.id}
+        theme={settingsTheme}
+        onClose={() => setSettingsTheme(null)}
+      />
     </div>
   );
 }

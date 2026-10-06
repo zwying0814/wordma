@@ -1,5 +1,14 @@
 import { App as AntdApp, Menu } from "antd";
-import { FileText, FileStack, Folder, LayoutDashboard, Palette, Settings, Tags } from "lucide-react";
+import {
+  FileText,
+  FileStack,
+  Folder,
+  Image as ImageIcon,
+  LayoutDashboard,
+  Palette,
+  Settings,
+  Tags,
+} from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import { useLocation } from "wouter";
 import { useSite } from "../context/SiteContext";
@@ -16,13 +25,15 @@ const styles = stylex.create({
 });
 
 export default function SidebarNav() {
-  const { articles } = useSite();
+  const { articles, tags, categories, media } = useSite();
   const { message } = AntdApp.useApp();
   const [location, navigate] = useLocation();
 
   const selectedKey = location.startsWith("/articles") || location.startsWith("/editor")
     ? "/articles"
-    : location.startsWith("/pages")
+    : location.startsWith("/media")
+      ? "/media"
+      : location.startsWith("/pages")
       ? "/pages"
       : location.startsWith("/themes")
         ? "/themes"
@@ -39,8 +50,24 @@ export default function SidebarNav() {
       // antd v6 MenuItem 的 extra 槽：靠右对齐（对应设计稿 .nav-count）
       extra: <span {...stylex.props(styles.countPill)}>{articles.length}</span>,
     },
-    { key: "/tags", icon: <Tags size={16} />, label: "标签" },
-    { key: "/categories", icon: <Folder size={16} />, label: "分类" },
+    {
+      key: "/tags",
+      icon: <Tags size={16} />,
+      label: "标签",
+      extra: <span {...stylex.props(styles.countPill)}>{tags.length}</span>,
+    },
+    {
+      key: "/categories",
+      icon: <Folder size={16} />,
+      label: "分类",
+      extra: <span {...stylex.props(styles.countPill)}>{categories.length}</span>,
+    },
+    {
+      key: "/media",
+      icon: <ImageIcon size={16} />,
+      label: "媒体库",
+      extra: <span {...stylex.props(styles.countPill)}>{media.length}</span>,
+    },
     { key: "/pages", icon: <FileStack size={16} />, label: "页面" },
     { key: "/themes", icon: <Palette size={16} />, label: "主题" },
     { key: "/settings", icon: <Settings size={16} />, label: "设置" },
@@ -57,6 +84,7 @@ export default function SidebarNav() {
           key === "/articles" ||
           key === "/tags" ||
           key === "/categories" ||
+          key === "/media" ||
           key === "/pages" ||
           key === "/themes" ||
           key === "/settings"

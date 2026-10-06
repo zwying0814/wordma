@@ -39,9 +39,15 @@ function ArticleRow({
     <div
       role="button"
       tabIndex={0}
-      onClick={() => navigate(`/editor/${article.id}`)}
+      onClick={(e) => {
+        // 点击行内按钮（删除/气泡）不触发整行跳转，与设计稿 row.onclick 守卫一致
+        if ((e.target as HTMLElement).closest("button")) return;
+        navigate(`/editor/${article.id}`);
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") navigate(`/editor/${article.id}`);
+        if (e.key === "Enter" && e.target === e.currentTarget) {
+          navigate(`/editor/${article.id}`);
+        }
       }}
       {...stylex.props(
         pageStyles.row,

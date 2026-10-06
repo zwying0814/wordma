@@ -140,19 +140,20 @@ pub fn insert_article(
     if !exists {
         return Err(format!("站点不存在: {site_id}"));
     }
-    conn.execute(
-        "INSERT INTO articles (site_id, title) VALUES (?1, ?2)",
-        params![site_id, title.trim()],
-    )
-    .map_err(|e| format!("创建文章失败: {e}"))?;
-    let id = conn.last_insert_rowid();
-    // 默认 slug：post-{id}，保证唯一；用户可后续修改
-    conn.execute(
-        "UPDATE articles SET slug = ?1 WHERE id = ?2",
-        params![format!("post-{id}"), id],
-    )
-    .map_err(|e| format!("生成 slug 失败: {e}"))?;
-    get_article(conn, id)
+    // 随机 slug 撞唯一索引时重试（8 位字母空间约 2000 亿，实际几乎不会发生）
+    for _ in 0..5 {
+        let slug = generate_slug();
+        let inserted = conn.execute(
+            "INSERT INTO articles (site_id, title, slug) VALUES (?1, ?2, ?3)",
+            params![site_id, title.trim(), slug],
+        );
+        match inserted {
+            Ok(_) => return get_article(conn, conn.last_insert_rowid()),
+            Err(e) if crate::db::is_unique_conflict(&e) => continue,
+            Err(e) => return Err(format!("创建文章失败: {e}")),
+        }
+    }
+    Err("生成 slug 失败，请重试".into())
 }
 
 pub fn get_article(conn: &Connection, id: i64) -> Result<Article, String> {
@@ -181,6 +182,15 @@ pub fn get_articles_by_site(conn: &Connection, site_id: i64) -> Result<Vec<Artic
         .collect::<Result<Vec<_>, rusqlite::Error>>()
         .map_err(|e| format!("读取文章失败: {e}"))?;
     finish_articles(conn, rows)
+}
+
+/// 自动生成 slug：8 位小写字母的随机串（不含数字）
+pub fn generate_slug() -> String {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    (0..8)
+        .map(|_| rng.gen_range(b'a'..=b'z') as char)
+        .collect()
 }
 
 /// slug 规则：小写字母/数字/中划线，不允许首尾中划线（文章与独立页面共用）
@@ -361,6 +371,9 @@ mod tests {
         assert_eq!(a.title, "第一篇");
         assert_eq!(a.status, STATUS_DRAFT);
         assert_eq!(a.content, "");
+        // 自动生成 slug：8 位小写字母、无数字
+        assert_eq!(a.slug.len(), 8);
+        assert!(a.slug.chars().all(|c| c.is_ascii_lowercase()));
         assert!(a.tags.is_empty());
         assert!(a.categories.is_empty());
 
@@ -455,8 +468,9 @@ mod tests {
         let conn = mem_db();
         let site = insert_site(&conn, "站", None).unwrap();
         let a = insert_article(&conn, site.id, "山中一日").unwrap();
-        // 默认 slug：post-{id}
-        assert_eq!(a.slug, format!("post-{}", a.id));
+        // 默认 slug：8 位随机小写字母
+        assert_eq!(a.slug.len(), 8);
+        assert!(a.slug.chars().all(|c| c.is_ascii_lowercase()));
 
         // 合法修改 + 大写归一化
         let renamed = update_article(

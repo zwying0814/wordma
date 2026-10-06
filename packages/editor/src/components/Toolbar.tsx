@@ -3,6 +3,7 @@ import { useEditorState } from "@tiptap/react";
 import {
   Bold,
   Heading1,
+  ImagePlus,
   Heading2,
   Heading3,
   Italic,
@@ -89,7 +90,13 @@ function ToolButton({
   );
 }
 
-export function Toolbar({ editor }: { editor: Editor | null }) {
+export function Toolbar({
+  editor,
+  onPickImage,
+}: {
+  editor: Editor | null;
+  onPickImage?: () => Promise<string | null>;
+}) {
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) =>
@@ -134,6 +141,17 @@ export function Toolbar({ editor }: { editor: Editor | null }) {
         icon={Redo2}
         disabled={!state.canRedo}
         onClick={run((c) => c.redo())}
+      />
+      <ToolButton
+        label="插入图片"
+        icon={ImagePlus}
+        disabled={!editor}
+        onClick={() => {
+          if (!onPickImage || !editor) return;
+          onPickImage().then((url) => {
+            if (url) editor.chain().focus().setImage({ src: url }).run();
+          });
+        }}
       />
       <span {...stylex.props(styles.divider)} />
       <ToolButton

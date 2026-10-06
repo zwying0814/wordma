@@ -15,6 +15,7 @@ use tera::Tera;
 
 use crate::article::{get_articles_by_site, Article, STATUS_PUBLISHED};
 use crate::db::Db;
+use crate::media::media_root;
 use crate::pages::get_pages_by_site;
 use crate::routing::{generate_path, get_routing_rules};
 use crate::taxonomy::{get_categories_by_site, get_tags_by_site};
@@ -182,6 +183,41 @@ pub struct ThemePreview {
     pub accent: String,
 }
 
+/// 设置项类型；未知字符串兜底为 Text（serde(other)，前向兼容）
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ThemeSettingType {
+    Textarea,
+    Number,
+    Switch,
+    Select,
+    Color,
+    /// 兜底变体：未知类型与缺省（serde(other) 要求位于最后）
+    #[default]
+    #[serde(other)]
+    Text,
+}
+
+/// 主题设置项声明（theme.json 的 settings 数组元素；整段可选）
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ThemeSetting {
+    /// 模板上下文字段名 + 存库键
+    #[serde(default)]
+    pub key: String,
+    /// 表单展示名
+    #[serde(default)]
+    pub label: String,
+    #[serde(rename = "type")]
+    pub r#type: ThemeSettingType,
+    /// schema 默认值；缺失为 Null，类型不符时按 type 取零值兜底
+    #[serde(default)]
+    pub default: serde_json::Value,
+    /// select 的可选项（value 与展示文案相同）
+    #[serde(default)]
+    pub options: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThemeMeta {
@@ -202,6 +238,9 @@ pub struct ThemeMeta {
     pub tags: Vec<String>,
     #[serde(default)]
     pub preview: Option<ThemePreview>,
+    /// 主题设置项 schema；缺省即该主题无设置界面
+    #[serde(default)]
+    pub settings: Vec<ThemeSetting>,
     // 运行时计算的字段：theme.json 解析时缺省，序列化时输出给前端
     #[serde(default)]
     pub active: bool,
@@ -242,6 +281,113 @@ pub fn set_active_theme_name(
     set_setting(conn, &key, name).map_err(|e| format!("保存激活主题失败: {e}"))
 }
 
+// ===== 主题设置项：schema 加载 / 值合并 / 校验 =====
+
+const THEME_SETTINGS_KEY_PREFIX: &str = "theme_settings:";
+
+fn theme_settings_key(site_id: i64, theme_name: &str) -> String {
+    format!("{THEME_SETTINGS_KEY_PREFIX}{site_id}:{theme_name}")
+}
+
+/// 读取主题的设置项 schema；theme.json 缺失/损坏 → 空（不阻断渲染）
+fn load_theme_settings(themes_dir: &Path, theme_name: &str) -> Vec<ThemeSetting> {
+    let raw = match fs::read_to_string(themes_dir.join(theme_name).join("theme.json")) {
+        Ok(raw) => raw,
+        Err(_) => return Vec::new(),
+    };
+    serde_json::from_str::<ThemeMeta>(&raw)
+        .map(|meta| meta.settings)
+        .unwrap_or_default()
+}
+
+/// 渲染端合并（宽松）：存储值类型不符 → schema default → 零值；未知 key 忽略。
+/// 与 save 路径的严格校验是有意的不对称：自家表单只产出合法值，
+/// 宽松只留给 DB / theme.json 被手工改坏的场景。
+fn resolve_theme_settings(
+    schema: &[ThemeSetting],
+    stored: Option<&str>,
+) -> serde_json::Map<String, serde_json::Value> {
+    let stored_map: serde_json::Map<String, serde_json::Value> = stored
+        .and_then(|raw| serde_json::from_str(raw).ok())
+        .unwrap_or_default();
+
+    // 宽松读的单类型解析：返回 None 表示无法用该类型表达（走 default）
+    let coerce = |setting: &ThemeSetting, v: &serde_json::Value| -> Option<serde_json::Value> {
+        let t = &setting.r#type;
+        match t {
+            ThemeSettingType::Number => v.as_u64().map(|n| serde_json::json!(n)),
+            ThemeSettingType::Switch => v.as_bool().map(serde_json::Value::Bool),
+            ThemeSettingType::Select => {
+                let s = v.as_str()?;
+                if setting.options.is_empty() || setting.options.iter().any(|o| o == s) {
+                    Some(serde_json::json!(s))
+                } else {
+                    None // 不在可选项内，走 default
+                }
+            }
+            // text/textarea/color：字符串即用，数字/布尔宽松转为字符串
+            _ => match v {
+                serde_json::Value::String(s) => Some(serde_json::json!(s)),
+                serde_json::Value::Number(n) => Some(serde_json::json!(n.to_string())),
+                serde_json::Value::Bool(b) => Some(serde_json::json!(b.to_string())),
+                _ => None,
+            },
+        }
+    };
+
+    let mut out = serde_json::Map::new();
+    for setting in schema {
+        let value = stored_map
+            .get(&setting.key)
+            .and_then(|v| coerce(setting, v))
+            .or_else(|| coerce(setting, &setting.default))
+            // 兜底链终端：零值
+            .unwrap_or_else(|| match setting.r#type {
+                ThemeSettingType::Number => serde_json::json!(0),
+                ThemeSettingType::Switch => serde_json::json!(false),
+                _ => serde_json::json!(""),
+            });
+        out.insert(setting.key.clone(), value);
+    }
+    out
+}
+
+/// 内置约定键的取值范围（schema 之外的语义约束）
+fn builtin_number_range(key: &str) -> Option<(i64, i64)> {
+    match key {
+        "postsPerPage" => Some((1, 100)),
+        _ => None,
+    }
+}
+
+/// 保存校验（严格）：仅允许 schema 声明的 key 且类型严格匹配
+fn validate_theme_setting_values(
+    schema: &[ThemeSetting],
+    values: &HashMap<String, serde_json::Value>,
+) -> Result<(), String> {
+    for (key, value) in values {
+        let setting = schema
+            .iter()
+            .find(|s| s.key == *key)
+            .ok_or_else(|| format!("未知的主题设置项: {key}"))?;
+        let type_ok = match setting.r#type {
+            ThemeSettingType::Number => value.is_u64(),
+            ThemeSettingType::Switch => value.is_boolean(),
+            _ => value.is_string(),
+        };
+        if !type_ok {
+            return Err(format!("设置项 {key} 的值类型不正确"));
+        }
+        if let Some((min, max)) = builtin_number_range(key) {
+            let n = value.as_u64().unwrap_or(0) as i64;
+            if n < min || n > max {
+                return Err(format!("设置项 {key} 需在 {min} - {max} 之间"));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// 主题目录结构校验（导入与列表共用）
 pub fn validate_theme_dir(path: &Path) -> Result<(), String> {
     if !path.is_dir() {
@@ -256,6 +402,27 @@ pub fn validate_theme_dir(path: &Path) -> Result<(), String> {
     let templates = path.join("templates");
     if !templates.is_dir() {
         return Err("缺少 templates 目录".into());
+    }
+    // settings 为可选声明，但声明了就要形状正确（给主题作者友好报错）
+    if let Ok(raw_json) = fs::read_to_string(path.join("theme.json")) {
+        if let Ok(meta) = serde_json::from_str::<ThemeMeta>(&raw_json) {
+            let mut seen_keys = Vec::new();
+            for (i, setting) in meta.settings.iter().enumerate() {
+                let key_ok = !setting.key.is_empty()
+                    && setting.key.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+                    && setting.key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+                if !key_ok {
+                    return Err(format!("settings[{i}].key 含非法字符或为空"));
+                }
+                if seen_keys.contains(&setting.key) {
+                    return Err(format!("settings[{i}].key 重复: {}", setting.key));
+                }
+                seen_keys.push(setting.key.clone());
+                if setting.r#type == ThemeSettingType::Select && setting.options.is_empty() {
+                    return Err(format!("settings[{i}]（{}）为 select 类型，options 不能为空", setting.label));
+                }
+            }
+        }
     }
     let has_tera = fs::read_dir(&templates)
         .map_err(|e| format!("读取 templates 失败: {e}"))?
@@ -317,6 +484,7 @@ pub fn list_themes(
                     layout: String::new(),
                     tags: Vec::new(),
                     preview: None,
+                    settings: Vec::new(),
                     active: name == active,
                     invalid_message: Some(message),
                     preview_url: None,
@@ -521,6 +689,7 @@ pub fn render_site_to(
     site_id: i64,
     include_drafts: bool,
     base_url: &str,
+    media_dir: Option<&Path>,
 ) -> Result<RenderReport, String> {
     let rules = get_routing_rules(conn, site_id)?;
     let site = get_site(conn, site_id)?;
@@ -704,6 +873,27 @@ pub fn render_site_to(
         },
         "pages": pages_ctx,
     });
+    // 主题设置注入（theme 键恒存在；模板消费可选 key 需 | default 兜底）
+    let theme_values = resolve_theme_settings(
+        &load_theme_settings(themes_dir, theme_name),
+        get_setting(conn, &theme_settings_key(site_id, theme_name))
+            .map_err(|e| format!("读取主题设置失败: {e}"))?
+            .as_deref(),
+    );
+    let site_ctx = {
+        let mut ctx = site_ctx;
+        if let Some(obj) = ctx.as_object_mut() {
+            obj.insert("theme".into(), serde_json::Value::Object(theme_values.clone()));
+        }
+        ctx
+    };
+    // 内置约定：postsPerPage 控制首页分页大小（越界回落默认）
+    let page_size = theme_values
+        .get("postsPerPage")
+        .and_then(|v| v.as_u64())
+        .filter(|n| (1..=100).contains(n))
+        .map(|n| n as usize)
+        .unwrap_or(INDEX_PAGE_SIZE);
 
     // ===== 分类/标签列表页 =====
     let mut taxonomy_renders: Vec<(String, serde_json::Value)> = Vec::new();
@@ -776,7 +966,7 @@ pub fn render_site_to(
     }
 
     // ===== 首页分页 =====
-    let total_pages = published_sorted.len().div_ceil(INDEX_PAGE_SIZE).max(1);
+    let total_pages = published_sorted.len().div_ceil(page_size).max(1);
     let page_url = |num: usize| -> Result<String, String> {
         if num <= 1 {
             Ok(rules.index.clone())
@@ -793,11 +983,11 @@ pub fn render_site_to(
         if !used.insert(url.clone()) {
             return Err(format!("路径冲突: {url}（首页第 {page_num} 页），请检查分页路由规则"));
         }
-        let start = (page_num - 1) * INDEX_PAGE_SIZE;
+        let start = (page_num - 1) * page_size;
         let posts_slice: Vec<serde_json::Value> = posts_ctx
             .iter()
             .skip(start)
-            .take(INDEX_PAGE_SIZE)
+            .take(page_size)
             .cloned()
             .collect();
         let prev_url = if page_num > 1 { Some(page_url(page_num - 1)) } else { None };
@@ -927,6 +1117,13 @@ pub fn render_site_to(
     let assets = themes_dir.join(theme_name).join("assets");
     if assets.is_dir() {
         files += copy_dir_recursive(&assets, &dist.join("assets"))?;
+    }
+
+    // 站点媒体（文章里引用的 /media/xxx）
+    if let Some(media_dir) = media_dir {
+        if media_dir.is_dir() {
+            files += copy_dir_recursive(media_dir, &dist.join("media"))?;
+        }
     }
 
     Ok(RenderReport {
@@ -1064,6 +1261,57 @@ fn ensure_preview_listener(port: u16) -> Result<(), String> {
 
 // ===== Tauri commands =====
 
+/// 前端设置表单载荷：schema + 已解析值
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeSettingsPayload {
+    pub schema: Vec<ThemeSetting>,
+    pub values: serde_json::Map<String, serde_json::Value>,
+}
+
+#[tauri::command]
+pub fn get_theme_settings_cmd(
+    app: AppHandle,
+    db: State<Db>,
+    site_id: i64,
+    name: String,
+) -> Result<ThemeSettingsPayload, String> {
+    let themes_dir = themes_root(&app)?;
+    if !themes_dir.join(&name).join("theme.json").exists() {
+        return Err(format!("主题不存在: {name}"));
+    }
+    let conn = db.0.lock().map_err(|e| format!("数据库连接不可用: {e}"))?;
+    let schema = load_theme_settings(&themes_dir, &name);
+    let values = resolve_theme_settings(
+        &schema,
+        get_setting(&conn, &theme_settings_key(site_id, &name))
+            .map_err(|e| format!("读取主题设置失败: {e}"))?
+            .as_deref(),
+    );
+    Ok(ThemeSettingsPayload { schema, values })
+}
+
+#[tauri::command]
+pub fn set_theme_settings_cmd(
+    app: AppHandle,
+    db: State<Db>,
+    site_id: i64,
+    name: String,
+    values: HashMap<String, serde_json::Value>,
+) -> Result<(), String> {
+    let themes_dir = themes_root(&app)?;
+    let conn = db.0.lock().map_err(|e| format!("数据库连接不可用: {e}"))?;
+    // 仅激活主题可修改设置（与 UI 入口一致，双保险）
+    if get_active_theme_name(&conn, site_id)? != name {
+        return Err("只有当前启用中的主题才能修改设置".into());
+    }
+    let schema = load_theme_settings(&themes_dir, &name);
+    validate_theme_setting_values(&schema, &values)?;
+    let json = serde_json::to_string(&values).map_err(|e| e.to_string())?;
+    set_setting(&conn, &theme_settings_key(site_id, &name), &json)
+        .map_err(|e| format!("保存主题设置失败: {e}"))
+}
+
 #[tauri::command]
 pub fn list_themes_cmd(
     app: AppHandle,
@@ -1186,7 +1434,8 @@ pub fn render_site_cmd(
     let port = get_preview_port(&conn)?;
     let base_url = format!("http://127.0.0.1:{port}");
     let dist = preview_root(&app)?.join(site_id.to_string());
-    let report = render_site_to(&conn, &dist, &themes_dir, &active, site_id, true, &base_url)?;
+    let media_dir = media_root(&app)?;
+    let report = render_site_to(&conn, &dist, &themes_dir, &active, site_id, true, &base_url, Some(&media_dir))?;
     if let Ok(mut dir) = PREVIEW_DIR.write() {
         *dir = Some(dist);
     }
@@ -1248,6 +1497,198 @@ mod tests {
     }
 
     #[test]
+    fn settings_schema_parsing_fallbacks() {
+        let tmp = std::env::temp_dir().join(format!("wordma-schema-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let theme_dir = tmp.join("t1");
+        fs::create_dir_all(theme_dir.join("templates")).unwrap();
+        fs::write(theme_dir.join("templates").join("index.tera"), "x").unwrap();
+
+        // 无 settings → 空 schema
+        fs::write(theme_dir.join("theme.json"), r#"{"name":"t1"}"#).unwrap();
+        assert!(load_theme_settings(&tmp, "t1").is_empty());
+
+        // 缺 type → Text；未知 type → Text（serde other）；缺 default → Null
+        fs::write(
+            theme_dir.join("theme.json"),
+            r#"{"name":"t1","settings":[
+                {"key":"a","label":"A"},
+                {"key":"b","label":"B","type":"gallery"},
+                {"key":"c","label":"C","type":"text"}
+            ]}"#,
+        )
+        .unwrap();
+        let schema = load_theme_settings(&tmp, "t1");
+        assert_eq!(schema.len(), 3);
+        assert_eq!(schema[0].r#type, ThemeSettingType::Text);
+        assert_eq!(schema[1].r#type, ThemeSettingType::Text);
+        assert_eq!(schema[2].default, serde_json::Value::Null);
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn resolve_theme_settings_merge_and_fallback() {
+        let schema = vec![
+            ThemeSetting { key: "footerText".into(), label: "页脚".into(), r#type: ThemeSettingType::Text, default: serde_json::json!("由 Wordma 驱动"), options: vec![] },
+            ThemeSetting { key: "postsPerPage".into(), label: "每页".into(), r#type: ThemeSettingType::Number, default: serde_json::json!(10), options: vec![] },
+            ThemeSetting { key: "showTags".into(), label: "标签".into(), r#type: ThemeSettingType::Switch, default: serde_json::json!(true), options: vec![] },
+            ThemeSetting { key: "style".into(), label: "风格".into(), r#type: ThemeSettingType::Select, default: serde_json::json!("简约"), options: vec!["简约".into(), "杂志".into()] },
+        ];
+
+        // 无存储值 → 全默认，键序 = 声明序
+        let resolved = resolve_theme_settings(&schema, None);
+        let keys: Vec<&String> = resolved.keys().collect();
+        assert_eq!(keys, vec!["footerText", "postsPerPage", "showTags", "style"]);
+        assert_eq!(resolved["postsPerPage"], serde_json::json!(10));
+
+        // 类型宽松读：number 存字符串 → 回落默认；text 存数字 → 转字符串
+        let stored = r#"{"postsPerPage":"5","footerText":123}"#;
+        let resolved = resolve_theme_settings(&schema, Some(stored));
+        assert_eq!(resolved["postsPerPage"], serde_json::json!(10));
+        assert_eq!(resolved["footerText"], serde_json::json!("123"));
+
+        // switch 存字符串 → 回落默认；select 越选项 → 回落默认；未知 key 忽略
+        let stored = r#"{"showTags":"true","style":"不存在","unknown":1}"#;
+        let resolved = resolve_theme_settings(&schema, Some(stored));
+        assert_eq!(resolved["showTags"], serde_json::json!(true));
+        assert_eq!(resolved["style"], serde_json::json!("简约"));
+
+        // 存储损坏 → 全默认
+        let resolved = resolve_theme_settings(&schema, Some("{broken"));
+        assert_eq!(resolved["footerText"], serde_json::json!("由 Wordma 驱动"));
+    }
+
+    #[test]
+    fn validate_theme_setting_values_rejects_bad_input() {
+        let schema = vec![
+            ThemeSetting { key: "postsPerPage".into(), label: "每页".into(), r#type: ThemeSettingType::Number, default: serde_json::json!(10), options: vec![] },
+            ThemeSetting { key: "showTags".into(), label: "标签".into(), r#type: ThemeSettingType::Switch, default: serde_json::json!(true), options: vec![] },
+        ];
+        let mut values = HashMap::new();
+        values.insert("unknown".to_string(), serde_json::json!(1));
+        assert!(validate_theme_setting_values(&schema, &values).is_err());
+
+        let mut values = HashMap::new();
+        values.insert("postsPerPage".to_string(), serde_json::json!("50"));
+        assert!(validate_theme_setting_values(&schema, &values).is_err());
+        values.insert("postsPerPage".to_string(), serde_json::json!(0));
+        assert!(validate_theme_setting_values(&schema, &values).is_err());
+        values.insert("postsPerPage".to_string(), serde_json::json!(101));
+        assert!(validate_theme_setting_values(&schema, &values).is_err());
+        values.insert("postsPerPage".to_string(), serde_json::json!(3.5));
+        assert!(validate_theme_setting_values(&schema, &values).is_err());
+
+        values.insert("postsPerPage".to_string(), serde_json::json!(50));
+        assert!(validate_theme_setting_values(&schema, &values).is_ok());
+
+        let mut values = HashMap::new();
+        values.insert("showTags".to_string(), serde_json::json!("true"));
+        assert!(validate_theme_setting_values(&schema, &values).is_err());
+    }
+
+    #[test]
+    fn render_site_applies_theme_settings() {
+        let conn = mem_db();
+        let site = insert_site(&conn, "分页站", None).unwrap();
+        for i in 1..=11 {
+            let art = insert_article(&conn, site.id, &format!("第{}篇", i)).unwrap();
+            update_article(
+                &conn,
+                art.id,
+                None,
+                None,
+                Some(STATUS_PUBLISHED),
+                None,
+                &[],
+                &[],
+            )
+            .unwrap();
+        }
+        // 按站点×主题写入设置值（页脚文案 + 每页 3 篇）
+        crate::site::set_setting(
+            &conn,
+            &format!("{}{}:default", THEME_SETTINGS_KEY_PREFIX, site.id),
+            r#"{"footerText":"由 Wordma 测试驱动","postsPerPage":3}"#,
+        )
+        .unwrap();
+
+        let tmp = std::env::temp_dir().join(format!("wordma-tsettings-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let themes_dir = tmp.join("themes");
+        extract_builtin_theme(&themes_dir).unwrap();
+        let dist = tmp.join("preview").join(site.id.to_string());
+
+        render_site_to(
+            &conn,
+            &dist,
+            &themes_dir,
+            "default",
+            site.id,
+            false,
+            "http://127.0.0.1:12739",
+            None,
+        )
+        .unwrap();
+
+        // 页脚使用自定义文案
+        let index = fs::read_to_string(dist.join("index.html")).unwrap();
+        assert!(index.contains("由 Wordma 测试驱动"));
+        // 首页分页大小为 3：第 1 页是最新 3 篇（第11/10/9）
+        assert!(index.contains("第11篇"));
+        assert!(index.contains("第9篇"));
+        assert!(!index.contains("第8篇"));
+        // 第 2/4 页存在，第 4 页含最早的两篇
+        let page2 = fs::read_to_string(dist.join("page").join("2").join("index.html")).unwrap();
+        assert!(page2.contains("第8篇"));
+        let page4 = fs::read_to_string(dist.join("page").join("4").join("index.html")).unwrap();
+        assert!(page4.contains("第1篇"));
+
+        // postsPerPage 越界（0）→ 回落默认每页 10 篇
+        crate::site::set_setting(
+            &conn,
+            &format!("{}{}:default", THEME_SETTINGS_KEY_PREFIX, site.id),
+            r#"{"postsPerPage":0}"#,
+        )
+        .unwrap();
+        let _ = fs::remove_dir_all(&dist);
+        render_site_to(
+            &conn,
+            &dist,
+            &themes_dir,
+            "default",
+            site.id,
+            false,
+            "http://127.0.0.1:12739",
+            None,
+        )
+        .unwrap();
+        let index = fs::read_to_string(dist.join("index.html")).unwrap();
+        assert!(index.contains("第10篇")); // 第 1 页 10 篇（第11..第2）
+        assert!(!dist.join("page").join("3").join("index.html").exists());
+        assert!(dist.join("page").join("2").join("index.html").is_file());
+
+        // 无设置的站点 → 页脚回落默认文案
+        let site2 = insert_site(&conn, "另一站", None).unwrap();
+        let dist2 = tmp.join("preview").join(site2.id.to_string());
+        render_site_to(
+            &conn,
+            &dist2,
+            &themes_dir,
+            "default",
+            site2.id,
+            false,
+            "http://127.0.0.1:12739",
+            None,
+        )
+        .unwrap();
+        let index2 = fs::read_to_string(dist2.join("index.html")).unwrap();
+        assert!(index2.contains("由 Wordma 驱动"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn render_site_writes_expected_files() {
         let conn = mem_db();
         let site = insert_site(&conn, "我的博客", Some("安静写作")).unwrap();
@@ -1265,7 +1706,8 @@ mod tests {
             &[tag.id],
         )
         .unwrap();
-        let _ = insert_article(&conn, site.id, "草稿箱里的文章"); // 未发布
+        let draft = insert_article(&conn, site.id, "草稿箱里的文章"); // 未发布
+        let draft = draft.unwrap();
         let _ = insert_page(&conn, site.id, "关于我", "about").unwrap();
 
         let tmp = std::env::temp_dir().join(format!("wordma-render-{}", std::process::id()));
@@ -1274,12 +1716,13 @@ mod tests {
         extract_builtin_theme(&themes_dir).unwrap();
         let dist = tmp.join("preview").join(site.id.to_string());
 
-        let report = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false, "http://127.0.0.1:12739").unwrap();
+        let report = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false, "http://127.0.0.1:12739", None).unwrap();
         assert!(report.files >= 5);
 
         // 首页：含发布文章与站点名，不含草稿；导航含独立页面
         let index = fs::read_to_string(dist.join("index.html")).unwrap();
         assert!(index.contains("山中一日"));
+        assert!(index.contains("由 Wordma 驱动")); // 默认页脚文案
         assert!(index.contains("我的博客"));
         assert!(index.contains("关于我"));
         assert!(!index.contains("草稿箱里的文章"));
@@ -1314,9 +1757,10 @@ mod tests {
 
         // 预览模式渲染草稿详情页，但列表仍只显示已发布
         let dist2 = tmp.join("preview2");
-        render_site_to(&conn, &dist2, &themes_dir, "default", site.id, true, "http://127.0.0.1:12739").unwrap();
+        render_site_to(&conn, &dist2, &themes_dir, "default", site.id, true, "http://127.0.0.1:12739", None).unwrap();
         let draft_html =
-            fs::read_to_string(dist2.join("post").join("post-2.html")).unwrap();
+            fs::read_to_string(dist2.join("post").join(format!("{}.html", draft.slug)))
+                .unwrap();
         assert!(draft_html.contains("草稿箱里的文章"));
         let index2 = fs::read_to_string(dist2.join("index.html")).unwrap();
         assert!(!index2.contains("草稿箱里的文章"));
@@ -1327,7 +1771,7 @@ mod tests {
             .unwrap();
         let rules = RoutingRules { post: "/[year]/[month].html".into(), ..Default::default() };
         crate::routing::set_routing_rules(&conn, site.id, &rules).unwrap();
-        let err = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false, "http://127.0.0.1:12739").unwrap_err();
+        let err = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false, "http://127.0.0.1:12739", None).unwrap_err();
         assert!(err.contains("路径冲突"));
 
         let _ = fs::remove_dir_all(&tmp);

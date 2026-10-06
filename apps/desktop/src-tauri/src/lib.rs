@@ -1,5 +1,6 @@
 mod article;
 mod db;
+mod media;
 mod pages;
 mod routing;
 mod site;
@@ -50,10 +51,15 @@ pub fn run() {
             theme::list_themes_cmd,
             theme::set_active_theme_cmd,
             theme::render_site_cmd,
+            media::list_media,
+            media::upload_media,
+            media::delete_media_cmd,
             theme::open_preview_cmd,
             theme::open_themes_dir_cmd,
             theme::delete_theme_cmd,
             theme::get_preview_port_cmd,
+            theme::get_theme_settings_cmd,
+            theme::set_theme_settings_cmd,
             theme::set_preview_port_cmd
         ])
         .run(tauri::generate_context!())

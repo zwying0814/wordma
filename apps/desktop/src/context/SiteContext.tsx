@@ -2,6 +2,7 @@ import { createContext, useContext } from "react";
 import type { Article } from "../lib/article";
 import type { SitePage } from "../lib/pages";
 import type { Category, Tag } from "../lib/taxonomy";
+import type { MediaItem } from "../lib/media";
 import type { Site } from "../lib/site";
 
 export interface SiteContextValue {
@@ -19,6 +20,8 @@ export interface SiteContextValue {
   pages: SitePage[];
   pagesLoading: boolean;
   reloadPages: () => void;
+  media: MediaItem[];
+  reloadMedia: () => void;
 }
 
 export const SiteContext = createContext<SiteContextValue | null>(null);

@@ -24,9 +24,15 @@ function PageRow({
     <div
       role="button"
       tabIndex={0}
-      onClick={() => navigate(`/pages/edit/${page.id}`)}
+      onClick={(e) => {
+        // 点击行内按钮（编辑/删除/气泡）不触发整行跳转，与文章列表守卫一致
+        if ((e.target as HTMLElement).closest("button")) return;
+        navigate(`/pages/edit/${page.id}`);
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") navigate(`/pages/edit/${page.id}`);
+        if (e.key === "Enter" && e.target === e.currentTarget) {
+          navigate(`/pages/edit/${page.id}`);
+        }
       }}
       {...stylex.props(
         pageStyles.row,

@@ -10,6 +10,27 @@ export interface ThemePreview {
   accent: string;
 }
 
+export type ThemeSettingType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "switch"
+  | "select"
+  | "color";
+
+export interface ThemeSetting {
+  key: string;
+  label: string;
+  type: ThemeSettingType;
+  default: unknown;
+  options: string[];
+}
+
+export interface ThemeSettingsPayload {
+  schema: ThemeSetting[];
+  values: Record<string, unknown>;
+}
+
 export interface ThemeMeta {
   name: string;
   displayName: string;
@@ -25,6 +46,8 @@ export interface ThemeMeta {
   invalidMessage: string | null;
   /** 仅激活主题携带：当前站点的预览地址 */
   previewUrl: string | null;
+  /** 主题设置项 schema；缺省即无设置界面 */
+  settings: ThemeSetting[];
 }
 
 export interface RenderReport {
@@ -59,3 +82,15 @@ export const getPreviewPort = (): Promise<number> =>
 
 export const setPreviewPort = (port: number): Promise<void> =>
   invoke("set_preview_port_cmd", { port });
+
+export const getThemeSettings = (
+  siteId: number,
+  name: string,
+): Promise<ThemeSettingsPayload> =>
+  invoke("get_theme_settings_cmd", { siteId, name });
+
+export const setThemeSettings = (
+  siteId: number,
+  name: string,
+  values: Record<string, unknown>,
+): Promise<void> => invoke("set_theme_settings_cmd", { siteId, name, values });

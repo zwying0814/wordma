@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use tauri::Manager;
 
 /// SQLite 连接，包装为 Tauri 全局状态
@@ -54,6 +54,18 @@ CREATE TABLE IF NOT EXISTS article_categories (
     category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     PRIMARY KEY (article_id, category_id)
 );
+CREATE TABLE IF NOT EXISTS media (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL DEFAULT '',
+    mime_type TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    size INTEGER NOT NULL DEFAULT 0,
+    path TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_media_site ON media(site_id);
 CREATE TABLE IF NOT EXISTS pages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
@@ -116,8 +128,35 @@ pub fn run_migrations(conn: &Connection) -> Result<(), String> {
         conn.execute("ALTER TABLE articles ADD COLUMN slug TEXT", [])
             .map_err(|e| format!("添加 slug 列失败: {e}"))?;
     }
-    conn.execute("UPDATE articles SET slug = 'post-' || id WHERE slug IS NULL", [])
-        .map_err(|e| format!("回填 slug 失败: {e}"))?;
+    // 回填：NULL（老库新增列）与旧版自动生成的 post-{id} 数字 slug
+    // 一并迁移为随机字母串
+    let need_backfill: Vec<i64> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id FROM articles
+                 WHERE slug IS NULL OR slug GLOB 'post-[0-9]*'",
+            )
+            .map_err(|e| format!("检查 slug 失败: {e}"))?;
+        let rows = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| format!("检查 slug 失败: {e}"))?;
+        rows.collect::<Result<Vec<_>, rusqlite::Error>>()
+            .map_err(|e| format!("读取 slug 失败: {e}"))?
+    };
+    for id in need_backfill {
+        for _ in 0..5 {
+            let slug = crate::article::generate_slug();
+            let updated = conn.execute(
+                "UPDATE articles SET slug = ?1 WHERE id = ?2",
+                params![slug, id],
+            );
+            match updated {
+                Ok(_) => break,
+                Err(e) if is_unique_conflict(&e) => continue, // 撞 slug 重试
+                Err(e) => return Err(format!("回填 slug 失败: {e}")),
+            }
+        }
+    }
     conn.execute_batch(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_site_slug ON articles(site_id, slug);",
     )

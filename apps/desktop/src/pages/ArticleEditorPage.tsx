@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { App as AntdApp, Button, Select, Spin } from "antd";
 import { ArrowLeft, Eye } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
@@ -14,6 +14,8 @@ import {
   type ArticleStatus,
 } from "../lib/article";
 import { openPreview, renderSite } from "../lib/theme";
+import { uploadMedia, mediaPublicUrl } from "../lib/media";
+import MediaPickerModal from "../components/MediaPickerModal";
 import { countWords, fmtDate } from "../lib/words";
 
 // 布局对应设计稿 .editor（顶栏 + 居中窄栏编辑区）
@@ -68,6 +70,38 @@ export default function ArticleEditorPage({
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [tagIds, setTagIds] = useState<number[]>([]);
   const [slug, setSlug] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerResolver = useRef<((url: string | null) => void) | null>(null);
+
+  // 粘贴/拖入图片：上传到媒体库后插入
+  const handlePasteImage = useCallback(
+    async (file: File) => {
+      try {
+        const media = await uploadMedia(activeSite.id, file);
+        return mediaPublicUrl(media);
+      } catch (e) {
+        message.error(String(e));
+        return null;
+      }
+    },
+    [activeSite.id, message],
+  );
+
+  // 工具栏“插入图片”：打开媒体库选择
+  const handlePickImage = useCallback(
+    () =>
+      new Promise<string | null>((resolve) => {
+        pickerResolver.current = resolve;
+        setPickerOpen(true);
+      }),
+    [],
+  );
+
+  const closePicker = (url: string | null) => {
+    setPickerOpen(false);
+    pickerResolver.current?.(url);
+    pickerResolver.current = null;
+  };
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -267,8 +301,11 @@ export default function ArticleEditorPage({
             key={article.id}
             initialValue={content}
             onChange={setContent}
+            onPasteImage={handlePasteImage}
+            onPickImage={handlePickImage}
             placeholder="正文支持 Markdown：## 小标题、- 列表、> 引用、**加粗**…"
           />
+          <MediaPickerModal open={pickerOpen} onClose={closePicker} />
         </div>
       </div>
     </div>

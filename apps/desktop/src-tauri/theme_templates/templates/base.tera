@@ -19,6 +19,6 @@
   </div>
 </header>
 <main class="wrap">{% block content %}{% endblock %}</main>
-<footer class="site-foot"><div class="wrap">{{ site.description }}</div></footer>
+<footer class="site-foot"><div class="wrap">{{ theme.footerText | default(value="由 Wordma 驱动") }}</div></footer>
 </body>
 </html>

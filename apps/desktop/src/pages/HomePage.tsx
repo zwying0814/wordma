@@ -21,6 +21,8 @@ import {
   type Tag,
 } from "../lib/taxonomy";
 import { listPages, type SitePage } from "../lib/pages";
+import { listMedia, type MediaItem } from "../lib/media";
+import MediaPage from "./MediaPage";
 import ArticlesPage from "./ArticlesPage";
 import ArticleEditorPage from "./ArticleEditorPage";
 import DashboardPage from "./DashboardPage";
@@ -49,6 +51,7 @@ export default function HomePage() {
   const [taxonomyLoading, setTaxonomyLoading] = useState(true);
   const [pages, setPages] = useState<SitePage[]>([]);
   const [pagesLoading, setPagesLoading] = useState(true);
+  const [media, setMedia] = useState<MediaItem[]>([]);
 
   useEffect(() => {
     // 启动检查：没有站点时进入欢迎页；有站点时恢复上次激活的站点
@@ -120,6 +123,17 @@ export default function HomePage() {
     reloadPages();
   }, [reloadPages]);
 
+  const reloadMedia = useCallback(() => {
+    if (activeSite == null) return;
+    listMedia(activeSite.id)
+      .then(setMedia)
+      .catch(() => {});
+  }, [activeSite]);
+
+  useEffect(() => {
+    reloadMedia();
+  }, [reloadMedia]);
+
   // 必须在所有早退 return 之前调用（Rules of Hooks）；
   // activeSite 就绪前值为 null，Provider 只在就绪分支渲染
   const siteContextValue = useMemo(
@@ -137,6 +151,8 @@ export default function HomePage() {
             pages,
             pagesLoading,
             reloadPages,
+            media,
+            reloadMedia,
           }
         : null,
     [
@@ -151,6 +167,8 @@ export default function HomePage() {
       pages,
       pagesLoading,
       reloadPages,
+      media,
+      reloadMedia,
     ],
   );
 
@@ -258,6 +276,7 @@ export default function HomePage() {
             <Route path="/editor/:id" component={ArticleEditorPage} />
             <Route path="/tags" component={TagsPage} />
             <Route path="/categories" component={CategoriesPage} />
+            <Route path="/media" component={MediaPage} />
             <Route path="/pages" component={PagesPage} />
             <Route path="/pages/edit/:id" component={PageEditorPage} />
             <Route path="/themes" component={ThemePage} />
