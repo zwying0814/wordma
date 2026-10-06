@@ -41,7 +41,7 @@ static PREVIEW_LISTENER: Mutex<Option<(TcpListener, Arc<AtomicBool>)>> =
 // ===== 内置默认主题（编译进二进制，首次运行落盘，用户可直接改） =====
 
 const BUILTIN_FILES: &[(&str, &str)] = &[
-    ("theme.json", include_str!("../theme_templates/theme.json")),
+    ("theme.yaml", include_str!("../theme_templates/theme.yaml")),
     (
         "templates/base.tera",
         include_str!("../theme_templates/templates/base.tera"),
@@ -116,6 +116,13 @@ pub fn extract_builtin_theme(themes_dir: &Path) -> Result<(), String> {
         .and_then(|raw| serde_json::from_str(&raw).ok())
         .unwrap_or_default();
 
+    // 旧版 JSON 配置迁移：内容已由 theme.yaml 取代，移除遗留文件
+    let legacy_json = dir.join("theme.json");
+    if legacy_json.exists() {
+        let _ = fs::remove_file(&legacy_json);
+        manifest.hashes.remove("theme.json");
+    }
+
     for (rel, builtin) in BUILTIN_FILES {
         let path = dir.join(rel);
         if let Some(parent) = path.parent() {
@@ -165,7 +172,7 @@ pub fn extract_builtin_theme(themes_dir: &Path) -> Result<(), String> {
 
 // ===== 主题元信息 =====
 
-/// 主题卡片缩略图的预览配色（theme.json 可选声明）
+/// 主题卡片缩略图的预览配色（theme.yaml 可选声明）
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThemePreview {
@@ -198,7 +205,7 @@ pub enum ThemeSettingType {
     Text,
 }
 
-/// 主题设置项声明（theme.json 的 settings 数组元素；整段可选）
+/// 主题设置项声明（theme.yaml 的 settings 数组元素；整段可选）
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ThemeSetting {
@@ -241,7 +248,7 @@ pub struct ThemeMeta {
     /// 主题设置项 schema；缺省即该主题无设置界面
     #[serde(default)]
     pub settings: Vec<ThemeSetting>,
-    // 运行时计算的字段：theme.json 解析时缺省，序列化时输出给前端
+    // 运行时计算的字段：theme.yaml 解析时缺省，序列化时输出给前端
     #[serde(default)]
     pub active: bool,
     /// 非空表示主题结构损坏，卡片只读展示原因
@@ -289,20 +296,20 @@ fn theme_settings_key(site_id: i64, theme_name: &str) -> String {
     format!("{THEME_SETTINGS_KEY_PREFIX}{site_id}:{theme_name}")
 }
 
-/// 读取主题的设置项 schema；theme.json 缺失/损坏 → 空（不阻断渲染）
+/// 读取主题的设置项 schema；theme.yaml 缺失/损坏 → 空（不阻断渲染）
 fn load_theme_settings(themes_dir: &Path, theme_name: &str) -> Vec<ThemeSetting> {
-    let raw = match fs::read_to_string(themes_dir.join(theme_name).join("theme.json")) {
+    let raw = match fs::read_to_string(themes_dir.join(theme_name).join("theme.yaml")) {
         Ok(raw) => raw,
         Err(_) => return Vec::new(),
     };
-    serde_json::from_str::<ThemeMeta>(&raw)
+    serde_yaml::from_str::<ThemeMeta>(&raw)
         .map(|meta| meta.settings)
         .unwrap_or_default()
 }
 
 /// 渲染端合并（宽松）：存储值类型不符 → schema default → 零值；未知 key 忽略。
 /// 与 save 路径的严格校验是有意的不对称：自家表单只产出合法值，
-/// 宽松只留给 DB / theme.json 被手工改坏的场景。
+/// 宽松只留给 DB / theme.yaml 被手工改坏的场景。
 fn resolve_theme_settings(
     schema: &[ThemeSetting],
     stored: Option<&str>,
@@ -393,18 +400,18 @@ pub fn validate_theme_dir(path: &Path) -> Result<(), String> {
     if !path.is_dir() {
         return Err("不是目录".into());
     }
-    if !path.join("theme.json").is_file() {
-        return Err("缺少 theme.json".into());
+    if !path.join("theme.yaml").is_file() {
+        return Err("缺少 theme.yaml".into());
     }
-    let raw = fs::read_to_string(path.join("theme.json"))
-        .map_err(|e| format!("读取 theme.json 失败: {e}"))?;
-    let _: ThemeMeta = serde_json::from_str(&raw).map_err(|e| format!("theme.json 格式错误: {e}"))?;
+    let raw = fs::read_to_string(path.join("theme.yaml"))
+        .map_err(|e| format!("读取 theme.yaml 失败: {e}"))?;
+    let _: ThemeMeta = serde_yaml::from_str(&raw).map_err(|e| format!("theme.yaml 格式错误: {e}"))?;
     let templates = path.join("templates");
     if !templates.is_dir() {
         return Err("缺少 templates 目录".into());
     }
     // settings 为可选声明，但声明了就要形状正确（给主题作者友好报错）
-    if let Ok(raw_json) = fs::read_to_string(path.join("theme.json")) {
+    if let Ok(raw_json) = fs::read_to_string(path.join("theme.yaml")) {
         if let Ok(meta) = serde_json::from_str::<ThemeMeta>(&raw_json) {
             let mut seen_keys = Vec::new();
             for (i, setting) in meta.settings.iter().enumerate() {
@@ -452,16 +459,16 @@ pub fn list_themes(
     for entry in entries {
         let entry = entry.map_err(|e| format!("扫描主题目录失败: {e}"))?;
         let path = entry.path();
-        if !path.is_dir() || !path.join("theme.json").exists() {
+        if !path.is_dir() || !path.join("theme.yaml").exists() {
             continue;
         }
         let name = entry.file_name().to_string_lossy().to_string();
         let meta = match validate_theme_dir(&path) {
             Ok(()) => {
-                let raw = fs::read_to_string(path.join("theme.json"))
-                    .map_err(|e| format!("读取 theme.json 失败: {e}"))?;
-                let mut meta: ThemeMeta = serde_json::from_str(&raw)
-                    .map_err(|e| format!("解析 theme.json 失败（{}）：{e}", path.display()))?;
+                let raw = fs::read_to_string(path.join("theme.yaml"))
+                    .map_err(|e| format!("读取 theme.yaml 失败: {e}"))?;
+                let mut meta: ThemeMeta = serde_yaml::from_str(&raw)
+                    .map_err(|e| format!("解析 theme.yaml 失败（{}）：{e}", path.display()))?;
                 meta.name = name.clone();
                 if meta.display_name.is_empty() {
                     meta.display_name = meta.name.clone();
@@ -1277,7 +1284,7 @@ pub fn get_theme_settings_cmd(
     name: String,
 ) -> Result<ThemeSettingsPayload, String> {
     let themes_dir = themes_root(&app)?;
-    if !themes_dir.join(&name).join("theme.json").exists() {
+    if !themes_dir.join(&name).join("theme.yaml").exists() {
         return Err(format!("主题不存在: {name}"));
     }
     let conn = db.0.lock().map_err(|e| format!("数据库连接不可用: {e}"))?;
@@ -1384,7 +1391,7 @@ pub fn set_active_theme_cmd(
     name: String,
 ) -> Result<(), String> {
     let themes_dir = themes_root(&app)?;
-    if !themes_dir.join(&name).join("theme.json").exists() {
+    if !themes_dir.join(&name).join("theme.yaml").exists() {
         return Err(format!("主题不存在: {name}"));
     }
     let conn = db.0.lock().map_err(|e| format!("数据库连接不可用: {e}"))?;
@@ -1480,6 +1487,13 @@ mod tests {
         extract_builtin_theme(&themes_dir).unwrap();
         assert!(taxonomies.is_file());
 
+        // 旧版 JSON 配置迁移：遗留 theme.json 被移除，theme.yaml 就位
+        let legacy = themes_dir.join("default").join("theme.json");
+        fs::write(&legacy, "{\"name\": \"default\"}").unwrap();
+        extract_builtin_theme(&themes_dir).unwrap();
+        assert!(!legacy.exists());
+        assert!(themes_dir.join("default").join("theme.yaml").is_file());
+
         // manifest 记录被改回内置指纹（模拟"未被用户修改"）→ 内置内容覆盖
         let manifest_path = themes_dir.join("default").join(".builtin-manifest.json");
         let manifest = fs::read_to_string(&manifest_path).unwrap();
@@ -1505,17 +1519,13 @@ mod tests {
         fs::write(theme_dir.join("templates").join("index.tera"), "x").unwrap();
 
         // 无 settings → 空 schema
-        fs::write(theme_dir.join("theme.json"), r#"{"name":"t1"}"#).unwrap();
+        fs::write(theme_dir.join("theme.yaml"), "name: t1\n").unwrap();
         assert!(load_theme_settings(&tmp, "t1").is_empty());
 
         // 缺 type → Text；未知 type → Text（serde other）；缺 default → Null
         fs::write(
-            theme_dir.join("theme.json"),
-            r#"{"name":"t1","settings":[
-                {"key":"a","label":"A"},
-                {"key":"b","label":"B","type":"gallery"},
-                {"key":"c","label":"C","type":"text"}
-            ]}"#,
+            theme_dir.join("theme.yaml"),
+            "name: t1\nsettings:\n  - key: a\n    label: A\n  - key: b\n    label: B\n    type: gallery\n  - key: c\n    label: C\n    type: text\n",
         )
         .unwrap();
         let schema = load_theme_settings(&tmp, "t1");
