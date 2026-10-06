@@ -14,7 +14,12 @@ import {
   type ArticleStatus,
 } from "../lib/article";
 import { openPreview, renderSite } from "../lib/theme";
-import { uploadMedia, mediaPublicUrl } from "../lib/media";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import {
+  listMedia,
+  uploadMedia,
+  mediaPublicUrl,
+} from "../lib/media";
 import MediaPickerModal from "../components/MediaPickerModal";
 import { countWords, fmtDate } from "../lib/words";
 
@@ -59,7 +64,7 @@ export default function ArticleEditorPage({
 }: {
   params: { id: string };
 }) {
-  const { activeSite, reloadArticles, tags, categories } = useSite();
+  const { activeSite, reloadArticles, reloadMedia, tags, categories } = useSite();
   const { message } = AntdApp.useApp();
   const [, navigate] = useLocation();
   const [article, setArticle] = useState<Article | null>(null);
@@ -70,6 +75,9 @@ export default function ArticleEditorPage({
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [tagIds, setTagIds] = useState<number[]>([]);
   const [slug, setSlug] = useState("");
+  // filename → 磁盘绝对路径：编辑器显示图片时把 /media/x 解析为 asset 地址
+  const mediaPathsRef = useRef<Record<string, string>>({});
+  const [mediaReady, setMediaReady] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerResolver = useRef<((url: string | null) => void) | null>(null);
 
@@ -78,13 +86,41 @@ export default function ArticleEditorPage({
     async (file: File) => {
       try {
         const media = await uploadMedia(activeSite.id, file);
+        mediaPathsRef.current = {
+          ...mediaPathsRef.current,
+          [media.filename]: media.path,
+        };
+        reloadMedia();
         return mediaPublicUrl(media);
       } catch (e) {
         message.error(String(e));
         return null;
       }
     },
-    [activeSite.id, message],
+    [activeSite.id, reloadMedia],
+  );
+
+  // 站点媒体清单变化时刷新 filename → path 映射（编辑器挂载前必须就绪）
+  useEffect(() => {
+    setMediaReady(false);
+    listMedia(activeSite.id)
+      .then((list) => {
+        const map: Record<string, string> = {};
+        for (const m of list) map[m.filename] = m.path;
+        mediaPathsRef.current = map;
+      })
+      .catch(() => {})
+      .finally(() => setMediaReady(true));
+  }, [activeSite.id]);
+
+  const handleResolveImageUrl = useCallback(
+    (src: string) => {
+      if (!src.startsWith("/media/")) return src;
+      const filename = src.slice("/media/".length);
+      const path = mediaPathsRef.current[filename];
+      return path ? convertFileSrc(path) : src;
+    },
+    [],
   );
 
   // 工具栏“插入图片”：打开媒体库选择
@@ -201,7 +237,7 @@ export default function ArticleEditorPage({
     );
   }
 
-  if (!article) {
+  if (!article || !mediaReady) {
     return (
       <div
         {...stylex.props(
@@ -303,6 +339,7 @@ export default function ArticleEditorPage({
             onChange={setContent}
             onPasteImage={handlePasteImage}
             onPickImage={handlePickImage}
+            onResolveImageUrl={handleResolveImageUrl}
             placeholder="正文支持 Markdown：## 小标题、- 列表、> 引用、**加粗**…"
           />
           <MediaPickerModal open={pickerOpen} onClose={closePicker} />

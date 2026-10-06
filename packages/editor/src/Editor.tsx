@@ -1,5 +1,6 @@
 /// <reference path="./env.d.ts" />
 import { useRef } from "react";
+import { mergeAttributes } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { Image } from "@tiptap/extension-image";
 import { Markdown } from "@tiptap/markdown";
@@ -20,6 +21,8 @@ export interface WordmaEditorProps {
   onPasteImage?: (file: File) => Promise<string | null>;
   /** 工具栏“插入图片”点击时调用：返回插入 URL，null 表示取消 */
   onPickImage?: () => Promise<string | null>;
+  /** 编辑器显示图片节点时，把 markdown 里的 src（如 /media/x.png）解析为可加载地址 */
+  onResolveImageUrl?: (src: string) => string;
 }
 
 const styles = stylex.create({
@@ -45,18 +48,30 @@ export function WordmaEditor({
   onChange,
   onPasteImage,
   onPickImage,
+  onResolveImageUrl,
   placeholder,
 }: WordmaEditorProps) {
   // 编辑器选项闭包经 ref 取最新引用，避免过期捕获
   const pasteRef = useRef(onPasteImage);
   pasteRef.current = onPasteImage;
+  const resolveRef = useRef(onResolveImageUrl);
+  resolveRef.current = onResolveImageUrl;
+
+  // 图片渲染时经 resolveImageUrl 解析 src（markdown 中仍存公开路径）
+  const ResolvedImage = Image.extend({
+    renderHTML({ node, HTMLAttributes }) {
+      const src = (node.attrs.src as string) ?? "";
+      const resolved = resolveRef.current?.(src) ?? src;
+      return ["img", mergeAttributes(HTMLAttributes, { src: resolved })];
+    },
+  });
 
   const editor = useEditor({
     // 初始内容按 markdown 解析（v3 的 contentType 选项）
     contentType: "markdown",
     extensions: [
       StarterKit,
-      Image.configure({ allowBase64: false }),
+      ResolvedImage.configure({ allowBase64: false }),
       Markdown,
       Placeholder.configure({ placeholder: placeholder ?? "" }),
       SlashCommand,
