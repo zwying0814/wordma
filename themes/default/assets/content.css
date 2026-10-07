@@ -144,8 +144,25 @@
 
 /* 图片节点视图（编辑器内）：四角手柄定位容器 */
 .image-node-view {
+  position: relative;
   display: block;
   width: fit-content;
   max-width: 100%;
   margin: 0.6em 0;
+}
+
+/* 四角缩放手柄：仅选中节点时显示 */
+.image-node-view .resize-handle {
+  display: none;
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--ant-color-primary);
+  border: 2px solid #fff;
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.image-node-view.ProseMirror-selectednode .resize-handle {
+  display: block;
 }

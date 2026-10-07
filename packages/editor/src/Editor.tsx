@@ -193,11 +193,12 @@ export function WordmaEditor({
         // 四角缩放手柄：pointer 拖拽实时改宽度，pointerup 一次性提交事务
         for (const dir of ["nw", "ne", "sw", "se"] as const) {
           const handle = document.createElement("div");
+          handle.className = "resize-handle";
           handle.setAttribute("data-resize-handle", dir);
           handle.contentEditable = "false";
-          handle.style.cssText = `position:absolute;${
+          handle.style.cssText = `${
             dir.includes("w") ? "left:0" : "right:0"
-          };${dir.startsWith("n") ? "top:0" : "bottom:0"};width:10px;height:10px;background:var(--ant-color-primary);border:2px solid #fff;border-radius:2px;cursor:${
+          };${dir.startsWith("n") ? "top:0" : "bottom:0"};cursor:${
             dir === "nw" || dir === "se" ? "nwse-resize" : "nesw-resize"
           };`;
           handle.addEventListener("pointerdown", (event) => {
