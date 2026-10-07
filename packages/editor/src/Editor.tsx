@@ -1,7 +1,9 @@
 /// <reference path="./env.d.ts" />
 import { useRef } from "react";
 import { mergeAttributes } from "@tiptap/core";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import { NodeSelection } from "@tiptap/pm/state";
 import { Image } from "@tiptap/extension-image";
 import { TableKit } from "@tiptap/extension-table";
 import TextAlign from "@tiptap/extension-text-align";
@@ -9,6 +11,7 @@ import { Markdown } from "@tiptap/markdown";
 import Placeholder from "@tiptap/extension-placeholder";
 import StarterKit from "@tiptap/starter-kit";
 import * as stylex from "@stylexjs/stylex";
+import { AlignCenter, AlignLeft, AlignRight, Trash2 } from "lucide-react";
 import { Toolbar } from "./components/Toolbar";
 import { SlashCommand } from "./extensions/SlashCommand";
 import "./editor.css";
@@ -75,6 +78,51 @@ function fixMarkdownTables(text: string): string {
 }
 
 const styles = stylex.create({
+  bubble: {
+    display: "flex",
+    alignItems: "center",
+    gap: 2,
+    padding: 4,
+    backgroundColor: "var(--ant-color-bg-container)",
+    borderStyle: "solid",
+    borderWidth: 1,
+    borderColor: "var(--ant-color-border-secondary)",
+    borderRadius: 8,
+    boxShadow: "var(--ant-box-shadow-secondary)",
+  },
+  bubbleBtn: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    borderStyle: "none",
+    borderRadius: 4,
+    padding: "2px 6px",
+    fontSize: 12,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    color: "var(--ant-color-text)",
+    backgroundColor: {
+      default: "transparent",
+      ":hover": "var(--ant-color-fill-tertiary)",
+    },
+  },
+  bubbleBtnActive: {
+    color: "var(--ant-color-primary)",
+    backgroundColor: {
+      default: "var(--ant-color-primary-bg)",
+      ":hover": "var(--ant-color-primary-bg)",
+    },
+  },
+  bubbleBtnDanger: {
+    color: "var(--ant-color-error)",
+  },
+  divider: {
+    width: 1,
+    alignSelf: "stretch",
+    marginInline: 4,
+    backgroundColor: "var(--ant-color-border-secondary)",
+  },
   root: {
     display: "flex",
     flexDirection: "column",
@@ -107,12 +155,30 @@ export function WordmaEditor({
   const resolveRef = useRef(onResolveImageUrl);
   resolveRef.current = onResolveImageUrl;
 
-  // 图片渲染时经 resolveImageUrl 解析 src（markdown 中仍存公开路径）
+  // 图片渲染时经 resolveImageUrl 解析 src（markdown 中仍存公开路径），
+  // 并按 align 属性设置对齐（居中/右靠时转为块级 + auto 边距）
   const ResolvedImage = Image.extend({
+    addAttributes() {
+      return {
+        ...this.parent?.(),
+        align: {
+          default: "center",
+          parseHTML: (element) => element.getAttribute("data-align") ?? "center",
+          renderHTML: (attributes) => ({ "data-align": attributes.align }),
+        },
+      };
+    },
     renderHTML({ node, HTMLAttributes }) {
       const src = (node.attrs.src as string) ?? "";
       const resolved = resolveRef.current?.(src) ?? src;
-      return ["img", mergeAttributes(HTMLAttributes, { src: resolved })];
+      const align = (node.attrs.align as string) ?? "center";
+      const margins =
+        align === "center"
+          ? "display:block;margin-inline:auto;"
+          : align === "right"
+            ? "display:block;margin-inline-start:auto;"
+            : "display:block;";
+      return ["img", mergeAttributes(HTMLAttributes, { src: resolved, style: margins })];
     },
   });
 
@@ -211,9 +277,152 @@ export function WordmaEditor({
     },
   });
 
+  // 气泡状态：是否选中图片 / 当前图片对齐 / 是否在表格内
+  const editorState = useEditorState({
+    editor,
+    selector: ({ editor: e }) =>
+      e
+        ? {
+            isImage:
+              e.state.selection instanceof NodeSelection &&
+              e.state.selection.node.type.name === "image",
+            imageAlign:
+              (e.getAttributes("image").align as string | undefined) ?? "center",
+            inTable: e.isActive("table"),
+          }
+        : null,
+  });
+
   return (
     <div {...stylex.props(styles.root)}>
       <Toolbar editor={editor} onPickImage={onPickImage} />
+      {/* 选中图片时的气泡：对齐 + 删除 */}
+      <BubbleMenu
+        editor={editor}
+        pluginKey="imageBubble"
+        options={{ placement: "top", offset: 10 }}
+        shouldShow={({ state }) =>
+          state.selection instanceof NodeSelection &&
+          state.selection.node.type.name === "image"
+        }
+      >
+        <div {...stylex.props(styles.bubble)}>
+          <button
+            type="button"
+            title="左对齐"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() =>
+              editor?.chain().focus().updateAttributes("image", { align: "left" }).run()
+            }
+            {...stylex.props(
+              styles.bubbleBtn,
+              editorState?.imageAlign === "left" && styles.bubbleBtnActive,
+            )}
+          >
+            <AlignLeft size={14} />
+          </button>
+          <button
+            type="button"
+            title="居中"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() =>
+              editor?.chain().focus().updateAttributes("image", { align: "center" }).run()
+            }
+            {...stylex.props(
+              styles.bubbleBtn,
+              editorState?.imageAlign === "center" && styles.bubbleBtnActive,
+            )}
+          >
+            <AlignCenter size={14} />
+          </button>
+          <button
+            type="button"
+            title="右对齐"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() =>
+              editor?.chain().focus().updateAttributes("image", { align: "right" }).run()
+            }
+            {...stylex.props(
+              styles.bubbleBtn,
+              editorState?.imageAlign === "right" && styles.bubbleBtnActive,
+            )}
+          >
+            <AlignRight size={14} />
+          </button>
+          <button
+            type="button"
+            title="删除图片"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().deleteSelection().run()}
+            {...stylex.props(styles.bubbleBtn, styles.bubbleBtnDanger)}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </BubbleMenu>
+      {/* 光标在表格内时的气泡：行列操作 */}
+      <BubbleMenu
+        editor={editor}
+        pluginKey="tableBubble"
+        options={{ placement: "bottom", offset: 8 }}
+        shouldShow={({ editor: e }) => e.isActive("table")}
+      >
+        <div {...stylex.props(styles.bubble)}>
+          {(
+            [
+              ["行↑", () => editor?.chain().focus().addRowBefore().run()],
+              ["行↓", () => editor?.chain().focus().addRowAfter().run()],
+              ["列←", () => editor?.chain().focus().addColumnBefore().run()],
+              ["列→", () => editor?.chain().focus().addColumnAfter().run()],
+            ] as const
+          ).map(([label, fn]) => (
+            <button
+              key={label}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={fn}
+              {...stylex.props(styles.bubbleBtn)}
+            >
+              {label}
+            </button>
+          ))}
+          <span {...stylex.props(styles.divider)} />
+          {(
+            [
+              ["删行", () => editor?.chain().focus().deleteRow().run()],
+              ["删列", () => editor?.chain().focus().deleteColumn().run()],
+            ] as const
+          ).map(([label, fn]) => (
+            <button
+              key={label}
+              type="button"
+              title={label}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={fn}
+              {...stylex.props(styles.bubbleBtn, styles.bubbleBtnDanger)}
+            >
+              {label}
+            </button>
+          ))}
+          <span {...stylex.props(styles.divider)} />
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().toggleHeaderRow().run()}
+            {...stylex.props(styles.bubbleBtn)}
+          >
+            表头
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor?.chain().focus().deleteTable().run()}
+            {...stylex.props(styles.bubbleBtn, styles.bubbleBtnDanger)}
+          >
+            删表
+          </button>
+        </div>
+      </BubbleMenu>
       <div {...stylex.props(styles.scroll)}>
         <EditorContent editor={editor} />
       </div>
