@@ -15,8 +15,8 @@
         "title": "desktop",
         "width": 1440,
         "height": 960,
-        "minWidth": 1440,
-        "minHeight": 960
+        "minWidth": 1024,
+        "minHeight": 720
       }
     ],
     "security": {
