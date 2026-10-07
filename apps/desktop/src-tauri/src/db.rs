@@ -162,33 +162,6 @@ pub fn run_migrations(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("创建 slug 索引失败: {e}"))?;
 
-    // 内容格式迁移（一次性）：编辑器切换为 Tiptap 后内容统一存 HTML，
-    // 存量 markdown 在此转换为 HTML
-    let content_migrated = crate::site::get_setting(conn, "content_html_migrated")
-        .map_err(|e| format!("检查内容迁移状态失败: {e}"))?
-        .is_some();
-    if !content_migrated {
-        let rows: Vec<(i64, String)> = {
-            let mut stmt = conn
-                .prepare("SELECT id, content FROM articles")
-                .map_err(|e| format!("读取文章失败: {e}"))?;
-            let rows = stmt
-                .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-                .map_err(|e| format!("读取文章失败: {e}"))?;
-            rows.collect::<Result<Vec<_>, _>>()
-                .map_err(|e| format!("读取文章失败: {e}"))?
-        };
-        for (id, content) in rows {
-            let html = crate::article::markdown_to_html(&content);
-            conn.execute(
-                "UPDATE articles SET content = ?1 WHERE id = ?2",
-                params![html, id],
-            )
-            .map_err(|e| format!("迁移文章内容失败: {e}"))?;
-        }
-        crate::site::set_setting(conn, "content_html_migrated", "1")
-            .map_err(|e| format!("记录内容迁移状态失败: {e}"))?;
-    }
     Ok(())
 }
 

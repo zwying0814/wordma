@@ -9,15 +9,6 @@ use crate::db::Db;
 pub const STATUS_DRAFT: &str = "draft";
 pub const STATUS_PUBLISHED: &str = "published";
 
-/// markdown → HTML（存量内容一次性迁移用；新内容已是 HTML）
-pub fn markdown_to_html(md: &str) -> String {
-    use pulldown_cmark::{html, Options, Parser};
-    let parser = Parser::new_ext(md, Options::all());
-    let mut out = String::new();
-    html::push_html(&mut out, parser);
-    out
-}
-
 /// HTML 文本长度：剥掉标签后的非空白字符数（字数统计口径与前端一致）
 pub fn html_text_len(html: &str) -> usize {
     let mut text = String::new();

@@ -26,7 +26,6 @@ serde_yaml = "0.9"
 rusqlite = { version = "0.32", features = ["bundled"] }
 tera = "2"
 sha2 = "0.10"
-pulldown-cmark = "0.13"
 base64 = "0.22"
 rand = "0.8"
 
