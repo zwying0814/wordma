@@ -141,3 +141,11 @@
   max-width: 100%;
   height: auto;
 }
+
+/* 图片节点视图（编辑器内）：四角手柄定位容器 */
+.image-node-view {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.6em 0;
+}

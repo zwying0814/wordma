@@ -1,6 +1,5 @@
 /// <reference path="./env.d.ts" />
 import { useRef } from "react";
-import { mergeAttributes } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { NodeSelection } from "@tiptap/pm/state";
@@ -163,22 +162,94 @@ export function WordmaEditor({
         ...this.parent?.(),
         align: {
           default: "center",
-          parseHTML: (element) => element.getAttribute("data-align") ?? "center",
+          parseHTML: (element) =>
+            element.getAttribute("data-align") ?? element.getAttribute("align") ?? "center",
           renderHTML: (attributes) => ({ "data-align": attributes.align }),
         },
       };
     },
-    renderHTML({ node, HTMLAttributes }) {
-      const src = (node.attrs.src as string) ?? "";
-      const resolved = resolveRef.current?.(src) ?? src;
-      const align = (node.attrs.align as string) ?? "center";
-      const margins =
-        align === "center"
-          ? "display:block;margin-inline:auto;"
-          : align === "right"
-            ? "display:block;margin-inline-start:auto;"
-            : "display:block;";
-      return ["img", mergeAttributes(HTMLAttributes, { src: resolved, style: margins })];
+    // 自定义节点视图：显示时解析 src + 四角拖拽缩放（对齐 reactjs-tiptap-editor 的能力）
+    addNodeView() {
+      return ({ node, editor, getPos }) => {
+        const wrapper = document.createElement("div");
+        wrapper.classList.add("image-node-view");
+        const img = document.createElement("img");
+        img.draggable = false;
+        const apply = (current: typeof node) => {
+          img.src = resolveRef.current?.(current.attrs.src ?? "") ?? current.attrs.src ?? "";
+          img.alt = current.attrs.alt ?? "";
+          const w = current.attrs.width;
+          img.style.width = typeof w === "number" ? `${w}px` : (w as string) ?? "auto";
+          const align = (current.attrs.align as string) ?? "center";
+          wrapper.style.marginInline =
+            align === "center"
+              ? "auto"
+              : align === "right"
+                ? "0 0 0 auto"
+                : "0 auto 0 0";
+        };
+        apply(node);
+
+        // 四角缩放手柄：pointer 拖拽实时改宽度，pointerup 一次性提交事务
+        for (const dir of ["nw", "ne", "sw", "se"] as const) {
+          const handle = document.createElement("div");
+          handle.setAttribute("data-resize-handle", dir);
+          handle.contentEditable = "false";
+          handle.style.cssText = `position:absolute;${
+            dir.includes("w") ? "left:0" : "right:0"
+          };${dir.startsWith("n") ? "top:0" : "bottom:0"};width:10px;height:10px;background:var(--ant-color-primary);border:2px solid #fff;border-radius:2px;cursor:${
+            dir === "nw" || dir === "se" ? "nwse-resize" : "nesw-resize"
+          };`;
+          handle.addEventListener("pointerdown", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const startX = event.clientX;
+            const startWidth = img.getBoundingClientRect().width;
+            handle.setPointerCapture(event.pointerId);
+            const onMove = (ev: PointerEvent) => {
+              const dx = ev.clientX - startX;
+              const w = Math.max(
+                60,
+                Math.round(startWidth + (dir.includes("e") ? dx : -dx)),
+              );
+              img.style.width = `${w}px`;
+            };
+            const onUp = () => {
+              handle.removeEventListener("pointermove", onMove);
+              handle.removeEventListener("pointerup", onUp);
+              const width = Math.round(parseFloat(img.style.width));
+              const pos = getPos();
+              if (typeof pos === "number") {
+                editor.view.dispatch(
+                  editor.view.state.tr.setNodeMarkup(pos, undefined, {
+                    ...node.attrs,
+                    width,
+                  }),
+                );
+              }
+            };
+            handle.addEventListener("pointermove", onMove);
+            handle.addEventListener("pointerup", onUp);
+          });
+          wrapper.append(handle);
+        }
+        wrapper.append(img);
+
+        return {
+          dom: wrapper,
+          ignoreMutation: () => true,
+          // 手柄上的事件不交给 PM（避免拖拽被当作节点拖动/选区变化）
+          stopEvent: (event) => {
+            const target = event.target as HTMLElement | null;
+            return !!target?.closest?.("[data-resize-handle]");
+          },
+          update: (updated) => {
+            if (updated.type.name !== "image") return false;
+            apply(updated);
+            return true;
+          },
+        };
+      };
     },
   });
 
