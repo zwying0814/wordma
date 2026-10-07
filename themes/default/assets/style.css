@@ -66,7 +66,16 @@ main.wrap { padding-top: 32px; padding-bottom: 56px; }
 .post-content h1 { font-size: 1.55em; }
 .post-content h2 { font-size: 1.3em; }
 .post-content h3 { font-size: 1.12em; }
-.post-content img { max-width: 100%; }
+.post-content img {
+  display: block;
+  max-width: 100%;
+}
+.post-content img[data-align="center"] {
+  margin-inline: auto;
+}
+.post-content img[data-align="right"] {
+  margin-inline-start: auto;
+}
 .post-content pre {
   background: #F1F2F4;
   border-radius: 8px;

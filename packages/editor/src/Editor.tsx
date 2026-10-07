@@ -179,7 +179,10 @@ export function WordmaEditor({
           img.src = resolveRef.current?.(current.attrs.src ?? "") ?? current.attrs.src ?? "";
           img.alt = current.attrs.alt ?? "";
           const w = current.attrs.width;
-          img.style.width = typeof w === "number" ? `${w}px` : (w as string) ?? "auto";
+          // 宽度设在容器上：百分比相对内容区解析，图片铺满容器
+          wrapper.style.width =
+            typeof w === "number" ? `${w}px` : (w as string) ?? "fit-content";
+          img.style.width = "100%";
           const align = (current.attrs.align as string) ?? "center";
           wrapper.style.marginInline =
             align === "center"
@@ -205,7 +208,7 @@ export function WordmaEditor({
             event.preventDefault();
             event.stopPropagation();
             const startX = event.clientX;
-            const startWidth = img.getBoundingClientRect().width;
+            const startWidth = wrapper.getBoundingClientRect().width;
             handle.setPointerCapture(event.pointerId);
             const onMove = (ev: PointerEvent) => {
               const dx = ev.clientX - startX;
@@ -213,12 +216,13 @@ export function WordmaEditor({
                 60,
                 Math.round(startWidth + (dir.includes("e") ? dx : -dx)),
               );
-              img.style.width = `${w}px`;
+              wrapper.style.width = `${w}px`;
+              img.style.width = "100%";
             };
             const onUp = () => {
               handle.removeEventListener("pointermove", onMove);
               handle.removeEventListener("pointerup", onUp);
-              const width = Math.round(parseFloat(img.style.width));
+              const width = Math.round(parseFloat(wrapper.style.width));
               const pos = getPos();
               if (typeof pos === "number") {
                 editor.view.dispatch(
@@ -386,7 +390,7 @@ export function WordmaEditor({
             title="左对齐"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() =>
-              editor?.chain().focus().updateAttributes("image", { align: "left" }).run()
+              editor?.chain().updateAttributes("image", { align: "left" }).run()
             }
             {...stylex.props(
               styles.bubbleBtn,
@@ -400,7 +404,7 @@ export function WordmaEditor({
             title="居中"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() =>
-              editor?.chain().focus().updateAttributes("image", { align: "center" }).run()
+              editor?.chain().updateAttributes("image", { align: "center" }).run()
             }
             {...stylex.props(
               styles.bubbleBtn,
@@ -414,7 +418,7 @@ export function WordmaEditor({
             title="右对齐"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() =>
-              editor?.chain().focus().updateAttributes("image", { align: "right" }).run()
+              editor?.chain().updateAttributes("image", { align: "right" }).run()
             }
             {...stylex.props(
               styles.bubbleBtn,
