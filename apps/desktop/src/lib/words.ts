@@ -7,3 +7,8 @@ export function countWords(text: string): number {
 export function fmtDate(iso: string): string {
   return iso.slice(0, 10);
 }
+
+/** HTML 内容的字数：剥掉标签后统计非空白字符数 */
+export function countWordsHtml(html: string): number {
+  return countWords(html.replace(/<[^>]*>/g, " "));
+}

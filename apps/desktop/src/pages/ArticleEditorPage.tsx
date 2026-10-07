@@ -13,14 +13,15 @@ import {
   type Article,
   type ArticleStatus,
 } from "../lib/article";
-import { openPreview, previewMarkdownHtml, renderSite } from "../lib/theme";
+import { getContentCss, openPreview, renderSite } from "../lib/theme";
 import {
+  convertFileSrc,
   listMedia,
-  uploadMedia,
   mediaPublicUrl,
+  uploadMedia,
 } from "../lib/media";
 import MediaPickerModal from "../components/MediaPickerModal";
-import { countWords, fmtDate } from "../lib/words";
+import { countWordsHtml, fmtDate } from "../lib/words";
 
 // 布局对应设计稿 .editor（顶栏 + 居中窄栏编辑区）
 const styles = stylex.create({
@@ -78,6 +79,7 @@ export default function ArticleEditorPage({
   const mediaPathsRef = useRef<Record<string, string>>({});
   const [mediaReady, setMediaReady] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [contentCss, setContentCss] = useState("");
   const pickerResolver = useRef<((url: string | null) => void) | null>(null);
 
   // 粘贴/拖入图片：上传到媒体库后插入
@@ -99,20 +101,12 @@ export default function ArticleEditorPage({
     [activeSite.id, reloadMedia],
   );
 
-  // 实时预览：内容变化后防抖走 Rust 渲染管线（与发布同引擎）
+  // 主题 content.css（编辑器内容区排版，跟随主题）
   useEffect(() => {
-    if (!article) return;
-    const timer = setTimeout(() => {
-      previewMarkdownHtml(activeSite.id, content, true)
-        .then(setPreviewHtml)
-        .catch((e) =>
-          setPreviewHtml(
-            `<p style="color:#d64545;font-family:system-ui">预览失败：${String(e)}</p>`,
-          ),
-        );
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [content, activeSite.id, article]);
+    getContentCss(activeSite.id)
+      .then(setContentCss)
+      .catch(() => {});
+  }, [activeSite.id]);
 
   // 站点媒体清单变化时刷新 filename → path 映射（编辑器挂载前必须就绪）
   useEffect(() => {
@@ -142,10 +136,20 @@ export default function ArticleEditorPage({
     pickerResolver.current?.(url);
     pickerResolver.current = null;
   };
+
+  // 编辑器图片显示：把 /media/x 解析为 asset 协议地址
+  const handleResolveImageUrl = useCallback(
+    (src: string) => {
+      if (!src.startsWith("/media/")) return src;
+      const filename = src.slice("/media/".length);
+      const path = mediaPathsRef.current[filename];
+      return path ? convertFileSrc(path) : src;
+    },
+    [],
+  );
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [titleError, setTitleError] = useState(false);
 
   useEffect(() => {
@@ -293,6 +297,7 @@ export default function ArticleEditorPage({
           {status === "published" ? "更新发布" : "发布"}
         </Button>
       </div>
+      {contentCss && <style>{contentCss}</style>}
       <div {...stylex.props(editorStyles.body)}>
         <div {...stylex.props(editorStyles.col)}>
           <input
@@ -335,7 +340,7 @@ export default function ArticleEditorPage({
               {...stylex.props(styles.metaTags)}
             />
             <span {...stylex.props(styles.wordCount)}>
-              约 {countWords(content)} 字
+              约 {countWordsHtml(content)} 字
             </span>
           </div>
           <WordmaEditor
@@ -344,7 +349,8 @@ export default function ArticleEditorPage({
             onChange={setContent}
             onPasteImage={handlePasteImage}
             onPickImage={handlePickImage}
-            previewHtml={previewHtml ?? undefined}
+            onResolveImageUrl={handleResolveImageUrl}
+            contentClassName="post-content"
           />
           <MediaPickerModal open={pickerOpen} onClose={closePicker} />
         </div>

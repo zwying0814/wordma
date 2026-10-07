@@ -5,7 +5,7 @@ import * as stylex from "@stylexjs/stylex";
 import { useLocation } from "wouter";
 import { useSite } from "../context/SiteContext";
 import { createArticle, type Article } from "../lib/article";
-import { countWords, fmtDate } from "../lib/words";
+import { countWordsHtml, fmtDate } from "../lib/words";
 import { pageStyles } from "../styles/page.stylex";
 
 const styles = stylex.create({
@@ -94,7 +94,7 @@ export default function DashboardPage() {
 
   const published = articles.filter((a) => a.status === "published").length;
   const drafts = articles.length - published;
-  const totalWords = articles.reduce((n, a) => n + countWords(a.content), 0);
+  const totalWords = articles.reduce((n, a) => n + countWordsHtml(a.content), 0);
 
   const recent = useMemo(
     () =>
@@ -190,7 +190,7 @@ export default function DashboardPage() {
                   {a.categories.length > 0 && a.tags.length > 0 ? " · " : ""}
                   {a.tags.map((t) => t.name).join("、") || null}
                   {a.categories.length + a.tags.length > 0 ? " · " : ""}
-                  {fmtDate(a.updatedAt)} · 约 {countWords(a.content)} 字
+                  {fmtDate(a.updatedAt)} · 约 {countWordsHtml(a.content)} 字
                 </span>
               </div>
               <div {...stylex.props(pageStyles.rowSide)}>

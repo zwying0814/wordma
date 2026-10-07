@@ -9,9 +9,16 @@
   "dependencies": {
     "@stylexjs/atoms": "catalog:",
     "@stylexjs/stylex": "catalog:",
+    "@tiptap/core": "3.31.4",
+    "@tiptap/extension-image": "3.31.4",
+    "@tiptap/extension-placeholder": "3.31.4",
+    "@tiptap/markdown": "3.31.4",
+    "@tiptap/pm": "3.31.4",
+    "@tiptap/react": "3.31.4",
+    "@tiptap/starter-kit": "3.31.4",
+    "@tiptap/suggestion": "3.31.4",
     "antd": "catalog:",
-    "lucide-react": "catalog:",
-    "monaco-editor": "0.57.0"
+    "lucide-react": "catalog:"
   },
   "peerDependencies": {
     "react": "catalog:",

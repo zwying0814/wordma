@@ -1,0 +1,95 @@
+/* 主题 content.css —— 编辑器内容区的排版（跟随主题）。
+   WordmaEditor 会把此类名挂在 ProseMirror 元素上（contentClassName）。 */
+.post-content {
+  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ant-color-text);
+  caret-color: var(--ant-color-primary);
+}
+
+.post-content p {
+  margin: 0 0 0.6em;
+}
+
+.post-content h1,
+.post-content h2,
+.post-content h3 {
+  margin: 0.9em 0 0.4em;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.post-content h1 {
+  font-size: 1.7em;
+}
+
+.post-content h2 {
+  font-size: 1.4em;
+}
+
+.post-content h3 {
+  font-size: 1.18em;
+}
+
+.post-content ul,
+.post-content ol {
+  margin: 0 0 0.6em;
+  padding-inline-start: 1.6em;
+}
+
+.post-content li {
+  margin: 0.15em 0;
+}
+
+.post-content blockquote {
+  margin: 0 0 0.6em;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--ant-color-border);
+  color: var(--ant-color-text-secondary);
+}
+
+.post-content pre {
+  margin: 0 0 0.6em;
+  padding: 12px 14px;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.post-content code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--ant-color-fill-tertiary);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.post-content pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.post-content hr {
+  border: none;
+  border-top: 1px solid var(--ant-color-border-secondary);
+  margin: 1.2em 0;
+}
+
+.post-content img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+/* Placeholder 扩展：空文档首行显示占位文字 */
+.post-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--ant-color-text-quaternary);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

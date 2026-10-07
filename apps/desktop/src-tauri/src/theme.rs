@@ -7,7 +7,6 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
-use pulldown_cmark::{html, Options, Parser};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
@@ -69,6 +68,10 @@ const BUILTIN_FILES: &[(&str, &str)] = &[
     (
         "assets/style.css",
         include_str!("../../../../themes/default/assets/style.css"),
+    ),
+    (
+        "assets/content.css",
+        include_str!("../../../../themes/default/assets/content.css"),
     ),
 ];
 
@@ -514,15 +517,6 @@ pub struct RenderReport {
     pub files: usize,
 }
 
-/// markdown -> html + 字数（非空白字符数，与前端统计口径一致）
-fn markdown_to_html(md: &str) -> (String, usize) {
-    let parser = Parser::new_ext(md, Options::all());
-    let mut html_out = String::new();
-    html::push_html(&mut html_out, parser);
-    let words = md.chars().filter(|c| !c.is_whitespace()).count();
-    (html_out, words)
-}
-
 /// 文章的路由变量（日期取自创建时间）
 fn post_vars(a: &Article) -> HashMap<String, String> {
     let mut vars = HashMap::new();
@@ -756,7 +750,7 @@ pub fn render_site_to(
                 p.title
             ));
         }
-        let (content_html, _) = markdown_to_html(&p.content);
+        let content_html = p.content.clone();
         pages_ctx.push(serde_json::json!({
             "title": p.title,
             "url": url,
@@ -811,7 +805,8 @@ pub fn render_site_to(
                 serde_json::json!({ "name": t.name, "url": tag_urls.get(&t.id).cloned().unwrap_or_default() })
             })
             .collect();
-        let (content_html, word_count) = markdown_to_html(&a.content);
+        let content_html = a.content.clone();
+        let word_count = crate::article::html_text_len(&a.content);
         let date = a.created_at.get(0..10).unwrap_or("").to_string();
         let categories_text = a
             .categories
@@ -930,7 +925,7 @@ pub fn render_site_to(
                     || (a.tags.iter().any(|t| t.id == *id) && *rule == "tag")
             })
             .map(|a| {
-                let word_count = a.content.chars().filter(|c| !c.is_whitespace()).count();
+                let word_count = crate::article::html_text_len(&a.content);
                 let category_links: Vec<serde_json::Value> = a
                     .categories
                     .iter()
@@ -1025,7 +1020,6 @@ pub fn render_site_to(
     ));
     for a in &published {
         let url = post_urls.get(&a.id).cloned().unwrap_or_default();
-        let html = markdown_to_html(&a.content).0;
         let link = format!("{base_url}{url}");
         feed.push_str(&format!(
             "<item><title>{}</title><link>{}</link><guid>{}</guid><pubDate>{}</pubDate><description><![CDATA[{}]]></description></item>",
@@ -1033,7 +1027,7 @@ pub fn render_site_to(
             xml_escape(&link),
             xml_escape(&link),
             rfc2822_date(&a.created_at),
-            html,
+            a.content.clone(),
         ));
     }
     feed.push_str("</channel></rss>");
@@ -1276,6 +1270,19 @@ pub struct ThemeSettingsPayload {
     pub values: serde_json::Map<String, serde_json::Value>,
 }
 
+/// 主题 content.css 内容（编辑器内容区排版，跟随主题）
+#[tauri::command]
+pub fn get_content_css_cmd(app: AppHandle, db: State<Db>, site_id: i64) -> Result<String, String> {
+    let themes_dir = themes_root(&app)?;
+    extract_builtin_theme(&themes_dir)?;
+    let conn = db.0.lock().map_err(|e| format!("数据库连接不可用: {e}"))?;
+    let active = get_active_theme_name(&conn, site_id)?;
+    Ok(fs::read_to_string(
+        themes_dir.join(&active).join("assets").join("content.css"),
+    )
+    .unwrap_or_default())
+}
+
 #[tauri::command]
 pub fn get_theme_settings_cmd(
     app: AppHandle,
@@ -1317,108 +1324,6 @@ pub fn set_theme_settings_cmd(
     let json = serde_json::to_string(&values).map_err(|e| e.to_string())?;
     set_setting(&conn, &theme_settings_key(site_id, &name), &json)
         .map_err(|e| format!("保存主题设置失败: {e}"))
-}
-
-/// 编辑器实时预览用：单篇 markdown → HTML（同发布渲染引擎）
-#[tauri::command]
-pub fn markdown_to_html_cmd(markdown: String) -> Result<String, String> {
-    Ok(markdown_to_html(&markdown).0)
-}
-
-/// 渲染单篇文章预览页：完整 HTML（内联主题样式与媒体图片，供 iframe srcDoc）
-#[tauri::command]
-pub fn preview_markdown_html_cmd(
-    app: AppHandle,
-    db: State<Db>,
-    site_id: i64,
-    markdown: String,
-    content_only: bool,
-) -> Result<String, String> {
-    let themes_dir = themes_root(&app)?;
-    extract_builtin_theme(&themes_dir)?;
-    let conn = db.0.lock().map_err(|e| format!("数据库连接不可用: {e}"))?;
-    let active = get_active_theme_name(&conn, site_id)?;
-    let rules = get_routing_rules(&conn, site_id)?;
-    let site = get_site(&conn, site_id)?;
-    let pages = get_pages_by_site(&conn, site_id)?;
-    let theme_values = resolve_theme_settings(
-        &load_theme_settings(&themes_dir, &active),
-        get_setting(&conn, &theme_settings_key(site_id, &active))
-            .map_err(|e| format!("读取主题设置失败: {e}"))?
-            .as_deref(),
-    );
-    let theme_dir = themes_dir.join(&active);
-    let mut tera = build_tera(&themes_dir, &active)?;
-    tera.autoescape_on(vec![".tera"]);
-    let (content_html, word_count) = markdown_to_html(&markdown);
-    let pages_ctx: Vec<serde_json::Value> = pages
-        .iter()
-        .filter(|p| p.show_in_nav)
-        .map(|p| {
-            Ok(serde_json::json!({
-                "title": p.title,
-                "url": generate_path(
-                    &rules.page,
-                    &HashMap::from([("slug".to_string(), p.slug.clone())]),
-                )?,
-                "showInNav": true,
-            }))
-        })
-        .collect::<Result<Vec<_>, String>>()?;
-    // srcDoc iframe 无站点根：主题样式内联、媒体图片内联为 data URL。
-    // content_only 模式只输出正文（编辑器分栏），否则渲染完整站点骨架
-    let mut out = if content_only {
-        let css = fs::read_to_string(theme_dir.join("assets").join("style.css"))
-            .unwrap_or_default();
-        format!(
-            "<style>{css}</style><article class=\"post\"><div class=\"post-content\">{content_html}</div></article>"
-        )
-    } else {
-        let site_ctx = serde_json::json!({
-            "site": { "name": site.name, "description": site.description.clone().unwrap_or_default() },
-            "urls": { "archive": rules.archive, "categories": "/categories/", "tags": "/tags/" },
-            "pages": pages_ctx,
-            "theme": theme_values,
-            "post": { "title": "", "date": "", "contentHtml": content_html, "wordCount": word_count },
-        });
-        let html = render_page(&tera, "post.tera", &site_ctx, &serde_json::json!({}))?;
-        let css = fs::read_to_string(theme_dir.join("assets").join("style.css"))
-            .unwrap_or_default();
-        html.replace(
-            r#"<link rel="stylesheet" href="/assets/style.css">"#,
-            &format!("<style>{css}</style>"),
-        )
-    };
-    let media_dir = media_root(&app)?.join(site_id.to_string());
-    if let Ok(entries) = fs::read_dir(&media_dir) {
-        use base64::Engine as _;
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if !path.is_file() {
-                continue;
-            }
-            let filename = entry.file_name().to_string_lossy().to_string();
-            let ext = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-            let mime = match ext.as_str() {
-                "png" => "image/png",
-                "jpg" | "jpeg" => "image/jpeg",
-                "gif" => "image/gif",
-                "webp" => "image/webp",
-                "svg" => "image/svg+xml",
-                _ => continue,
-            };
-            if let Ok(data) = fs::read(&path) {
-                use base64::engine::general_purpose::STANDARD as BASE64;
-                let data_url = format!("data:{mime};base64,{}", BASE64.encode(&data));
-                out = out.replace(&format!("/media/{filename}"), &data_url);
-            }
-        }
-    }
-    Ok(out)
 }
 
 #[tauri::command]
@@ -1811,7 +1716,7 @@ mod tests {
             &conn,
             a.id,
             None,
-            Some("## 山\n\n**出发**了。"),
+            Some("<h2>山</h2><p><strong>出发</strong>了。</p>"),
             Some(STATUS_PUBLISHED),
             None,
             &[cat.id],

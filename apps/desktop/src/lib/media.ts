@@ -1,5 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
+export { convertFileSrc };
+
 export type MediaKind = "image" | "video";
 
 export interface MediaItem {

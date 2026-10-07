@@ -9,6 +9,30 @@ use crate::db::Db;
 pub const STATUS_DRAFT: &str = "draft";
 pub const STATUS_PUBLISHED: &str = "published";
 
+/// markdown → HTML（存量内容一次性迁移用；新内容已是 HTML）
+pub fn markdown_to_html(md: &str) -> String {
+    use pulldown_cmark::{html, Options, Parser};
+    let parser = Parser::new_ext(md, Options::all());
+    let mut out = String::new();
+    html::push_html(&mut out, parser);
+    out
+}
+
+/// HTML 文本长度：剥掉标签后的非空白字符数（字数统计口径与前端一致）
+pub fn html_text_len(html: &str) -> usize {
+    let mut text = String::new();
+    let mut in_tag = false;
+    for c in html.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => text.push(c),
+            _ => {}
+        }
+    }
+    text.chars().filter(|c| !c.is_whitespace()).count()
+}
+
 /// 文章关联的分类/标签引用（载荷里只带 id 与名称）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

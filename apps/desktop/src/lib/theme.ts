@@ -77,6 +77,9 @@ export const openThemesDir = (): Promise<void> =>
 export const deleteTheme = (name: string): Promise<void> =>
   invoke("delete_theme_cmd", { name });
 
+export const getContentCss = (siteId: number): Promise<string> =>
+  invoke("get_content_css_cmd", { siteId });
+
 export const getPreviewPort = (): Promise<number> =>
   invoke("get_preview_port_cmd");
 

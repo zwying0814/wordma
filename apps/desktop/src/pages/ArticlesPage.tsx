@@ -11,7 +11,7 @@ import {
   type Article,
   type ArticleStatus,
 } from "../lib/article";
-import { countWords, fmtDate } from "../lib/words";
+import { countWordsHtml, fmtDate } from "../lib/words";
 import { pageStyles } from "../styles/page.stylex";
 
 function ArticleRow({
@@ -30,7 +30,7 @@ function ArticleRow({
     article.categories.map((c) => c.name).join("、") || null,
     article.tags.map((t) => t.name).join("、") || null,
     fmtDate(article.updatedAt),
-    `约 ${countWords(article.content)} 字`,
+    `约 ${countWordsHtml(article.content)} 字`,
   ]
     .filter(Boolean)
     .join(" · ");

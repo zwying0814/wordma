@@ -1,10 +1,11 @@
-import { Selection as MonacoSelection, type editor } from "monaco-editor";
+import type { Editor } from "@tiptap/react";
+import { useEditorState } from "@tiptap/react";
 import {
   Bold,
   Heading1,
+  ImagePlus,
   Heading2,
   Heading3,
-  ImagePlus,
   Italic,
   List,
   ListOrdered,
@@ -17,13 +18,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
-
-type SourceEditor = editor.IStandaloneCodeEditor;
-
-interface Props {
-  editor: SourceEditor | null;
-  onPickImage?: () => Promise<string | null>;
-}
 
 const styles = stylex.create({
   bar: {
@@ -53,6 +47,13 @@ const styles = stylex.create({
       ":hover": "var(--ant-color-fill-tertiary)",
     },
   },
+  btnActive: {
+    color: "var(--ant-color-primary)",
+    backgroundColor: {
+      default: "var(--ant-color-primary-bg)",
+      ":hover": "var(--ant-color-primary-bg-hover)",
+    },
+  },
   divider: {
     width: 1,
     height: 18,
@@ -64,11 +65,13 @@ const styles = stylex.create({
 function ToolButton({
   label,
   icon: Icon,
+  active = false,
   disabled = false,
   onClick,
 }: {
   label: string;
   icon: LucideIcon;
+  active?: boolean;
   disabled?: boolean;
   onClick: () => void;
 }) {
@@ -77,167 +80,146 @@ function ToolButton({
       type="button"
       title={label}
       aria-label={label}
+      aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      {...stylex.props(styles.btn)}
+      {...stylex.props(styles.btn, active && styles.btnActive)}
     >
       <Icon size={16} />
     </button>
   );
 }
 
-function insertText(ed: SourceEditor, text: string) {
-  const sel = ed.getSelection();
-  if (!sel) return;
-  ed.executeEdits("wordma", [{ range: sel, text, forceMoveMarkers: true }]);
-}
+export function Toolbar({
+  editor,
+  onPickImage,
+}: {
+  editor: Editor | null;
+  onPickImage?: () => Promise<string | null>;
+}) {
+  const state = useEditorState({
+    editor,
+    selector: ({ editor: e }) =>
+      e
+        ? {
+            canUndo: e.can().undo(),
+            canRedo: e.can().redo(),
+            bold: e.isActive("bold"),
+            italic: e.isActive("italic"),
+            strike: e.isActive("strike"),
+            h1: e.isActive("heading", { level: 1 }),
+            h2: e.isActive("heading", { level: 2 }),
+            h3: e.isActive("heading", { level: 3 }),
+            bulletList: e.isActive("bulletList"),
+            orderedList: e.isActive("orderedList"),
+            blockquote: e.isActive("blockquote"),
+            codeBlock: e.isActive("codeBlock"),
+          }
+        : null,
+  });
 
-/** 包裹/解除包裹选区（如 **加粗**） */
-function wrapSelection(ed: SourceEditor, marker: string) {
-  const sel = ed.getSelection();
-  const model = ed.getModel();
-  if (!sel || !model) return;
-  const text = model.getValueInRange(sel);
-  const wrapped =
-    text.startsWith(marker) &&
-    text.endsWith(marker) &&
-    text.length >= marker.length * 2;
-  const inner = wrapped
-    ? text.slice(marker.length, text.length - marker.length)
-    : `${marker}${text}${marker}`;
-  ed.executeEdits("wordma", [{ range: sel, text: inner, forceMoveMarkers: true }]);
-  // 恢复选区到内容本身
-  ed.setSelection(
-    new MonacoSelection(
-      sel.startLineNumber,
-      sel.startColumn + (wrapped ? -marker.length : marker.length),
-      sel.endLineNumber,
-      sel.endColumn + (wrapped ? -marker.length : marker.length),
-    ),
-  );
-}
+  if (!editor || !state) {
+    return null;
+  }
 
-/** 对选中的行做行首前缀切换（如 "- "、"## "） */
-function toggleLinePrefix(ed: SourceEditor, prefix: string) {
-  const sel = ed.getSelection();
-  const model = ed.getModel();
-  if (!sel || !model) return;
-  let allPrefixed = true;
-  for (let line = sel.startLineNumber; line <= sel.endLineNumber; line++) {
-    if (!model.getLineContent(line).startsWith(prefix)) {
-      allPrefixed = false;
-      break;
-    }
-  }
-  const edits = [];
-  for (let line = sel.startLineNumber; line <= sel.endLineNumber; line++) {
-    const has = model.getLineContent(line).startsWith(prefix);
-    if (has === allPrefixed) {
-      edits.push({
-        range: {
-          startLineNumber: line,
-          startColumn: 1,
-          endLineNumber: line,
-          endColumn: has ? prefix.length + 1 : 1,
-        },
-        text: has ? "" : prefix,
-      });
-    }
-  }
-  if (edits.length > 0) ed.executeEdits("wordma", edits);
-}
-
-export function Toolbar({ editor, onPickImage }: Props) {
-  if (!editor) {
-    return <div {...stylex.props(styles.bar)} />;
-  }
+  const run = (fn: (c: ReturnType<Editor["chain"]>) => void) => () => {
+    const c = editor.chain().focus();
+    fn(c);
+    c.run();
+  };
 
   return (
     <div {...stylex.props(styles.bar)} role="toolbar" aria-label="编辑工具栏">
       <ToolButton
         label="撤销"
         icon={Undo2}
-        onClick={() => editor.trigger("toolbar", "undo", null)}
+        disabled={!state.canUndo}
+        onClick={run((c) => c.undo())}
       />
       <ToolButton
         label="重做"
         icon={Redo2}
-        onClick={() => editor.trigger("toolbar", "redo", null)}
+        disabled={!state.canRedo}
+        onClick={run((c) => c.redo())}
+      />
+      <ToolButton
+        label="插入图片"
+        icon={ImagePlus}
+        disabled={!editor}
+        onClick={() => {
+          if (!onPickImage || !editor) return;
+          onPickImage().then((url) => {
+            if (url) editor.chain().focus().setImage({ src: url }).run();
+          });
+        }}
       />
       <span {...stylex.props(styles.divider)} />
       <ToolButton
         label="标题 1"
         icon={Heading1}
-        onClick={() => toggleLinePrefix(editor, "# ")}
+        active={state.h1}
+        onClick={run((c) => c.toggleHeading({ level: 1 }))}
       />
       <ToolButton
         label="标题 2"
         icon={Heading2}
-        onClick={() => toggleLinePrefix(editor, "## ")}
+        active={state.h2}
+        onClick={run((c) => c.toggleHeading({ level: 2 }))}
       />
       <ToolButton
         label="标题 3"
         icon={Heading3}
-        onClick={() => toggleLinePrefix(editor, "### ")}
+        active={state.h3}
+        onClick={run((c) => c.toggleHeading({ level: 3 }))}
       />
       <span {...stylex.props(styles.divider)} />
       <ToolButton
         label="加粗"
         icon={Bold}
-        onClick={() => wrapSelection(editor, "**")}
+        active={state.bold}
+        onClick={run((c) => c.toggleBold())}
       />
       <ToolButton
         label="斜体"
         icon={Italic}
-        onClick={() => wrapSelection(editor, "*")}
+        active={state.italic}
+        onClick={run((c) => c.toggleItalic())}
       />
       <ToolButton
         label="删除线"
         icon={Strikethrough}
-        onClick={() => wrapSelection(editor, "~~")}
+        active={state.strike}
+        onClick={run((c) => c.toggleStrike())}
       />
       <span {...stylex.props(styles.divider)} />
       <ToolButton
         label="无序列表"
         icon={List}
-        onClick={() => toggleLinePrefix(editor, "- ")}
+        active={state.bulletList}
+        onClick={run((c) => c.toggleBulletList())}
       />
       <ToolButton
         label="有序列表"
         icon={ListOrdered}
-        onClick={() => toggleLinePrefix(editor, "1. ")}
+        active={state.orderedList}
+        onClick={run((c) => c.toggleOrderedList())}
       />
       <ToolButton
         label="引用"
         icon={Quote}
-        onClick={() => toggleLinePrefix(editor, "> ")}
+        active={state.blockquote}
+        onClick={run((c) => c.toggleBlockquote())}
       />
       <ToolButton
         label="代码块"
         icon={SquareCode}
-        onClick={() => {
-          const sel = editor.getSelection();
-          insertText(editor, "```\n\n```");
-          if (sel) {
-            // 光标移入代码块内部的空行
-            editor.setPosition({
-              lineNumber: sel.startLineNumber + 1,
-              column: 1,
-            });
-          }
-        }}
+        active={state.codeBlock}
+        onClick={run((c) => c.toggleCodeBlock())}
       />
       <ToolButton
         label="分割线"
         icon={Minus}
-        onClick={() => insertText(editor, "\n---\n")}
-      />
-      <span {...stylex.props(styles.divider)} />
-      <ToolButton
-        label="插入图片"
-        icon={ImagePlus}
-        disabled={!onPickImage}
-        onClick={() => onPickImage?.()}
+        onClick={run((c) => c.setHorizontalRule())}
       />
     </div>
   );
