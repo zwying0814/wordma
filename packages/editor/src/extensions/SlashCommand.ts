@@ -11,6 +11,7 @@ import {
   Minus,
   Quote,
   SquareCode,
+  Table,
   type LucideIcon,
 } from "lucide-react";
 import { SlashMenu, type SlashMenuHandle } from "../components/SlashMenu";
@@ -87,6 +88,13 @@ const DEFAULT_ITEMS: SlashMenuItem[] = [
     desc: "分隔内容",
     icon: Minus,
     command: chain((c) => c.setHorizontalRule()),
+  },
+  {
+    key: "table",
+    label: "表格",
+    desc: "3×3 带表头",
+    icon: Table,
+    command: chain((c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true })),
   },
 ];
 

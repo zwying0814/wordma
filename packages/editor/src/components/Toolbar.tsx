@@ -1,6 +1,10 @@
 import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
 import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
   Bold,
   Heading1,
   ImagePlus,
@@ -14,6 +18,7 @@ import {
   Redo2,
   SquareCode,
   Strikethrough,
+  Table,
   Undo2,
   type LucideIcon,
 } from "lucide-react";
@@ -114,6 +119,10 @@ export function Toolbar({
             orderedList: e.isActive("orderedList"),
             blockquote: e.isActive("blockquote"),
             codeBlock: e.isActive("codeBlock"),
+            alignLeft: e.isActive({ textAlign: "left" }),
+            alignCenter: e.isActive({ textAlign: "center" }),
+            alignRight: e.isActive({ textAlign: "right" }),
+            alignJustify: e.isActive({ textAlign: "justify" }),
           }
         : null,
   });
@@ -220,6 +229,37 @@ export function Toolbar({
         label="分割线"
         icon={Minus}
         onClick={run((c) => c.setHorizontalRule())}
+      />
+      <span {...stylex.props(styles.divider)} />
+      <ToolButton
+        label="左对齐"
+        icon={AlignLeft}
+        active={state.alignLeft}
+        onClick={run((c) => c.setTextAlign("left"))}
+      />
+      <ToolButton
+        label="居中"
+        icon={AlignCenter}
+        active={state.alignCenter}
+        onClick={run((c) => c.setTextAlign("center"))}
+      />
+      <ToolButton
+        label="右对齐"
+        icon={AlignRight}
+        active={state.alignRight}
+        onClick={run((c) => c.setTextAlign("right"))}
+      />
+      <ToolButton
+        label="两端对齐"
+        icon={AlignJustify}
+        active={state.alignJustify}
+        onClick={run((c) => c.setTextAlign("justify"))}
+      />
+      <span {...stylex.props(styles.divider)} />
+      <ToolButton
+        label="插入表格"
+        icon={Table}
+        onClick={run((c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }))}
       />
     </div>
   );

@@ -3,6 +3,8 @@ import { useRef } from "react";
 import { mergeAttributes } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { Image } from "@tiptap/extension-image";
+import { Table } from "@tiptap/extension-table";
+import TextAlign from "@tiptap/extension-text-align";
 import { Markdown } from "@tiptap/markdown";
 import Placeholder from "@tiptap/extension-placeholder";
 import StarterKit from "@tiptap/starter-kit";
@@ -70,11 +72,28 @@ export function WordmaEditor({
   });
 
   const editor = useEditor({
-    // 初始内容按 markdown 解析（v3 的 contentType 选项）
-    contentType: "markdown",
+    // 内容按 HTML 解析（存储格式为 HTML）
+    contentType: "html",
     extensions: [
       StarterKit,
-      ResolvedImage.configure({ allowBase64: false }),
+      ResolvedImage.configure({
+        allowBase64: false,
+        // 拖拽图片四角/边框缩放，等比且限制最小尺寸
+        resize: {
+          enabled: true,
+          directions: [
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right",
+          ],
+          minWidth: 60,
+          minHeight: 40,
+          alwaysPreserveAspectRatio: true,
+        },
+      }),
+      Table.configure({ resizable: true }),
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
       Markdown,
       Placeholder.configure({ placeholder: placeholder ?? "" }),
       SlashCommand,
@@ -140,7 +159,7 @@ export function WordmaEditor({
       },
     },
     onUpdate({ editor }) {
-      onChange(editor.getMarkdown());
+      onChange(editor.getHTML());
     },
   });
 
