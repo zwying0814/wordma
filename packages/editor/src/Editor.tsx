@@ -288,6 +288,8 @@ export function WordmaEditor({
               e.state.selection.node.type.name === "image",
             imageAlign:
               (e.getAttributes("image").align as string | undefined) ?? "center",
+            imageWidth:
+              (e.getAttributes("image").width as string | number | undefined) ?? null,
             inTable: e.isActive("table"),
           }
         : null,
@@ -349,6 +351,30 @@ export function WordmaEditor({
           >
             <AlignRight size={14} />
           </button>
+          <span {...stylex.props(styles.divider)} />
+          {[25, 50, 75, 100].map((pct) => (
+            <button
+              key={pct}
+              type="button"
+              title={`宽度 ${pct}%`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() =>
+                editor
+                  ?.chain()
+                  .focus()
+                  .updateAttributes("image", { width: `${pct}%` })
+                  .run()
+              }
+              {...stylex.props(
+                styles.bubbleBtn,
+                (editorState?.imageWidth ?? "100%") === `${pct}%` &&
+                  styles.bubbleBtnActive,
+              )}
+            >
+              {pct}%
+            </button>
+          ))}
+          <span {...stylex.props(styles.divider)} />
           <button
             type="button"
             title="删除图片"
