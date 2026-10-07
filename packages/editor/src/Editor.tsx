@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { mergeAttributes } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { Image } from "@tiptap/extension-image";
-import { Table } from "@tiptap/extension-table";
+import { TableKit } from "@tiptap/extension-table";
 import TextAlign from "@tiptap/extension-text-align";
 import { Markdown } from "@tiptap/markdown";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -92,7 +92,10 @@ export function WordmaEditor({
           alwaysPreserveAspectRatio: true,
         },
       }),
-      Table.configure({ resizable: true }),
+      // TableKit 打包 table/tableRow/tableCell/tableHeader 四件套
+      TableKit.configure({
+        table: { resizable: true },
+      }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Markdown,
       Placeholder.configure({ placeholder: placeholder ?? "" }),
