@@ -29,6 +29,51 @@ export interface WordmaEditorProps {
   contentClassName?: string;
 }
 
+
+// ===== Markdown 粘贴启发式（移植自 reactjs-tiptap-editor 的 MarkdownPaste） =====
+const MARKDOWN_PATTERNS: RegExp[] = [
+  /^#{1,6}\s+/m, // 标题
+  /^\s*[-*+]\s+/m, // 无序列表
+  /^\s*\d+\.\s+/m, // 有序列表
+  /^\s*>\s+/m, // 引用
+  /\*\*.+?\*\*/, // 加粗
+  /\*[^*]+\*/, // 斜体
+  /`[^`]+`/, // 行内代码
+  /^```/m, // 代码块
+  /^\s*---\s*$/m, // 分割线
+  /\[.+?\]\(.+?\)/, // 链接
+  /!\[.*?\]\(.+?\)/, // 图片
+];
+
+function looksLikeMarkdown(text: string): boolean {
+  let matches = 0;
+  for (const pattern of MARKDOWN_PATTERNS) {
+    if (pattern.test(text) && ++matches >= 2) return true;
+  }
+  // 单特征命中：图片/代码块/分割线特征足够强，直接判定
+  return (
+    /!\[.*?\]\(.+?\)/.test(text) ||
+    /^```/m.test(text) ||
+    /^\s*---\s*$/m.test(text)
+  );
+}
+
+/** 修复表格行之间被粘贴进来的空行（管道行之间的空行会破坏表格解析） */
+function fixMarkdownTables(text: string): string {
+  const lines = text.split("\n");
+  const result: string[] = [];
+  let inTable = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const isRow = trimmed.startsWith("|") && trimmed.endsWith("|");
+    if (trimmed === "" && inTable) continue;
+    if (isRow) inTable = true;
+    else inTable = false;
+    result.push(line);
+  }
+  return result.join("\n");
+}
+
 const styles = stylex.create({
   root: {
     display: "flex",
@@ -127,15 +172,15 @@ export function WordmaEditor({
           return true;
         }
 
-        // 2) 粘贴的文本包含图片语法：按 markdown 解析后插入
-        //    （媒体库"复制 Markdown 引用" → 粘贴到文章的路径）
+        // 2) 粘贴的文本命中 markdown 特征：整段解析后插入
+        //    （媒体库"复制 Markdown 引用"、外部编辑器复制等路径）
         const text = clipboard?.getData("text/plain") ?? "";
-        if (text && /!\[[^\]]*\]\([^)]+\)/.test(text)) {
+        if (text && looksLikeMarkdown(text)) {
           // Markdown 扩展在 Editor 上挂载的解析器（见 @tiptap/markdown 的接口增强）
           const manager = editor.markdown;
           if (manager) {
             event.preventDefault();
-            const doc = manager.parse(text);
+            const doc = manager.parse(fixMarkdownTables(text));
             editor.chain().focus().insertContent(doc.content ?? []).run();
             return true;
           }
