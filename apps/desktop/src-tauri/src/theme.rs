@@ -1448,7 +1448,7 @@ pub fn render_site_cmd(
     let port = get_preview_port(&conn)?;
     let base_url = format!("http://127.0.0.1:{port}");
     let dist = preview_root(&app)?.join(site_id.to_string());
-    let media_dir = media_root(&app)?;
+    let media_dir = media_root(&app)?.join(site_id.to_string());
     let report = render_site_to(&conn, &dist, &themes_dir, &active, site_id, true, &base_url, Some(&media_dir))?;
     if let Ok(mut dir) = PREVIEW_DIR.write() {
         *dir = Some(dist);
@@ -1733,8 +1733,24 @@ mod tests {
         extract_builtin_theme(&themes_dir).unwrap();
         let dist = tmp.join("preview").join(site.id.to_string());
 
-        let report = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false, "http://127.0.0.1:12739", None).unwrap();
+        // 站点媒体目录（含一张图片）随渲染拷贝到 dist/media
+        let media_src = tmp.join("media-src");
+        fs::create_dir_all(&media_src).unwrap();
+        fs::write(media_src.join("p.png"), b"pngdata").unwrap();
+
+        let report = render_site_to(
+            &conn,
+            &dist,
+            &themes_dir,
+            "default",
+            site.id,
+            false,
+            "http://127.0.0.1:12739",
+            Some(&media_src),
+        )
+        .unwrap();
         assert!(report.files >= 5);
+        assert!(dist.join("media").join("p.png").is_file());
 
         // 首页：含发布文章与站点名，不含草稿；导航含独立页面
         let index = fs::read_to_string(dist.join("index.html")).unwrap();
