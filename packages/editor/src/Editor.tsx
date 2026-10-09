@@ -184,12 +184,13 @@ export function WordmaEditor({
             typeof w === "number" ? `${w}px` : (w as string) ?? "fit-content";
           img.style.width = "100%";
           const align = (current.attrs.align as string) ?? "center";
+          // margin-inline 只接受 1-2 个值（start end），四值的物理 margin 语法会被浏览器整条丢弃
           wrapper.style.marginInline =
             align === "center"
               ? "auto"
               : align === "right"
-                ? "0 0 0 auto"
-                : "0 auto 0 0";
+                ? "auto 0"
+                : "0 auto";
         };
         apply(node);
 
