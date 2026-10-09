@@ -3,10 +3,8 @@ import { App as AntdApp, Button, Checkbox, Spin } from "antd";
 import { ArrowLeft } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import x from "@stylexjs/atoms";
-import { WordmaEditor } from "@wordma/editor";
 import { useLocation } from "wouter";
 import { getPage, updatePage } from "../lib/pages";
-import { getContentCss } from "../lib/theme";
 import { editorStyles } from "../styles/editor.stylex";
 
 const styles = stylex.create({
@@ -32,7 +30,7 @@ const styles = stylex.create({
   },
 });
 
-/** 独立页面编辑器：标题 + slug + 内容（复用 WordmaEditor） */
+/** 独立页面编辑器：标题 + slug + 内容 */
 export default function PageEditorPage({
   params,
 }: {
@@ -49,14 +47,6 @@ export default function PageEditorPage({
   const [content, setContent] = useState("");
   const [showInNav, setShowInNav] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [contentCss, setContentCss] = useState("");
-
-  // 主题 content.css（编辑器内容区排版，跟随主题）
-  useEffect(() => {
-    getContentCss(page?.siteId ?? 0)
-      .then(setContentCss)
-      .catch(() => {});
-  }, [page?.siteId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,7 +127,6 @@ export default function PageEditorPage({
 
   return (
     <div {...stylex.props(editorStyles.shell)}>
-      {contentCss && <style>{contentCss}</style>}
       <div {...stylex.props(editorStyles.topBar)}>
         <Button
           type="text"
@@ -182,12 +171,6 @@ export default function PageEditorPage({
               spellCheck={false}
             />
           </div>
-          <WordmaEditor
-            key={page.id}
-            initialValue={content}
-            onChange={setContent}
-            contentClassName="post-content"
-          />
         </div>
       </div>
     </div>

@@ -55,9 +55,6 @@ importers:
       '@tauri-apps/plugin-opener':
         specifier: ^2
         version: 2.7.0
-      '@wordma/editor':
-        specifier: workspace:*
-        version: link:../../packages/editor
       '@wordma/ui':
         specifier: workspace:*
         version: link:../../packages/ui

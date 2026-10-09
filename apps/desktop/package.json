@@ -14,7 +14,6 @@
     "@stylexjs/stylex": "catalog:",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
-    "@wordma/editor": "workspace:*",
     "@wordma/ui": "workspace:*",
     "antd": "catalog:",
     "lucide-react": "catalog:",

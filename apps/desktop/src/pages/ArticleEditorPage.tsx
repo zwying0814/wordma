@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { App as AntdApp, Button, Select, Spin } from "antd";
 import { ArrowLeft, Eye } from "lucide-react";
 import * as stylex from "@stylexjs/stylex";
 import x from "@stylexjs/atoms";
 import { editorStyles } from "../styles/editor.stylex";
-import { WordmaEditor } from "@wordma/editor";
 import { useLocation } from "wouter";
 import { useSite } from "../context/SiteContext";
 import {
@@ -13,14 +12,7 @@ import {
   type Article,
   type ArticleStatus,
 } from "../lib/article";
-import { getContentCss, openPreview, renderSite } from "../lib/theme";
-import {
-  convertFileSrc,
-  listMedia,
-  mediaPublicUrl,
-  uploadMedia,
-} from "../lib/media";
-import MediaPickerModal from "../components/MediaPickerModal";
+import { openPreview, renderSite } from "../lib/theme";
 import { countWordsHtml, fmtDate } from "../lib/words";
 
 // 布局对应设计稿 .editor（顶栏 + 居中窄栏编辑区）
@@ -64,7 +56,7 @@ export default function ArticleEditorPage({
 }: {
   params: { id: string };
 }) {
-  const { activeSite, reloadArticles, reloadMedia, tags, categories } = useSite();
+  const { activeSite, reloadArticles, tags, categories } = useSite();
   const { message } = AntdApp.useApp();
   const [, navigate] = useLocation();
   const [article, setArticle] = useState<Article | null>(null);
@@ -75,78 +67,6 @@ export default function ArticleEditorPage({
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [tagIds, setTagIds] = useState<number[]>([]);
   const [slug, setSlug] = useState("");
-  // filename → 磁盘绝对路径：编辑器显示图片时把 /media/x 解析为 asset 地址
-  const mediaPathsRef = useRef<Record<string, string>>({});
-  const [mediaReady, setMediaReady] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [contentCss, setContentCss] = useState("");
-  const pickerResolver = useRef<((url: string | null) => void) | null>(null);
-
-  // 粘贴/拖入图片：上传到媒体库后插入
-  const handlePasteImage = useCallback(
-    async (file: File) => {
-      try {
-        const media = await uploadMedia(activeSite.id, file);
-        mediaPathsRef.current = {
-          ...mediaPathsRef.current,
-          [media.filename]: media.path,
-        };
-        reloadMedia();
-        return mediaPublicUrl(media);
-      } catch (e) {
-        message.error(String(e));
-        return null;
-      }
-    },
-    [activeSite.id, reloadMedia],
-  );
-
-  // 主题 content.css（编辑器内容区排版，跟随主题）
-  useEffect(() => {
-    getContentCss(activeSite.id)
-      .then(setContentCss)
-      .catch(() => {});
-  }, [activeSite.id]);
-
-  // 站点媒体清单变化时刷新 filename → path 映射（编辑器挂载前必须就绪）
-  useEffect(() => {
-    setMediaReady(false);
-    listMedia(activeSite.id)
-      .then((list) => {
-        const map: Record<string, string> = {};
-        for (const m of list) map[m.filename] = m.path;
-        mediaPathsRef.current = map;
-      })
-      .catch(() => {})
-      .finally(() => setMediaReady(true));
-  }, [activeSite.id]);
-
-  // 工具栏“插入图片”：打开媒体库选择
-  const handlePickImage = useCallback(
-    () =>
-      new Promise<string | null>((resolve) => {
-        pickerResolver.current = resolve;
-        setPickerOpen(true);
-      }),
-    [],
-  );
-
-  const closePicker = (url: string | null) => {
-    setPickerOpen(false);
-    pickerResolver.current?.(url);
-    pickerResolver.current = null;
-  };
-
-  // 编辑器图片显示：把 /media/x 解析为 asset 协议地址
-  const handleResolveImageUrl = useCallback(
-    (src: string) => {
-      if (!src.startsWith("/media/")) return src;
-      const filename = src.slice("/media/".length);
-      const path = mediaPathsRef.current[filename];
-      return path ? convertFileSrc(path) : src;
-    },
-    [],
-  );
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -246,7 +166,7 @@ export default function ArticleEditorPage({
     );
   }
 
-  if (!article || !mediaReady) {
+  if (!article) {
     return (
       <div
         {...stylex.props(
@@ -297,7 +217,6 @@ export default function ArticleEditorPage({
           {status === "published" ? "更新发布" : "发布"}
         </Button>
       </div>
-      {contentCss && <style>{contentCss}</style>}
       <div {...stylex.props(editorStyles.body)}>
         <div {...stylex.props(editorStyles.col)}>
           <input
@@ -343,16 +262,6 @@ export default function ArticleEditorPage({
               约 {countWordsHtml(content)} 字
             </span>
           </div>
-          <WordmaEditor
-            key={article.id}
-            initialValue={content}
-            onChange={setContent}
-            onPasteImage={handlePasteImage}
-            onPickImage={handlePickImage}
-            onResolveImageUrl={handleResolveImageUrl}
-            contentClassName="post-content"
-          />
-          <MediaPickerModal open={pickerOpen} onClose={closePicker} />
         </div>
       </div>
     </div>
