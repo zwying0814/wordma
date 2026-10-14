@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 
-import { createSlateEditor } from 'platejs';
+import { createSlateEditor, DebugPlugin } from 'platejs';
 import { serializeHtml } from 'platejs/static';
 import type { Value } from 'platejs';
 import { ArrowLeftIcon, ChevronDown, Dices } from 'lucide-react';
@@ -71,6 +71,7 @@ export function ArticleEditor({
     [article.id, article.updatedAt]
   );
 
+
   const [title, setTitle] = React.useState(article.title);
   const [slug, setSlug] = React.useState(article.slug);
   const [status, setStatus] = React.useState(article.status);
@@ -116,7 +117,13 @@ export function ArticleEditor({
     setSaving(true);
     setSaveError(null);
     try {
-      const html = await serializeHtml(editor);
+      // serializeHtml 以静态方式渲染节点组件，plate hooks 脱离节点上下文会产生
+      // [USE_ELEMENT_CONTEXT] 告警（输出不受影响，默认值已验证正确）。
+      // 序列化期间临时提升日志级别，完成后恢复。
+      const prevLogLevel = editor.getOption(DebugPlugin, 'logLevel');
+      editor.setOption(DebugPlugin, 'logLevel', 'error');
+      try {
+        const html = await serializeHtml(editor);
       const saved = await updateArticle({
         id: article.id,
         title: title.trim() || '未命名文章',
@@ -126,9 +133,12 @@ export function ArticleEditor({
         categoryIds,
         tagIds,
       });
-      setSlug(saved.slug);
-      setSavedAt(new Date().toLocaleTimeString('zh-CN'));
-      onSaved?.();
+        setSlug(saved.slug);
+        setSavedAt(new Date().toLocaleTimeString('zh-CN'));
+        onSaved?.();
+      } finally {
+        editor.setOption(DebugPlugin, 'logLevel', prevLogLevel ?? 'warn');
+      }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
     } finally {
