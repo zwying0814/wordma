@@ -25,6 +25,11 @@ import {
   renameTag,
 } from './taxonomy';
 import {
+  getRoutingRulesFor,
+  validateRoutingRules,
+} from './routing';
+import type { RoutingRules } from './routing';
+import {
   deleteMedia,
   listMedia,
   uploadMediaData,
@@ -71,6 +76,13 @@ export function registerAllIpc(): void {
   handleIpc('debug_protocol', () => ({
     handled: protocol.isProtocolHandled('wordma-media'),
   }));
+  // 路由规则校验（T14 验收通道；设置 UI 二期）
+  handleIpc('debug_validate_routing', (payload) =>
+    validateRoutingRules(payload.rules as RoutingRules)
+  );
+  handleIpc('get_routing_rules', (payload) =>
+    getRoutingRulesFor(payload.siteId as number)
+  );
   handleIpc('debug_fetch', async (payload) => {
     try {
       const res = await net.fetch(payload.url as string);
