@@ -4,6 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+/** 编辑器相关用例依赖的演示内容（标题/富文本/引用等文案断言的来源） */
+const DEMO_ARTICLE_HTML =
+  '<h1>用 Plate 写博客</h1><p>支持 <strong>粗体</strong>、<em>斜体</em>、<u>下划线</u>、<code>inline code</code>、<kbd>⌘+B</kbd> 和 <mark>高亮</mark>。</p><blockquote><p>这是一段引用。</p></blockquote><p></p>';
+
 export type LaunchOptions = {
   /** 数据目录（默认每次独立临时目录；持久化类测试传同一目录） */
   dataDir?: string;
@@ -23,7 +27,11 @@ export async function launchDesktop(
   dataDir: string;
   seeded: { siteId: number; articleId: number } | null;
 }> {
-  const { dataDir: dataDirOption, seed = true, articleContent = '' } = options;
+  const {
+    dataDir: dataDirOption,
+    seed = true,
+    articleContent = DEMO_ARTICLE_HTML,
+  } = options;
   const dataDir =
     dataDirOption ?? fs.mkdtempSync(path.join(os.tmpdir(), 'wordma-e2e-'));
 

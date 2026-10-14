@@ -50,6 +50,8 @@ test('T9: 新建分类与标签（计数 0 篇）', async () => {
 test('T9: 重复新建同名 → 复用（列表不重复）', async () => {
   await page.getByTestId('tag-name-input').fill('随笔');
   await page.getByTestId('tag-create').click();
+  // 等创建的异步回写完成（输入框清空）再进行下一次
+  await expect(page.getByTestId('tag-name-input')).toHaveValue('');
   await page.getByTestId('tag-name-input').fill('随笔');
   await page.getByTestId('tag-create').click();
 
@@ -61,6 +63,7 @@ test('T9: 重复新建同名 → 复用（列表不重复）', async () => {
 test('T9: 重命名生效；撞名 → 行内错误', async () => {
   await page.getByTestId('tag-name-input').fill('甲');
   await page.getByTestId('tag-create').click();
+  await expect(page.getByTestId('tag-name-input')).toHaveValue('');
   await page.getByTestId('tag-name-input').fill('乙');
   await page.getByTestId('tag-create').click();
 

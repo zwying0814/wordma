@@ -60,7 +60,7 @@ test('T13: 编辑内容 + 保存 → 重启还原', async () => {
   await expect(page.getByTestId('page-saved-at')).toBeVisible();
   await app.close();
   // 等待前一个 Electron 进程完全退出，避免 SQLite 文件句柄竞态
-  await page.waitForTimeout(500);
+  await new Promise((resolve) => setTimeout(resolve, 500));
 
   const second = await launchDesktop({ dataDir, seed: true });
   app = second.app;
