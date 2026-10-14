@@ -1,27 +1,47 @@
 'use client';
 
+import * as React from 'react';
+
 import { ImagePlusIcon } from 'lucide-react';
 import { KEYS, isUrl } from 'platejs';
 import { useEditorRef } from 'platejs/react';
-import * as React from 'react';
 
+import { useSite } from '@/context/SiteContext';
+import { listMedia, mediaUrl } from '@/lib/media';
+import type { MediaItem } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 import { ToolbarButton } from './toolbar';
 
+/** 图片插入按钮：URL 直填 + 媒体库网格选择（点击即插入 wordma-media:// 图片） */
 export function ImageToolbarButton(
   props: React.ComponentProps<typeof ToolbarButton>
 ) {
   const editor = useEditorRef();
+  const { activeSite } = useSite();
+  const siteId = activeSite?.id ?? null;
+
   const [open, setOpen] = React.useState(false);
   const [url, setUrl] = React.useState('');
+  const [items, setItems] = React.useState<MediaItem[]>([]);
 
-  const insertImage = () => {
-    if (!url || !isUrl(url)) return;
+  React.useEffect(() => {
+    if (!open || siteId === null) return;
+    let cancelled = false;
+    void listMedia(siteId)
+      .then((list) => {
+        if (!cancelled) setItems(list.filter((item) => item.kind === 'image'));
+      })
+      .catch(() => setItems([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, siteId]);
 
+  const insertImage = (src: string) => {
     editor.tf.insertNodes(
-      { children: [{ text: '' }], type: KEYS.img, url },
+      { children: [{ text: '' }], type: KEYS.img, url: src },
       { select: true }
     );
     setOpen(false);
@@ -50,6 +70,30 @@ export function ImageToolbarButton(
         }
       />
       <PopoverContent className="w-[330px] rounded-md border bg-popover p-2 shadow-md">
+        {/* 媒体库网格 */}
+        {siteId !== null && items.length > 0 && (
+          <div
+            className="mb-2 grid max-h-40 grid-cols-4 gap-1 overflow-y-auto"
+            data-testid="media-picker-grid"
+          >
+            {items.map((item) => (
+              <button
+                className="aspect-square cursor-pointer overflow-hidden rounded border bg-muted/30 hover:ring-2 hover:ring-ring"
+                key={item.id}
+                onClick={() => insertImage(mediaUrl(siteId, item.filename))}
+                title={item.originalName}
+                type="button"
+              >
+                <img
+                  alt={item.originalName}
+                  className="size-full object-cover"
+                  src={mediaUrl(siteId, item.filename)}
+                />
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           <input
             autoFocus
@@ -59,7 +103,7 @@ export function ImageToolbarButton(
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                insertImage();
+                if (isUrl(url)) insertImage(url);
               }
             }}
             placeholder="Paste image URL..."
@@ -67,8 +111,8 @@ export function ImageToolbarButton(
           />
           <Button
             className="h-8 shrink-0 px-3 text-sm"
-            disabled={!url || !isUrl(url)}
-            onClick={insertImage}
+            disabled={!isUrl(url)}
+            onClick={() => insertImage(url)}
             type="button"
           >
             Insert

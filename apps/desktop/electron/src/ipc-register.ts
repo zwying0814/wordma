@@ -1,4 +1,4 @@
-import { ipcMain, app } from 'electron';
+import { ipcMain, app, net, protocol } from 'electron';
 import { getDb } from './db';
 import {
   createArticle,
@@ -17,6 +17,12 @@ import {
   renameCategory,
   renameTag,
 } from './taxonomy';
+import {
+  deleteMedia,
+  listMedia,
+  uploadMediaData,
+  uploadMediaFromPath,
+} from './media';
 import {
   createSite,
   deleteSite,
@@ -55,6 +61,17 @@ export function registerAllIpc(): void {
       .all()
       .map((row: any) => row.name)
   );
+  handleIpc('debug_protocol', () => ({
+    handled: protocol.isProtocolHandled('wordma-media'),
+  }));
+  handleIpc('debug_fetch', async (payload) => {
+    try {
+      const res = await net.fetch(payload.url as string);
+      return { status: res.status, body: (await res.text()).slice(0, 60) };
+    } catch (err) {
+      return { err: String(err) };
+    }
+  });
 
   // site
   handleIpc('list_sites', () => listSites());
@@ -121,4 +138,22 @@ export function registerAllIpc(): void {
     renameCategory({ id: payload.id, name: payload.name })
   );
   handleIpc('delete_category', (payload) => deleteCategory(payload.id));
+
+  // media
+  handleIpc('list_media', (payload) => listMedia(payload.siteId));
+  handleIpc('upload_media_from_path', (payload) =>
+    uploadMediaFromPath({
+      siteId: payload.siteId,
+      filePath: payload.filePath,
+      originalName: payload.originalName,
+    })
+  );
+  handleIpc('upload_media_data', (payload) =>
+    uploadMediaData({
+      siteId: payload.siteId,
+      base64: payload.base64,
+      originalName: payload.originalName,
+    })
+  );
+  handleIpc('delete_media', (payload) => deleteMedia(payload.id));
 }

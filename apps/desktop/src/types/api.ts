@@ -78,6 +78,8 @@ declare global {
   interface Window {
     api: {
       invoke: (channel: string, payload?: unknown) => Promise<unknown>;
+      /** File 对象 → 磁盘真实路径（媒体上传） */
+      getPathForFile: (file: File) => string;
     };
   }
 }

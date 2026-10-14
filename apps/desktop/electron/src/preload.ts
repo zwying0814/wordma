@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 /**
  * 渲染层唯一后端入口：window.api.invoke(channel, payload)。
@@ -7,6 +7,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 const api = {
   invoke: (channel: string, payload?: unknown): Promise<unknown> =>
     ipcRenderer.invoke(channel, payload),
+  /** File 对象 → 磁盘真实路径（媒体路径上传通道用） */
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
 };
 
 contextBridge.exposeInMainWorld('api', api);

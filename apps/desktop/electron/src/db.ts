@@ -6,11 +6,19 @@ import path from 'node:path';
 import { runMigrations } from './migrations';
 
 let db: DatabaseSync | null = null;
+let dataDir: string | null = null;
+
+/** 当前数据目录（media/preview 等磁盘布局的根） */
+export function getDataDir(): string {
+  if (!dataDir) throw new Error('数据目录尚未初始化');
+  return dataDir;
+}
 
 /** 初始化数据目录与数据库连接（主进程启动时调用一次） */
-export function initDataDir(dataDir: string): void {
-  mkdirSync(dataDir, { recursive: true });
-  db = new DatabaseSync(path.join(dataDir, 'wordma.db'));
+export function initDataDir(dir: string): void {
+  mkdirSync(dir, { recursive: true });
+  dataDir = dir;
+  db = new DatabaseSync(path.join(dir, 'wordma.db'));
   db.exec('PRAGMA foreign_keys = ON');
   runMigrations(db);
 }

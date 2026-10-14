@@ -8,6 +8,7 @@ import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
 import { ArticlesPage } from '@/pages/ArticlesPage';
 import { TaxonomyPage } from '@/pages/TaxonomyPage';
 import { WelcomePage } from '@/pages/WelcomePage';
+import { MediaPage } from '@/pages/MediaPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 export default function App() {
@@ -59,7 +60,7 @@ function Routes() {
                   <TaxonomyPage />
                 </Route>
                 <Route path="/media">
-                  <PlaceholderPage task="T11" title="媒体库" />
+                  <MediaPage />
                 </Route>
                 <Route path="/settings">
                   <PlaceholderPage task="T16" title="设置" />
