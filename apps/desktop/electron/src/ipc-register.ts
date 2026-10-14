@@ -8,6 +8,13 @@ import {
   updateArticle,
 } from './article';
 import {
+  createPage,
+  deletePage,
+  getPage,
+  listPages,
+  updatePage,
+} from './pages';
+import {
   createCategory,
   createTag,
   deleteCategory,
@@ -156,4 +163,29 @@ export function registerAllIpc(): void {
     })
   );
   handleIpc('delete_media', (payload) => deleteMedia(payload.id));
+
+  // pages
+  handleIpc('list_pages', (payload) => listPages(payload.siteId));
+  handleIpc('get_page', (payload) => getPage(payload.id));
+  handleIpc('create_page', (payload) =>
+    createPage({
+      siteId: payload.siteId,
+      title: payload.title,
+      slug: payload.slug,
+      content: payload.content,
+      showInNav: payload.showInNav,
+      sortOrder: payload.sortOrder,
+    })
+  );
+  handleIpc('update_page', (payload) =>
+    updatePage({
+      id: payload.id,
+      title: payload.title,
+      content: payload.content,
+      slug: payload.slug,
+      showInNav: payload.showInNav,
+      sortOrder: payload.sortOrder,
+    })
+  );
+  handleIpc('delete_page', (payload) => deletePage(payload.id));
 }

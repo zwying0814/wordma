@@ -6,6 +6,8 @@ import { SidebarNav } from '@/components/SidebarNav';
 import { SiteSwitcher } from '@/components/SiteSwitcher';
 import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
 import { ArticlesPage } from '@/pages/ArticlesPage';
+import { PageEditorPage } from '@/pages/PageEditorPage';
+import { PagesPage } from '@/pages/PagesPage';
 import { TaxonomyPage } from '@/pages/TaxonomyPage';
 import { WelcomePage } from '@/pages/WelcomePage';
 import { MediaPage } from '@/pages/MediaPage';
@@ -53,8 +55,11 @@ function Routes() {
                 <Route path="/articles">
                   <ArticlesPage />
                 </Route>
+                <Route path="/pages/editor/:id">
+                  <PageEditorPage />
+                </Route>
                 <Route path="/pages">
-                  <PlaceholderPage task="T13" title="页面" />
+                  <PagesPage />
                 </Route>
                 <Route path="/taxonomy">
                   <TaxonomyPage />
