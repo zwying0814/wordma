@@ -49,8 +49,11 @@ test('语言选择器：搜索并切换语言', async () => {
   await page.getByRole('menuitem', { name: 'Code' }).click();
   await page.keyboard.type('const answer = 42');
 
-  // 打开语言选择器
-  await page.getByRole('button', { name: 'Plain Text' }).click();
+  // 打开语言选择器（限定 popover 触发器，避免与列表里的同名 'Plain Text' 项撞 strict mode）
+  await page
+    .locator('[data-slot="popover-trigger"]')
+    .filter({ hasText: 'Plain Text' })
+    .click();
   const search = page.getByPlaceholder('Search language...');
   await expect(search).toBeVisible();
 

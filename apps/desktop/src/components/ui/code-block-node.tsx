@@ -182,9 +182,12 @@ function CodeBlockCombobox({
                 className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground"
                 key={language.label}
                 onClick={() => {
+                  // 显式解析路径：at 直接传 Node 对象在部分时序下会丢内容
+                  const path = editor.api.findPath(element);
+                  if (!path) return;
                   editor.tf.setNodes<TCodeBlockElement>(
                     { lang: language.value },
-                    { at: element }
+                    { at: path }
                   );
                   setOpen(false);
                 }}

@@ -5,6 +5,7 @@ import { SiteProvider, useSite } from '@/context/SiteContext';
 import { SidebarNav } from '@/components/SidebarNav';
 import { SiteSwitcher } from '@/components/SiteSwitcher';
 import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
+import { ArticlesPage } from '@/pages/ArticlesPage';
 import { WelcomePage } from '@/pages/WelcomePage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
@@ -48,7 +49,7 @@ function Routes() {
             <main className="min-w-0 flex-1 overflow-y-auto">
               <Switch>
                 <Route path="/articles">
-                  <PlaceholderPage task="T7" title="文章" />
+                  <ArticlesPage />
                 </Route>
                 <Route path="/pages">
                   <PlaceholderPage task="T13" title="页面" />
@@ -63,7 +64,7 @@ function Routes() {
                   <PlaceholderPage task="T16" title="设置" />
                 </Route>
                 <Route>
-                  <PlaceholderPage task="T7" title="文章" />
+                  <ArticlesPage />
                 </Route>
               </Switch>
             </main>

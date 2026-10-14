@@ -7,6 +7,7 @@ import path from 'node:path';
 export type LaunchOptions = {
   /** 数据目录（默认每次独立临时目录；持久化类测试传同一目录） */
   dataDir?: string;
+  /** 播种文章的正文 HTML（默认空内容） */
   /**
    * 是否播种测试站点并进入编辑器（默认 true —— 编辑器 E2E 的前置状态）。
    * seed=false 时停留在启动页（无站点则为 Welcome），供应用壳/服务类测试使用。
@@ -22,7 +23,7 @@ export async function launchDesktop(
   dataDir: string;
   seeded: { siteId: number; articleId: number } | null;
 }> {
-  const { dataDir: dataDirOption, seed = true } = options;
+  const { dataDir: dataDirOption, seed = true, articleContent = '' } = options;
   const dataDir =
     dataDirOption ?? fs.mkdtempSync(path.join(os.tmpdir(), 'wordma-e2e-'));
 
@@ -38,7 +39,7 @@ export async function launchDesktop(
 
   if (seed) {
     // 播种：确保站点存在并激活，确保有一篇文章，然后进入编辑器
-    seeded = (await page.evaluate(async () => {
+    seeded = (await page.evaluate(async (content: string) => {
       const api = (window as any).api;
       const active = await api.invoke('get_active_site');
       let siteId = active?.id;
@@ -53,11 +54,12 @@ export async function launchDesktop(
         const article = await api.invoke('create_article', {
           siteId,
           title: '演示文章',
+          content,
         });
         articleId = article.id;
       }
       return { siteId: Number(siteId), articleId: Number(articleId) };
-    })) as { siteId: number; articleId: number };
+    }, articleContent)) as { siteId: number; articleId: number };
 
     await page.evaluate((id: number) => {
       window.location.hash = `#/editor/${id}`;

@@ -90,15 +90,16 @@ test('T4: 刷新后激活站点保持，不回 Welcome', async () => {
   await expect(page.getByTestId('site-switcher')).toContainText('持久站点');
 });
 
-test('T4: 编辑器路由不依赖站点（直连渲染）', async () => {
+test('T8 后语义：编辑器路由访问不存在的文章显示错误态', async () => {
   const launched = await launchDesktop({ seed: false });
   app = launched.app;
   page = launched.page;
 
-  // 无站点，但 /editor/:id 直连可渲染（迁移期语义，保护编辑器 E2E）
+  // 空库中没有文章：/editor/999 进入错误态（带返回栏）
   await page.evaluate(() => {
-    window.location.hash = '#/editor/1';
+    window.location.hash = '#/editor/999';
   });
 
-  await expect(page.locator('[data-slate-editor="true"]')).toBeVisible();
+  await expect(page.getByTestId('editor-back')).toBeVisible();
+  await expect(page.getByText('文章不存在')).toBeVisible();
 });
