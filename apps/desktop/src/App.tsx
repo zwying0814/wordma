@@ -6,6 +6,7 @@ import { SidebarNav } from '@/components/SidebarNav';
 import { SiteSwitcher } from '@/components/SiteSwitcher';
 import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
 import { ArticlesPage } from '@/pages/ArticlesPage';
+import { TaxonomyPage } from '@/pages/TaxonomyPage';
 import { WelcomePage } from '@/pages/WelcomePage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
@@ -55,7 +56,7 @@ function Routes() {
                   <PlaceholderPage task="T13" title="页面" />
                 </Route>
                 <Route path="/taxonomy">
-                  <PlaceholderPage task="T9" title="分类与标签" />
+                  <TaxonomyPage />
                 </Route>
                 <Route path="/media">
                   <PlaceholderPage task="T11" title="媒体库" />
