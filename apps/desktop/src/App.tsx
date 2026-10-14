@@ -9,9 +9,9 @@ import { ArticlesPage } from '@/pages/ArticlesPage';
 import { PageEditorPage } from '@/pages/PageEditorPage';
 import { PagesPage } from '@/pages/PagesPage';
 import { TaxonomyPage } from '@/pages/TaxonomyPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { WelcomePage } from '@/pages/WelcomePage';
 import { MediaPage } from '@/pages/MediaPage';
-import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 export default function App() {
   return (
@@ -68,7 +68,7 @@ function Routes() {
                   <MediaPage />
                 </Route>
                 <Route path="/settings">
-                  <PlaceholderPage task="T16" title="设置" />
+                  <SettingsPage />
                 </Route>
                 <Route>
                   <ArticlesPage />

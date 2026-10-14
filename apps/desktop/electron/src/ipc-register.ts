@@ -1,5 +1,6 @@
 import { ipcMain, app, net, protocol } from 'electron';
-import { getDataDir, getDb } from './db';
+import { getDb } from './db';
+import { getPreviewPort } from './preview';
 import {
   createArticle,
   deleteArticle,
@@ -29,9 +30,14 @@ import {
   validateRoutingRules,
 } from './routing';
 import type { RoutingRules } from './routing';
-import path from 'node:path';
-
-import { renderSiteTo } from './render';
+import { renderSitePreview } from './render';
+import {
+  setPreviewDir,
+  startPreviewServer,
+  validatePort,
+  getRunningPort,
+} from './preview';
+import { shell } from 'electron';
 import {
   deleteMedia,
   listMedia,
@@ -179,19 +185,31 @@ export function registerAllIpc(): void {
   );
   handleIpc('delete_media', (payload) => deleteMedia(payload.id));
 
-  // render（预览构建；T16 接入预览服务器）
+  // render / preview
   handleIpc('render_site', async (payload) => {
+    const report = await renderSitePreview(payload.siteId as number);
+    setPreviewDir(report.outputDir);
+    await startPreviewServer(getPreviewPort());
+    return report;
+  });
+  handleIpc('open_preview', async (payload) => {
     const siteId = payload.siteId as number;
-    const site = getSite(siteId);
-    const port = Number(getSetting('preview_port') ?? '12739');
-    const outputDir = path.join(getDataDir(), 'preview', String(siteId));
-    return renderSiteTo({
-      site,
-      siteId,
-      outputDir,
-      includeDrafts: true,
-      baseUrl: `http://127.0.0.1:${port}/`,
-    });
+    const report = await renderSitePreview(siteId);
+    setPreviewDir(report.outputDir);
+    const port = await startPreviewServer(getPreviewPort());
+    const url = `http://127.0.0.1:${port}/`;
+    await shell.openExternal(url);
+    return { url };
+  });
+  handleIpc('get_preview_port', () => getPreviewPort());
+  handleIpc('set_preview_port', async (payload) => {
+    const port = Number(payload.port);
+    validatePort(port);
+    setSetting('preview_port', String(port));
+    if (getRunningPort() !== null && getRunningPort() !== port) {
+      await startPreviewServer(port);
+    }
+    return port;
   });
 
   // pages

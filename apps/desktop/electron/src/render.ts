@@ -4,10 +4,11 @@ import path from 'node:path';
 
 import { listArticles } from './article';
 import { getDataDir } from './db';
-import type { Site } from './site';
+import { getSite, type Site } from './site';
 import { listPages } from './pages';
 import { listCategories, listTags } from './taxonomy';
 import { generatePath, getRoutingRulesFor } from './routing';
+import { getPreviewPort } from './preview';
 import {
   ARCHIVE_TEMPLATE,
   BASE_TEMPLATE,
@@ -296,6 +297,19 @@ export async function renderSiteTo(options: {
   }
 
   return { siteId, outputDir, files: files.length, baseUrl };
+}
+
+/** 渲染站点预览（含草稿，输出到 preview/{siteId}，baseUrl 指向预览服务器） */
+export async function renderSitePreview(siteId: number): Promise<RenderReport> {
+  const site = getSite(siteId);
+  const port = getPreviewPort();
+  return renderSiteTo({
+    site,
+    siteId,
+    outputDir: path.join(getDataDir(), 'preview', String(siteId)),
+    includeDrafts: true,
+    baseUrl: `http://127.0.0.1:${port}/`,
+  });
 }
 
 function groupByYear(posts: PostView[]): {
