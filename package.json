@@ -1,0 +1,17 @@
+{
+  "name": "vite-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@12.11.2",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo run dev dev:electron",
+    "lint": "turbo lint",
+    "format": "turbo format",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "turbo": "^2.11.7",
+    "typescript": "~6.0.2"
+  }
+}

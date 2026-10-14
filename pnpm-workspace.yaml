@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  electron: true
+  esbuild: true
+  msw: false
+  msgpackr-extract: false
