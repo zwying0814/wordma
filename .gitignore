@@ -33,8 +33,9 @@ dist-ssr
 *.tsbuildinfo
 tmp
 
-# 本地文档（不入库）
+# 本地文档与设计稿（不入库）
 docs
+design
 
 # playwright
 
