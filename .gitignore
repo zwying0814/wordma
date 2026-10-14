@@ -33,6 +33,9 @@ dist-ssr
 *.tsbuildinfo
 tmp
 
+# 本地文档（不入库）
+docs
+
 # playwright
 
 test-results
