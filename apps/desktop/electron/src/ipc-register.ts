@@ -1,5 +1,5 @@
 import { ipcMain, app, net, protocol } from 'electron';
-import { getDb } from './db';
+import { getDataDir, getDb } from './db';
 import {
   createArticle,
   deleteArticle,
@@ -29,6 +29,9 @@ import {
   validateRoutingRules,
 } from './routing';
 import type { RoutingRules } from './routing';
+import path from 'node:path';
+
+import { renderSiteTo } from './render';
 import {
   deleteMedia,
   listMedia,
@@ -175,6 +178,21 @@ export function registerAllIpc(): void {
     })
   );
   handleIpc('delete_media', (payload) => deleteMedia(payload.id));
+
+  // render（预览构建；T16 接入预览服务器）
+  handleIpc('render_site', async (payload) => {
+    const siteId = payload.siteId as number;
+    const site = getSite(siteId);
+    const port = Number(getSetting('preview_port') ?? '12739');
+    const outputDir = path.join(getDataDir(), 'preview', String(siteId));
+    return renderSiteTo({
+      site,
+      siteId,
+      outputDir,
+      includeDrafts: true,
+      baseUrl: `http://127.0.0.1:${port}/`,
+    });
+  });
 
   // pages
   handleIpc('list_pages', (payload) => listPages(payload.siteId));

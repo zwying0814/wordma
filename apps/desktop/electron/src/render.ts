@@ -1,0 +1,368 @@
+import ejs from 'ejs';
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { listArticles } from './article';
+import { getDataDir } from './db';
+import type { Site } from './site';
+import { listPages } from './pages';
+import { listCategories, listTags } from './taxonomy';
+import { generatePath, getRoutingRulesFor } from './routing';
+import {
+  ARCHIVE_TEMPLATE,
+  BASE_TEMPLATE,
+  INDEX_TEMPLATE,
+  PAGE_TEMPLATE,
+  POST_TEMPLATE,
+  STYLE_CSS,
+  TAXONOMIES_TEMPLATE,
+} from './templates';
+
+export type RenderReport = {
+  siteId: number;
+  outputDir: string;
+  files: number;
+  baseUrl: string;
+};
+
+type PostRef = { id: number; name: string };
+
+type PostView = {
+  id: number;
+  title: string;
+  url: string;
+  date: string;
+  status: 'draft' | 'published';
+  contentHtml: string;
+  categories: PostRef[];
+  tags: PostRef[];
+  categoriesText: string;
+  tagsText: string;
+  wordCount: number;
+};
+
+const POSTS_PER_PAGE = 10;
+const FOOTER_TEXT = '由 Wordma 驱动';
+
+/** 预览/构建共用入口：渲染站点到 outputDir */
+export async function renderSiteTo(options: {
+  site: Site;
+  siteId: number;
+  outputDir: string;
+  includeDrafts: boolean;
+  baseUrl: string;
+}): Promise<RenderReport> {
+  const { site, siteId, outputDir, includeDrafts, baseUrl } = options;
+
+  const rules = getRoutingRulesFor(siteId);
+  const articles = listArticles(siteId);
+  const pages = listPages(siteId);
+  const tags = listTags(siteId);
+  const categories = listCategories(siteId);
+
+  // 1) 清空输出目录
+  rmSync(outputDir, { recursive: true, force: true });
+  mkdirSync(outputDir, { recursive: true });
+
+  // 2) 数据准备
+  // 列表/归档/RSS 永远只含已发布；includeDrafts 仅控制草稿详情页是否生成（预览语义）
+  const detailArticles = includeDrafts ? articles : articles.filter(
+    (a) => a.status === 'published'
+  );
+  const listArticles_ = articles.filter((a) => a.status === 'published');
+  const mediaPrefix = `wordma-media://media/${siteId}/`;
+  const mediaReplacement = `${baseUrl}media/`;
+
+  const postViews: PostView[] = detailArticles.map((a) => ({
+    id: a.id,
+    title: a.title,
+    url: generatePath(rules.post, {
+      slug: a.slug,
+      id: String(a.id),
+      year: a.createdAt.slice(0, 4),
+      month: a.createdAt.slice(5, 7),
+      day: a.createdAt.slice(8, 10),
+    }),
+    date: a.createdAt.slice(0, 10),
+    status: a.status,
+    contentHtml: a.content.replaceAll(mediaPrefix, mediaReplacement),
+    categories: a.categories,
+    tags: a.tags,
+    categoriesText: a.categories.map((c) => c.name).join('、'),
+    tagsText: a.tags.map((t) => t.name).join('、'),
+    wordCount: countWords(a.content),
+  }));
+
+  // 3) URL 冲突检测（全站唯一）
+  const urlOwners = new Map<string, string>();
+  const claim = (url: string, label: string): void => {
+    const owner = urlOwners.get(url);
+    if (owner !== undefined) {
+      throw new Error(`路径冲突: ${url}（${owner} 与 ${label}）`);
+    }
+    urlOwners.set(url, label);
+  };
+
+  const pageUrls = new Map<number, string>();
+  const categoryUrls = new Map<number, string>();
+  const tagUrls = new Map<number, string>();
+  const archiveUrl = rules.archive;
+  const feedUrl = rules.feed;
+
+  for (const view of postViews) {
+    claim(view.url, `文章「${view.title}」`);
+  }
+  for (const page of pages) {
+    const url = generatePath(rules.page, { slug: page.slug, id: String(page.id) });
+    claim(url, `页面「${page.title}」`);
+    pageUrls.set(page.id, url);
+  }
+  for (const category of categories) {
+    const url = generatePath(rules.category, {
+      slug: taxonomySlug(category.name, category.id),
+      id: String(category.id),
+    });
+    claim(url, `分类「${category.name}」`);
+    categoryUrls.set(category.id, url);
+  }
+  for (const tag of tags) {
+    const url = generatePath(rules.tag, {
+      slug: taxonomySlug(tag.name, tag.id),
+      id: String(tag.id),
+    });
+    claim(url, `标签「${tag.name}」`);
+    tagUrls.set(tag.id, url);
+  }
+  claim(archiveUrl, '归档');
+  claim(rules.category, '分类总览');
+  claim(rules.tag, '标签总览');
+  claim(feedUrl, 'RSS');
+
+  // 4) 渲染上下文
+  const navPages = pages
+    .filter((p) => p.showInNav)
+    .map((p) => ({ title: p.title, url: pageUrls.get(p.id) ?? '/' }));
+
+  const baseContext = {
+    site: { name: site.name, description: site.description ?? '', url: baseUrl },
+    urls: { archive: archiveUrl, categories: rules.category, tags: rules.tag, feed: feedUrl },
+    navPages,
+    theme: { footerText: FOOTER_TEXT, postsPerPage: POSTS_PER_PAGE },
+    footerText: FOOTER_TEXT,
+    assetRoot: baseUrl,
+    title: site.name,
+    body: '',
+  };
+
+  const files: string[] = [];
+  const writePage = (url: string, bodyHtml: string, title: string): void => {
+    const html = ejs.render(BASE_TEMPLATE, {
+      ...baseContext,
+      body: bodyHtml,
+      title: `${title} - ${site.name}`,
+    });
+    const relative = url === '/' ? 'index.html' : toRelativeFile(url);
+    const filePath = path.join(outputDir, relative);
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, html);
+    files.push(relative);
+  };
+
+  // 5) 文章详情页
+  for (const view of postViews) {
+    const body = ejs.render(POST_TEMPLATE, { post: view });
+    writePage(view.url, body, view.title);
+  }
+
+  // 6) 独立页面
+  for (const page of pages) {
+    const body = ejs.render(PAGE_TEMPLATE, {
+      page: { title: page.title, contentHtml: page.content },
+    });
+    writePage(pageUrls.get(page.id) ?? '/', body, page.title);
+  }
+
+  // 7) 首页分页 + 分类/标签列表页（复用 index 模板；仅已发布）
+  const publishedViews = postViews.filter((p) => p.status === 'published');
+  const publishedSorted = [...publishedViews].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.id - a.id
+  );
+  const totalPages = Math.max(
+    1,
+    Math.ceil(publishedSorted.length / POSTS_PER_PAGE)
+  );
+  const indexPaginationUrl = (page: number): string =>
+    page <= 1 ? '/' : generatePath(rules.indexPagination, { num: String(page) });
+
+  const renderIndex = (
+    posts: PostView[],
+    page: number,
+    taxonomy?: { kind: string; name: string }
+  ): void => {
+    const body = ejs.render(INDEX_TEMPLATE, {
+      posts,
+      pagination: {
+        current: page,
+        total: totalPages,
+        prevUrl: page > 1 ? indexPaginationUrl(page - 1) : null,
+        nextUrl: page < totalPages ? indexPaginationUrl(page + 1) : null,
+      },
+      taxonomy,
+    });
+    writePage(indexPaginationUrl(page), body, site.name);
+  };
+
+  for (let page = 1; page <= totalPages; page += 1) {
+    const start = (page - 1) * POSTS_PER_PAGE;
+    renderIndex(publishedSorted.slice(start, start + POSTS_PER_PAGE), page);
+  }
+
+  // 分类/标签列表页（各自全量文章）
+  const categoryViews = categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    count: listArticles_.filter((a) => a.categories.some((r) => r.id === c.id)).length,
+  }));
+  const tagViews = tags.map((t) => ({
+    id: t.id,
+    name: t.name,
+    count: listArticles_.filter((a) => a.tags.some((r) => r.id === t.id)).length,
+  }));
+
+  for (const category of categories) {
+    const posts = publishedViews.filter((view) =>
+      view.categories.some((r) => r.id === category.id)
+    );
+    const body = ejs.render(INDEX_TEMPLATE, {
+      posts,
+      pagination: { current: 1, total: 1, prevUrl: null, nextUrl: null },
+      taxonomy: { kind: 'category', name: category.name },
+    });
+    writePage(categoryUrls.get(category.id) ?? '/', body, `分类：${category.name}`);
+  }
+  for (const tag of tags) {
+    const posts = publishedViews.filter((view) =>
+      view.tags.some((r) => r.id === tag.id)
+    );
+    const body = ejs.render(INDEX_TEMPLATE, {
+      posts,
+      pagination: { current: 1, total: 1, prevUrl: null, nextUrl: null },
+      taxonomy: { kind: 'tag', name: tag.name },
+    });
+    writePage(tagUrls.get(tag.id) ?? '/', body, `标签：${tag.name}`);
+  }
+
+  // 8) 归档（按创建年份分组，倒序）
+  const archiveBody = ejs.render(ARCHIVE_TEMPLATE, {
+    groups: groupByYear(publishedSorted),
+  });
+  writePage(archiveUrl, archiveBody, '归档');
+
+  // 9) 分类/标签总览
+  const taxonomiesBody = ejs.render(TAXONOMIES_TEMPLATE, {
+    heading: '分类',
+    items: categoryViews.map((c) => ({
+      name: c.name,
+      url: categoryUrls.get(c.id) ?? '/',
+      count: c.count,
+    })),
+  });
+  writePage('/categories/', taxonomiesBody, `分类 - ${site.name}`);
+
+  const tagOverviewBody = ejs.render(TAXONOMIES_TEMPLATE, {
+    heading: '标签',
+    items: tagViews.map((t) => ({
+      name: t.name,
+      url: tagUrls.get(t.id) ?? '/',
+      count: t.count,
+    })),
+  });
+  writePage('/tags/', tagOverviewBody, `标签 - ${site.name}`);
+
+  // 10) RSS 2.0
+  writeFileSync(path.join(outputDir, toRelativeFile(feedUrl)), buildRss(site, publishedSorted, baseUrl));
+  files.push(toRelativeFile(feedUrl));
+
+  // 11) assets + media 拷贝
+  const assetsDir = path.join(outputDir, 'assets');
+  mkdirSync(assetsDir, { recursive: true });
+  writeFileSync(path.join(assetsDir, 'style.css'), STYLE_CSS);
+  files.push('assets/style.css');
+
+  const mediaSrc = path.join(getDataDir(), 'media', String(siteId));
+  if (existsSync(mediaSrc)) {
+    cpSync(mediaSrc, path.join(outputDir, 'media'), { recursive: true });
+    files.push('media/');
+  }
+
+  return { siteId, outputDir, files: files.length, baseUrl };
+}
+
+function groupByYear(posts: PostView[]): {
+  year: string;
+  posts: { title: string; url: string; date: string }[];
+}[] {
+  const groups = new Map<string, PostView[]>();
+  for (const post of posts) {
+    const year = post.date.slice(0, 4);
+    const list = groups.get(year) ?? [];
+    list.push(post);
+    groups.set(year, list);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([year, list]) => ({
+      year,
+      posts: list.map((p) => ({ title: p.title, url: p.url, date: p.date })),
+    }));
+}
+
+function countWords(content: string): number {
+  return content.replace(/\s/g, '').length;
+}
+
+/** 分类/标签无 slug 列：名称 slugify，中文等字符回退 c-{id} */
+function taxonomySlug(name: string, id: number): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || `c-${id}`;
+}
+
+function toRelativeFile(url: string): string {
+  const clean = url.replace(/^\//, '');
+  if (clean === '' || clean.endsWith('/')) return `${clean}index.html`;
+  return clean;
+}
+
+function buildRss(site: Site, posts: PostView[], baseUrl: string): string {
+  const escape = (text: string): string =>
+    text
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;');
+
+  const items = posts
+    .map(
+      (post) => `    <item>
+      <title>${escape(post.title)}</title>
+      <link>${escape(baseUrl.replace(/\/$/, '') + post.url)}</link>
+      <guid isPermaLink="true">${escape(baseUrl.replace(/\/$/, '') + post.url)}</guid>
+      <pubDate>${new Date(post.date).toUTCString()}</pubDate>
+      <description><![CDATA[${post.contentHtml}]]></description>
+    </item>`
+    )
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>${escape(site.name)}</title>
+    <link>${escape(baseUrl)}</link>
+    <description>${escape(site.description ?? '')}</description>
+    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+${items}
+  </channel>
+</rss>`;
+}
