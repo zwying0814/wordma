@@ -14,6 +14,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 
 import { ToolbarButton } from './toolbar';
 
+/** isUrl 之外额外接受 data:image 内联图片（canvas 生成、粘贴场景） */
+const DATA_IMAGE_RE = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,/;
+const canInsertImage = (src: string): boolean =>
+  isUrl(src) || DATA_IMAGE_RE.test(src);
+
 /** 图片插入按钮：URL 直填 + 媒体库网格选择（点击即插入 wordma-media:// 图片） */
 export function ImageToolbarButton(
   props: React.ComponentProps<typeof ToolbarButton>
@@ -103,7 +108,7 @@ export function ImageToolbarButton(
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                if (isUrl(url)) insertImage(url);
+                if (canInsertImage(url)) insertImage(url);
               }
             }}
             placeholder="Paste image URL..."
@@ -111,7 +116,7 @@ export function ImageToolbarButton(
           />
           <Button
             className="h-8 shrink-0 px-3 text-sm"
-            disabled={!isUrl(url)}
+            disabled={!canInsertImage(url)}
             onClick={() => insertImage(url)}
             type="button"
           >
