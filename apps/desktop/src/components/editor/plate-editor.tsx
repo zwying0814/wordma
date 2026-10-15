@@ -2,9 +2,8 @@
 
 import * as React from 'react';
 
-import { createSlateEditor, DebugPlugin } from 'platejs';
-import { serializeHtml } from 'platejs/static';
-import type { Value } from 'platejs';
+import { createStaticEditor, serializeHtml } from 'platejs/static';
+import { createSlateEditor, type Value } from 'platejs';
 import { ArrowLeftIcon, ChevronDown, Dices } from 'lucide-react';
 import { Plate, useEditorSelector, usePlateEditor } from 'platejs/react';
 import { useLocation } from 'wouter';
@@ -15,6 +14,7 @@ import { updateArticle } from '@/lib/article';
 import { listCategories, listTags } from '@/lib/taxonomy';
 import type { Article } from '@/types/api';
 
+import { BlogEditorBaseKit } from '@/components/editor/plugins/blog-editor-base-kit';
 import { BlogEditorKit } from './plugins/blog-editor-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Editor, EditorContainer } from '@/components/ui/editor';
+import { EditorStatic } from '@/components/ui/editor-static';
 import { FixedToolbar } from '@/components/ui/fixed-toolbar';
 import { FixedToolbarButtons } from '@/components/ui/fixed-toolbar-buttons';
 import { FloatingToolbar } from '@/components/ui/floating-toolbar';
@@ -117,13 +118,16 @@ export function ArticleEditor({
     setSaving(true);
     setSaveError(null);
     try {
-      // serializeHtml 以静态方式渲染节点组件，plate hooks 脱离节点上下文会产生
-      // [USE_ELEMENT_CONTEXT] 告警（输出不受影响，默认值已验证正确）。
-      // 序列化期间临时提升日志级别，完成后恢复。
-      const prevLogLevel = editor.getOption(DebugPlugin, 'logLevel');
-      editor.setOption(DebugPlugin, 'logLevel', 'error');
-      try {
-        const html = await serializeHtml(editor);
+      // 用 base 插件的静态编辑器序列化：零上下文 hook、零告警
+      // （组件为 *-static.tsx 静态版，结构/样式与实时渲染等价）
+      const staticEditor = createStaticEditor({
+        plugins: BlogEditorBaseKit,
+        value: editor.children,
+      });
+      const html = await serializeHtml(staticEditor, {
+        editorComponent: EditorStatic,
+        props: { style: { padding: 0 } },
+      });
       const saved = await updateArticle({
         id: article.id,
         title: title.trim() || '未命名文章',
@@ -133,12 +137,9 @@ export function ArticleEditor({
         categoryIds,
         tagIds,
       });
-        setSlug(saved.slug);
-        setSavedAt(new Date().toLocaleTimeString('zh-CN'));
-        onSaved?.();
-      } finally {
-        editor.setOption(DebugPlugin, 'logLevel', prevLogLevel ?? 'warn');
-      }
+      setSlug(saved.slug);
+      setSavedAt(new Date().toLocaleTimeString('zh-CN'));
+      onSaved?.();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
     } finally {
