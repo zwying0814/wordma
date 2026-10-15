@@ -1,6 +1,8 @@
-import { ipcMain, app, net, protocol } from 'electron';
-import { getDb } from './db';
-import { getPreviewPort } from './preview';
+import path from 'node:path';
+
+import { ipcMain, app, net, protocol, shell } from 'electron';
+import { getDb, getDataDir } from './db';
+import { getPreviewPort, setPreviewDir, startPreviewServer, validatePort, getRunningPort } from './preview';
 import {
   createArticle,
   deleteArticle,
@@ -31,13 +33,6 @@ import {
 } from './routing';
 import type { RoutingRules } from './routing';
 import { renderSitePreview } from './render';
-import {
-  setPreviewDir,
-  startPreviewServer,
-  validatePort,
-  getRunningPort,
-} from './preview';
-import { shell } from 'electron';
 import {
   deleteMedia,
   listMedia,
@@ -184,6 +179,16 @@ export function registerAllIpc(): void {
     })
   );
   handleIpc('delete_media', (payload) => deleteMedia(payload.id));
+  handleIpc('reveal_media', (payload) => {
+    const filePath = payload.path as string;
+    if (
+      typeof filePath !== 'string' ||
+      !filePath.startsWith(path.join(getDataDir(), 'media'))
+    ) {
+      throw new Error('路径不合法');
+    }
+    shell.showItemInFolder(filePath);
+  });
 
   // render / preview
   handleIpc('render_site', async (payload) => {

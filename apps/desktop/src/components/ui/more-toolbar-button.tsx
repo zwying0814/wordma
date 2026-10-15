@@ -20,9 +20,10 @@ import {
 
 import { ToolbarButton } from './toolbar';
 
-export function MoreToolbarButton(
-  props: React.ComponentProps<typeof DropdownMenu>
-) {
+export function MoreToolbarButton({
+  children,
+  ...props
+}: { children?: React.ReactNode } & React.ComponentProps<typeof DropdownMenu>) {
   const editor = useEditorRef();
   const [open, setOpen] = React.useState(false);
 
@@ -45,6 +46,11 @@ export function MoreToolbarButton(
         align="start"
         className="ignore-click-outside/toolbar flex max-h-[500px] min-w-[180px] flex-col overflow-y-auto"
       >
+        {children && (
+          <div className="flex flex-col gap-1 py-1" data-testid="more-extra">
+            {children}
+          </div>
+        )}
         <DropdownMenuGroup>
           <DropdownMenuItem
             onClick={() => {

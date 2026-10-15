@@ -1,4 +1,4 @@
-'use client';
+import * as React from 'react';
 
 import { Image, useMediaState } from '@platejs/media/react';
 import { ResizableProvider, useResizableValue } from '@platejs/resizable';
@@ -19,9 +19,38 @@ export const ImageElement = withHOC(
   function ImageElement(props: PlateElementProps<TImageElement>) {
     const { align = 'center', focused, readOnly, selected } = useMediaState();
     const width = useResizableValue('width');
+    const { editor, element } = props;
+
+    // 可用最大宽度 = 所在内容列宽度（Resizable 默认按自身宽度钳制，
+    // 不传显式 maxWidth 时图片只能缩小无法放大）
+    const [maxWidth, setMaxWidth] = React.useState<number | undefined>(
+      undefined
+    );
+    const elementRef = React.useRef<HTMLElement | null>(null);
+
+    React.useEffect(() => {
+      let node: HTMLElement | null = null;
+      try {
+        node = editor.api.toDOMNode(element) as HTMLElement;
+      } catch {
+        return;
+      }
+      if (!node) return;
+      elementRef.current = node;
+
+      const update = () => setMaxWidth(node.clientWidth);
+      update();
+      const ro = new ResizeObserver(update);
+      ro.observe(node);
+      return () => ro.disconnect();
+    }, [editor, element]);
 
     return (
-      <PlateElement {...props} className="py-2.5">
+      <PlateElement
+        {...props}
+        ref={elementRef}
+        className="py-2.5"
+      >
         <figure
           className="group relative m-0"
           contentEditable={false}
@@ -34,6 +63,7 @@ export const ImageElement = withHOC(
             options={{
               align,
               readOnly,
+              maxWidth,
             }}
           >
             <ResizeHandle

@@ -1,9 +1,16 @@
 import * as React from 'react';
 
-import { Trash2, UploadIcon } from 'lucide-react';
+import { Copy, FolderOpen, Trash2, UploadIcon } from 'lucide-react';
 
 import { useSite } from '@/context/SiteContext';
-import { formatBytes, listMedia, mediaUrl, uploadMediaFromPath } from '@/lib/media';
+import {
+  copyMarkdown,
+  formatBytes,
+  listMedia,
+  mediaUrl,
+  revealMedia,
+  uploadMediaFromPath,
+} from '@/lib/media';
 import type { MediaItem } from '@/types/api';
 import { Button } from '@/components/ui/button';
 
@@ -121,16 +128,38 @@ export function MediaPage() {
               <figcaption className="truncate px-2 py-1 text-muted-foreground text-xs">
                 {item.originalName} · {formatBytes(item.size)}
               </figcaption>
-              <Button
-                aria-label={`删除 ${item.originalName}`}
-                className="absolute top-1 right-1 hidden group-hover:inline-flex"
-                data-testid={`media-delete-${item.filename}`}
-                onClick={() => void handleDelete(item)}
-                size="icon"
-                variant="ghost"
-              >
-                <Trash2 className="size-4 text-destructive" />
-              </Button>
+              <div className="absolute top-1 right-1 hidden gap-0.5 rounded-md bg-background/80 p-0.5 group-hover:inline-flex">
+                <Button
+                  aria-label={`复制 Markdown 引用 ${item.originalName}`}
+                  data-testid={`media-copy-${item.filename}`}
+                  onClick={() => void copyMarkdown(item)}
+                  size="icon"
+                  title="复制 Markdown 引用"
+                  variant="ghost"
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+                <Button
+                  aria-label={`在文件夹中显示 ${item.originalName}`}
+                  data-testid={`media-reveal-${item.filename}`}
+                  onClick={() => revealMedia(item)}
+                  size="icon"
+                  title="在文件夹中显示"
+                  variant="ghost"
+                >
+                  <FolderOpen className="size-3.5" />
+                </Button>
+                <Button
+                  aria-label={`删除 ${item.originalName}`}
+                  data-testid={`media-delete-${item.filename}`}
+                  onClick={() => void handleDelete(item)}
+                  size="icon"
+                  title="删除"
+                  variant="ghost"
+                >
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </div>
             </figure>
           ))}
         </div>
