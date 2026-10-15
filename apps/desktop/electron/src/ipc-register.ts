@@ -1,3 +1,4 @@
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import { ipcMain, app, net, protocol, shell } from 'electron';
@@ -31,6 +32,13 @@ import {
   getRoutingRulesFor,
   validateRoutingRules,
 } from './routing';
+import {
+  deleteTheme,
+  getActiveThemeName,
+  listThemes,
+  setActiveTheme,
+  themesDir,
+} from './theme';
 import type { RoutingRules } from './routing';
 import { renderSitePreview } from './render';
 import {
@@ -77,6 +85,20 @@ export function registerAllIpc(): void {
       .all()
       .map((row: any) => row.name)
   );
+  handleIpc('debug_theme', (payload) => {
+    const siteId = (payload?.siteId ?? getActiveSite()?.id) as number;
+    const name = getActiveThemeName(siteId);
+    const dir = path.join(themesDir(), name);
+    return {
+      siteId,
+      name,
+      dir,
+      hasYaml: existsSync(path.join(dir, 'theme.yaml')),
+      templates: existsSync(path.join(dir, 'templates'))
+        ? readdirSync(path.join(dir, 'templates'))
+        : null,
+    };
+  });
   handleIpc('debug_protocol', () => ({
     handled: protocol.isProtocolHandled('wordma-media'),
   }));
@@ -216,6 +238,20 @@ export function registerAllIpc(): void {
     }
     return port;
   });
+
+  // theme
+  handleIpc('list_themes', (payload) => {
+    const siteId =
+      payload?.siteId as number ?? getActiveSite()?.id;
+    return listThemes(siteId);
+  });
+  handleIpc('set_active_theme', (payload) =>
+    setActiveTheme(
+      (payload?.siteId ?? getActiveSite()?.id) as number,
+      payload?.name as string
+    )
+  );
+  handleIpc('delete_theme', (payload) => deleteTheme(payload.name as string));
 
   // pages
   handleIpc('list_pages', (payload) => listPages(payload.siteId));

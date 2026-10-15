@@ -159,3 +159,34 @@ kbd {
 }
 mark { background: #fef3c7; padding: 0 2px; }
 `;
+
+/** 内置默认主题的 theme.yaml（首次启动提取到 {dataDir}/themes/default/） */
+export const BUILTIN_THEME_YAML = `name: default
+displayName: 默认主题
+version: 0.1.0
+author: Wordma
+description: Wordma 内置默认主题：安静的浅色写作风格。
+layout: single
+tags:
+  - 单栏
+  - 浅色
+settings:
+  - key: footerText
+    label: 页脚文案
+    type: text
+    default: 由 Wordma 驱动
+  - key: postsPerPage
+    label: 每页文章数
+    type: number
+    default: 10
+`;
+
+/** 内置主题的模板文件（文件名 → 内容），供主题提取 */
+export const BUILTIN_THEME_TEMPLATES: Record<string, string> = {
+  'base.ejs': BASE_TEMPLATE,
+  'post.ejs': POST_TEMPLATE,
+  'page.ejs': PAGE_TEMPLATE,
+  'index.ejs': INDEX_TEMPLATE,
+  'archive.ejs': ARCHIVE_TEMPLATE,
+  'taxonomies.ejs': TAXONOMIES_TEMPLATE,
+};

@@ -7,6 +7,7 @@ import { Readable } from 'node:stream';
 import { closeDb, getDataDir, initDataDir } from './db';
 import { MIME_BY_EXT } from './media';
 import { registerAllIpc } from './ipc-register';
+import { ensureBuiltinThemes } from './theme';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -89,6 +90,7 @@ function loadWindow(win: BrowserWindow): void {
 app.whenReady().then(() => {
   try {
     initDataDir(resolveDataDir());
+    ensureBuiltinThemes();
     registerAllIpc();
     registerMediaProtocol();
   } catch (err) {

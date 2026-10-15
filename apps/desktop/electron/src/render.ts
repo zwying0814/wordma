@@ -1,5 +1,5 @@
 import ejs from 'ejs';
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { listArticles } from './article';
@@ -9,6 +9,7 @@ import { listPages } from './pages';
 import { listCategories, listTags } from './taxonomy';
 import { generatePath, getRoutingRulesFor } from './routing';
 import { getPreviewPort } from './preview';
+import { getActiveThemeName, resolveThemeSettings, themesDir } from './theme';
 import {
   ARCHIVE_TEMPLATE,
   BASE_TEMPLATE,
@@ -60,6 +61,15 @@ export async function renderSiteTo(options: {
   const pages = listPages(siteId);
   const tags = listTags(siteId);
   const categories = listCategories(siteId);
+
+  // 0) 激活主题（模板与 assets 优先于内置布局）
+  const themeName = getActiveThemeName(siteId);
+  const themeDir = path.join(themesDir(), themeName);
+  const hasTheme = themeName !== 'default' && existsSync(path.join(themeDir, 'theme.yaml'));
+
+  // 主题设置解析（宽松：坏值回退 schema 默认）
+  const themeSettingsMap = resolveThemeSettings(themeName, siteId);
+  const themeSettingsRaw = ''; // 兼容占位（不再直接读原始 JSON）
 
   // 1) 清空输出目录
   rmSync(outputDir, { recursive: true, force: true });
@@ -144,24 +154,56 @@ export async function renderSiteTo(options: {
     .filter((p) => p.showInNav)
     .map((p) => ({ title: p.title, url: pageUrls.get(p.id) ?? '/' }));
 
+  // 主题模板加载：激活主题 templates/*.ejs 优先，缺失回退内置布局
+  const themeTemplates: Record<string, string> = {};
+  if (hasTheme) {
+    const tplDir = path.join(themeDir, 'templates');
+    if (existsSync(tplDir)) {
+      for (const file of readdirSync(tplDir)) {
+        if (file.endsWith('.ejs')) {
+          themeTemplates[file] = readFileSync(path.join(tplDir, file), 'utf8');
+        }
+      }
+    }
+  }
+  const tpl = (name: string, fallback: string): string =>
+    themeTemplates[`${name}.ejs`] ?? fallback;
+
+  // 主题设置解析（宽松：坏值回退 schema 默认）
+  const themeContext: Record<string, unknown> = {};
+  try {
+    const schemas = JSON.parse(themeSettingsRaw ?? '[]') as never;
+    void schemas;
+  } catch {
+    /* theme_settings 存储的是 schema 键值对，见下 */
+  }
+
+  themeContext.footerText = themeSettingsMap.footerText ?? FOOTER_TEXT;
+  themeContext.postsPerPage = themeSettingsMap.postsPerPage ?? POSTS_PER_PAGE;
+
+  const files: string[] = [];
   const baseContext = {
     site: { name: site.name, description: site.description ?? '', url: baseUrl },
     urls: { archive: archiveUrl, categories: rules.category, tags: rules.tag, feed: feedUrl },
     navPages,
-    theme: { footerText: FOOTER_TEXT, postsPerPage: POSTS_PER_PAGE },
-    footerText: FOOTER_TEXT,
+    theme: themeContext,
+    footerText: String(themeContext.footerText),
     assetRoot: baseUrl,
     title: site.name,
     body: '',
   };
 
-  const files: string[] = [];
-  const writePage = (url: string, bodyHtml: string, title: string): void => {
-    const html = ejs.render(BASE_TEMPLATE, {
+  // base 壳：主题 base.ejs 优先
+  const baseTpl = themeTemplates['base.ejs'] ?? BASE_TEMPLATE;
+  const renderShell = (bodyHtml: string, title: string): string =>
+    ejs.render(baseTpl, {
       ...baseContext,
       body: bodyHtml,
       title: `${title} - ${site.name}`,
     });
+
+  const writePage = (url: string, bodyHtml: string, title: string): void => {
+    const html = renderShell(bodyHtml, title);
     const relative = url === '/' ? 'index.html' : toRelativeFile(url);
     const filePath = path.join(outputDir, relative);
     mkdirSync(path.dirname(filePath), { recursive: true });
@@ -169,15 +211,18 @@ export async function renderSiteTo(options: {
     files.push(relative);
   };
 
+
   // 5) 文章详情页
+  const postTpl = tpl('post', POST_TEMPLATE);
   for (const view of postViews) {
-    const body = ejs.render(POST_TEMPLATE, { post: view });
+    const body = ejs.render(postTpl, { post: view });
     writePage(view.url, body, view.title);
   }
 
   // 6) 独立页面
+  const pageTpl = tpl('page', PAGE_TEMPLATE);
   for (const page of pages) {
-    const body = ejs.render(PAGE_TEMPLATE, {
+    const body = ejs.render(pageTpl, {
       page: { title: page.title, contentHtml: page.content },
     });
     writePage(pageUrls.get(page.id) ?? '/', body, page.title);
@@ -195,12 +240,13 @@ export async function renderSiteTo(options: {
   const indexPaginationUrl = (page: number): string =>
     page <= 1 ? '/' : generatePath(rules.indexPagination, { num: String(page) });
 
+  const indexTpl = tpl('index', INDEX_TEMPLATE);
   const renderIndex = (
     posts: PostView[],
     page: number,
     taxonomy?: { kind: string; name: string }
   ): void => {
-    const body = ejs.render(INDEX_TEMPLATE, {
+    const body = ejs.render(indexTpl, {
       posts,
       pagination: {
         current: page,
@@ -234,7 +280,7 @@ export async function renderSiteTo(options: {
     const posts = publishedViews.filter((view) =>
       view.categories.some((r) => r.id === category.id)
     );
-    const body = ejs.render(INDEX_TEMPLATE, {
+    const body = ejs.render(indexTpl, {
       posts,
       pagination: { current: 1, total: 1, prevUrl: null, nextUrl: null },
       taxonomy: { kind: 'category', name: category.name },
@@ -245,7 +291,7 @@ export async function renderSiteTo(options: {
     const posts = publishedViews.filter((view) =>
       view.tags.some((r) => r.id === tag.id)
     );
-    const body = ejs.render(INDEX_TEMPLATE, {
+    const body = ejs.render(indexTpl, {
       posts,
       pagination: { current: 1, total: 1, prevUrl: null, nextUrl: null },
       taxonomy: { kind: 'tag', name: tag.name },
@@ -254,13 +300,15 @@ export async function renderSiteTo(options: {
   }
 
   // 8) 归档（按创建年份分组，倒序）
-  const archiveBody = ejs.render(ARCHIVE_TEMPLATE, {
+  const archiveTpl = tpl('archive', ARCHIVE_TEMPLATE);
+  const archiveBody = ejs.render(archiveTpl, {
     groups: groupByYear(publishedSorted),
   });
   writePage(archiveUrl, archiveBody, '归档');
 
   // 9) 分类/标签总览
-  const taxonomiesBody = ejs.render(TAXONOMIES_TEMPLATE, {
+  const taxonomiesTpl = tpl('taxonomies', TAXONOMIES_TEMPLATE);
+  const taxonomiesBody = ejs.render(taxonomiesTpl, {
     heading: '分类',
     items: categoryViews.map((c) => ({
       name: c.name,
@@ -270,7 +318,7 @@ export async function renderSiteTo(options: {
   });
   writePage('/categories/', taxonomiesBody, `分类 - ${site.name}`);
 
-  const tagOverviewBody = ejs.render(TAXONOMIES_TEMPLATE, {
+  const tagOverviewBody = ejs.render(taxonomiesTpl, {
     heading: '标签',
     items: tagViews.map((t) => ({
       name: t.name,
@@ -280,15 +328,19 @@ export async function renderSiteTo(options: {
   });
   writePage('/tags/', tagOverviewBody, `标签 - ${site.name}`);
 
-  // 10) RSS 2.0
   writeFileSync(path.join(outputDir, toRelativeFile(feedUrl)), buildRss(site, publishedSorted, baseUrl));
   files.push(toRelativeFile(feedUrl));
 
-  // 11) assets + media 拷贝
+  // 11) assets（主题 assets/ 优先）+ media 拷贝
   const assetsDir = path.join(outputDir, 'assets');
   mkdirSync(assetsDir, { recursive: true });
-  writeFileSync(path.join(assetsDir, 'style.css'), STYLE_CSS);
-  files.push('assets/style.css');
+  const themeAssets = path.join(themeDir, 'assets');
+  if (hasTheme && existsSync(themeAssets)) {
+    cpSync(themeAssets, assetsDir, { recursive: true });
+  } else {
+    writeFileSync(path.join(assetsDir, 'style.css'), STYLE_CSS);
+  }
+  files.push('assets/');
 
   const mediaSrc = path.join(getDataDir(), 'media', String(siteId));
   if (existsSync(mediaSrc)) {
