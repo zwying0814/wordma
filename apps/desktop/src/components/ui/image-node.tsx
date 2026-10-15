@@ -28,6 +28,16 @@ export const ImageElement = withHOC(
     );
     const elementRef = React.useRef<HTMLElement | null>(null);
 
+    /** 拖拽结束后恢复图片选中态（选区在拖拽中会被浏览器重置） */
+    const restoreSelection = React.useCallback(() => {
+      try {
+        const path = editor.api.findPath(element);
+        if (path) editor.tf.select(path);
+      } catch {
+        /* 元素可能已卸载 */
+      }
+    }, [editor, element]);
+
     React.useEffect(() => {
       let node: HTMLElement | null = null;
       try {
@@ -69,6 +79,8 @@ export const ImageElement = withHOC(
             <ResizeHandle
               className={mediaResizeHandleVariants({ direction: 'left' })}
               data-testid="image-resize-handle-left"
+              onMouseDownCapture={(e) => e.preventDefault()}
+              onPointerUp={restoreSelection}
               options={{ direction: 'left' }}
             />
             <div>
@@ -86,6 +98,8 @@ export const ImageElement = withHOC(
                 direction: 'right',
               })}
               data-testid="image-resize-handle-right"
+              onMouseDownCapture={(e) => e.preventDefault()}
+              onPointerUp={restoreSelection}
               options={{ direction: 'right' }}
             />
           </Resizable>
