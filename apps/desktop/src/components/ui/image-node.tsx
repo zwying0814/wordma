@@ -1,7 +1,11 @@
 import * as React from 'react';
 
 import { Image, useMediaState } from '@platejs/media/react';
-import { ResizableProvider, useResizableValue } from '@platejs/resizable';
+import {
+  ResizableProvider,
+  useResizableStore,
+  useResizableValue,
+} from '@platejs/resizable';
 import type { TImageElement } from 'platejs';
 import type { PlateElementProps } from 'platejs/react';
 import { PlateElement, withHOC } from 'platejs/react';
@@ -19,14 +23,8 @@ export const ImageElement = withHOC(
   function ImageElement(props: PlateElementProps<TImageElement>) {
     const { align = 'center', focused, readOnly, selected } = useMediaState();
     const width = useResizableValue('width');
+    const [maxWidth] = React.useState<number | undefined>(700);
     const { editor, element } = props;
-
-    // 可用最大宽度 = 所在内容列宽度（Resizable 默认按自身宽度钳制，
-    // 不传显式 maxWidth 时图片只能缩小无法放大）
-    const [maxWidth, setMaxWidth] = React.useState<number | undefined>(
-      undefined
-    );
-    const elementRef = React.useRef<HTMLElement | null>(null);
 
     /** 拖拽结束后恢复图片选中态（选区在拖拽中会被浏览器重置） */
     const restoreSelection = React.useCallback(() => {
@@ -38,22 +36,17 @@ export const ImageElement = withHOC(
       }
     }, [editor, element]);
 
+    // resizable store 的 onResize：无论释放位置在哪，缩放完成即恢复选中
+    const resizableStore = useResizableStore();
     React.useEffect(() => {
-      let node: HTMLElement | null = null;
-      try {
-        node = editor.api.toDOMNode(element) as HTMLElement;
-      } catch {
-        return;
-      }
-      if (!node) return;
-      elementRef.current = node;
+      resizableStore.set.onResize?.((state: { finished: boolean }) => {
+        if (state.finished) restoreSelection();
+      });
+    }, [resizableStore, restoreSelection]);
 
-      const update = () => setMaxWidth(node.clientWidth);
-      update();
-      const ro = new ResizeObserver(update);
-      ro.observe(node);
-      return () => ro.disconnect();
-    }, [editor, element]);
+    const elementRef = React.useRef<HTMLElement | null>(null);
+
+
 
     return (
       <PlateElement
@@ -70,18 +63,19 @@ export const ImageElement = withHOC(
           <Resizable
             align={align}
             data-testid="image-resizable"
-            options={{
-              align,
-              readOnly,
-              maxWidth,
-            }}
+            options={{ align, readOnly, maxWidth }}
           >
             <ResizeHandle
               className={mediaResizeHandleVariants({ direction: 'left' })}
               data-testid="image-resize-handle-left"
               onMouseDownCapture={(e) => e.preventDefault()}
               onPointerUp={restoreSelection}
-              options={{ direction: 'left' }}
+              options={{
+                direction: 'left',
+                onResize: ({ finished }: { finished: boolean }) => {
+                  if (finished) restoreSelection();
+                },
+              }}
             />
             <div>
               <Image
@@ -98,8 +92,6 @@ export const ImageElement = withHOC(
                 direction: 'right',
               })}
               data-testid="image-resize-handle-right"
-              onMouseDownCapture={(e) => e.preventDefault()}
-              onPointerUp={restoreSelection}
               options={{ direction: 'right' }}
             />
           </Resizable>
