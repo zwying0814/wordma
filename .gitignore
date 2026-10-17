@@ -45,3 +45,5 @@ playwright-report
 # electron 构建产物（源码在 electron/src，electron . 前需先 build:main）
 apps/desktop/electron/main.mjs
 apps/desktop/electron/preload.cjs
+
+.claude
