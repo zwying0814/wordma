@@ -165,15 +165,16 @@ export function FixedToolbarButtons() {
   const widthsRef = React.useRef<number[]>([]);
   const [fitCount, setFitCount] = React.useState(groups.length);
 
-  const measure = React.useCallback(() => {
-    widthsRef.current = groupRefs.current.map((el) => el?.offsetWidth ?? 0);
-  }, []);
-
+  /** 测量全部组的自然宽度（任一组被收纳后 offsetWidth=0，需先全量展开） */
   const fit = React.useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
     const moreWidth = 44;
     const available = container.clientWidth - moreWidth;
+    // 组宽在首次渲染时缓存一次；收纳只读缓存，不再依赖当前 DOM 宽度
+    if (widthsRef.current.length === 0) {
+      widthsRef.current = groupRefs.current.map((el) => el?.offsetWidth ?? 0);
+    }
     let used = 0;
     let count = 0;
     for (const width of widthsRef.current) {
@@ -184,19 +185,22 @@ export function FixedToolbarButtons() {
         break;
       }
     }
-    setFitCount(Math.max(1, count));
+    setFitCount((prev) => (prev === Math.max(1, count) ? prev : Math.max(1, count)));
   }, []);
 
+  React.useEffect(() => {
+    // 组内容变化（如 readOnly 切换）时刷新宽度缓存
+    widthsRef.current = [];
+  }, [groups]);
+
   React.useLayoutEffect(() => {
-    // 首次全量渲染后测量各组宽度并计算可容纳数
-    measure();
     fit();
     const ro = new ResizeObserver(() => {
       fit();
     });
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, [measure, fit]);
+  }, [fit]);
 
   const visible = groups.slice(0, fitCount);
   const overflowed = groups.slice(fitCount);
