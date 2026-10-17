@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 import { launchDesktop } from './launch';
@@ -28,7 +28,11 @@ test('Emoji 选择器打开、搜索并插入', async () => {
   await search.fill('tada');
   await page.getByRole('button', { name: '🎉' }).first().click();
 
-  await expect(page.getByText('🎉')).toBeVisible();
+  // 断言限定在编辑器内：选择器关闭动画期间，面板里的 🎉 仍在 DOM 中，
+  // 全局 getByText 会命中两个元素（strict mode 直接失败）
+  await expect(
+    page.locator('[data-slate-editor]').getByText('🎉')
+  ).toBeVisible();
 });
 
 test('分类导航可见且可切换', async () => {

@@ -104,11 +104,27 @@ app.whenReady().then(() => {
 
   createWindow();
 
+  if (process.env.WORDMA_E2E === '1') {
+    watchParentProcess();
+  }
+
   app.on('activate', () => {
     // macOS 上点击 Dock 图标时若无窗口则重建
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
+/**
+ * E2E 专用看门狗：测试 runner 强杀 worker 时父进程会消失，
+ * 此时退出，避免残留 Electron 进程继续占用数据库与预览端口。
+ * 仅在 WORDMA_E2E=1 下启用，生产启动路径行为不变。
+ */
+function watchParentProcess(): void {
+  const parentPid = process.ppid;
+  setInterval(() => {
+    if (process.ppid !== parentPid) app.quit();
+  }, 1000).unref();
+}
 
 /** 媒体协议：wordma-media://{siteId}/{filename} → 数据目录内文件 */
 function registerMediaProtocol(): void {

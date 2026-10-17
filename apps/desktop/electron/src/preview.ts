@@ -81,6 +81,11 @@ export function stopPreviewServer(): void {
   serverPort = null;
 }
 
+/** 丢弃当前服务目录（数据目录被清空后调用，避免继续指向已删除的路径） */
+export function clearPreviewDir(): void {
+  previewDir = null;
+}
+
 export function validatePort(port: number): void {
   if (!Number.isInteger(port) || port < MIN_PORT || port > MAX_PORT) {
     throw new Error(`预览端口须在 ${MIN_PORT}-${MAX_PORT} 之间`);

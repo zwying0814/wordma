@@ -1,9 +1,17 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 import { ipcMain, app, net, protocol, shell } from 'electron';
-import { getDb, getDataDir } from './db';
-import { getPreviewPort, setPreviewDir, startPreviewServer, validatePort, getRunningPort } from './preview';
+import { closeDb, getDb, getDataDir, initDataDir } from './db';
+import {
+  clearPreviewDir,
+  getPreviewPort,
+  setPreviewDir,
+  startPreviewServer,
+  stopPreviewServer,
+  validatePort,
+  getRunningPort,
+} from './preview';
 import {
   createArticle,
   deleteArticle,
@@ -34,6 +42,7 @@ import {
 } from './routing';
 import {
   deleteTheme,
+  ensureBuiltinThemes,
   getActiveThemeName,
   listThemes,
   setActiveTheme,
@@ -117,6 +126,27 @@ export function registerAllIpc(): void {
       return { err: String(err) };
     }
   });
+
+  // E2E 专用：把数据目录恢复成「全新启动」状态，让整个测试套件复用同一个 Electron 进程。
+  // 只在 WORDMA_E2E=1 时注册；处理函数必须全程同步 —— 若在 closeDb 与 initDataDir 之间
+  // 让出事件循环，在途 IPC 调 getDb() 会抛「数据库尚未初始化」。
+  if (process.env.WORDMA_E2E === '1') {
+    handleIpc('debug_reset_data', () => {
+      if (process.env.WORDMA_E2E !== '1') {
+        throw new Error('debug_reset_data 仅在 E2E 环境可用');
+      }
+      // 预览服务器与目录都要先断开，否则它们继续指向即将被删除的路径
+      stopPreviewServer();
+      clearPreviewDir();
+      const dir = getDataDir();
+      closeDb();
+      rmSync(dir, { recursive: true, force: true });
+      initDataDir(dir);
+      // 内置主题是磁盘上的目录，重建后要重新提取
+      ensureBuiltinThemes();
+      return { dataDir: dir };
+    });
+  }
 
   // site
   handleIpc('list_sites', () => listSites());

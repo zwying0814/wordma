@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 import { launchDesktop } from './launch';

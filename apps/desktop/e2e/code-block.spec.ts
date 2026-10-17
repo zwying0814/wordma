@@ -1,7 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import type { ElectronApplication, Page } from '@playwright/test';
 
-import { launchDesktop } from './launch';
+import { launchDesktop, waitForEditorFocus } from './launch';
 
 let app: ElectronApplication;
 let page: Page;
@@ -49,6 +49,7 @@ test('语言选择器：搜索并切换语言', async () => {
   await page.getByRole('menuitem', { name: 'Code' }).click();
   // 等插入变换落地再输入，避免文字进入其他块
   await expect(page.locator('[data-slate-editor] pre')).toBeVisible();
+  await waitForEditorFocus(page);
   await page.keyboard.type('const answer = 42');
 
   // 打开语言选择器（限定 popover 触发器，避免与列表里的同名 'Plain Text' 项撞 strict mode）
@@ -81,6 +82,7 @@ test('复制按钮存在且代码块内容可被复制', async () => {
     .getByRole('button', { name: 'Insert', exact: true })
     .click();
   await page.getByRole('menuitem', { name: 'Code' }).click();
+  await waitForEditorFocus(page);
   await page.keyboard.type('const answer = 42');
 
   await expect(
