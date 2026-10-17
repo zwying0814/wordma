@@ -1210,6 +1210,10 @@ export function TableCellElement({
         element.background ? 'bg-(--cellBackground)' : 'bg-background',
         isHeader && 'text-left *:m-0',
         'before:size-full',
+        // 单元格被框选时的高亮（data-table-cell-selected 由表格插件的
+        // useTableSelectionDom 写在 DOM 上，这里负责把它画出来）
+        'data-[table-cell-selected=true]:before:z-10',
+        'data-[table-cell-selected=true]:before:bg-brand/5',
         "before:absolute before:box-border before:select-none before:content-['']",
         borders.bottom?.size && 'before:border-b before:border-b-border',
         borders.right?.size && 'before:border-r before:border-r-border',

@@ -127,3 +127,26 @@ test('选中表格后可整体删除', async () => {
 
   await expect(page.locator('[data-slate-editor] table')).toBeHidden();
 });
+
+test('框选单元格有高亮样式', async () => {
+  await insertTable(3, 3);
+
+  // 在首格输入后用 Shift+方向键扩选到相邻单元格
+  await page.locator('[data-slate-editor] table td').first().click();
+  await page.keyboard.type('A1');
+  await page.keyboard.press('Shift+ArrowRight');
+
+  // data-table-cell-selected 由表格插件写在 DOM 上，样式来自 TableCellElement
+  // 的 before:bg-brand/5 —— 缺了这段 CSS 就会出现「选中了但看不出来」
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const cell = document.querySelector(
+          '[data-slate-editor] [data-table-cell-selected="true"]'
+        ) as HTMLElement | null;
+        if (!cell) return null;
+        return getComputedStyle(cell, '::before').backgroundColor;
+      })
+    )
+    .not.toBe('rgba(0, 0, 0, 0)');
+});
