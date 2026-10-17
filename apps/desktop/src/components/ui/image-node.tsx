@@ -1,11 +1,7 @@
 import * as React from 'react';
 
 import { Image, useMediaState } from '@platejs/media/react';
-import {
-  ResizableProvider,
-  useResizableStore,
-  useResizableValue,
-} from '@platejs/resizable';
+import { ResizableProvider, useResizableStore } from '@platejs/resizable';
 import type { TImageElement } from 'platejs';
 import type { PlateElementProps } from 'platejs/react';
 import { PlateElement, withHOC } from 'platejs/react';
@@ -22,7 +18,6 @@ export const ImageElement = withHOC(
   ResizableProvider,
   function ImageElement(props: PlateElementProps<TImageElement>) {
     const { align = 'center', focused, readOnly, selected } = useMediaState();
-    const width = useResizableValue('width');
     const [maxWidth] = React.useState<number | undefined>(700);
     const { editor, element } = props;
 
@@ -58,7 +53,6 @@ export const ImageElement = withHOC(
           className="group relative m-0"
           contentEditable={false}
           data-testid="image-figure"
-          style={{ width }}
         >
           <Resizable
             align={align}

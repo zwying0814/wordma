@@ -44,13 +44,31 @@ export function ImageToolbarButton(
     };
   }, [open, siteId]);
 
+  /** 探测图片自然宽后插入：width 写入元素（≤700），避免被 resizable 默认拉伸满宽 */
   const insertImage = (src: string) => {
-    editor.tf.insertNodes(
-      { children: [{ text: '' }], type: KEYS.img, url: src },
-      { select: true }
-    );
-    setOpen(false);
-    setUrl('');
+    const finishInsert = (width?: number) => {
+      editor.tf.insertNodes(
+        {
+          children: [{ text: '' }],
+          type: KEYS.img,
+          url: src,
+          ...(width !== undefined ? { width } : {}),
+        },
+        { select: true }
+      );
+      setOpen(false);
+      setUrl('');
+    };
+
+    const probe = new Image();
+    probe.onload = () => {
+      finishInsert(Math.min(probe.naturalWidth, 700));
+    };
+    probe.onerror = () => {
+      // 加载失败的图按原逻辑插入（显示裂图，用户可删除）
+      finishInsert();
+    };
+    probe.src = src;
   };
 
   return (
