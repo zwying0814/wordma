@@ -147,7 +147,7 @@ export function TurnIntoToolbarButton(props: DropdownMenuProps) {
 
       <DropdownMenuContent
         align="start"
-        className="ignore-click-outside/toolbar min-w-0"
+        className="ignore-click-outside/toolbar"
       >
         <ToolbarMenuGroup
           label="Turn into"

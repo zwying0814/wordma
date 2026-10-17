@@ -111,9 +111,8 @@ export function AlignToolbarButton(
         }
       />
 
-      {/* 通用弹层默认锁成触发器宽度（44px），四个图标会被挤成一竖列；
-          这里按内容自适应宽度 + 横向排布 */}
-      <DropdownMenuContent align="start" className="w-fit!">
+      {/* 一行四个图标横排（弹层宽度默认按内容自适应） */}
+      <DropdownMenuContent align="start">
         <DropdownMenuRadioGroup
           className="flex flex-row items-center gap-0.5"
           onValueChange={(itemValue) => {

@@ -161,7 +161,7 @@ export function InsertToolbarButton(props: DropdownMenuProps) {
 
       <DropdownMenuContent
         align="start"
-        className="flex max-h-[500px] min-w-0 flex-col overflow-y-auto"
+        className="flex max-h-[500px] flex-col overflow-y-auto"
       >
         {groups.map(({ group, items: nestedItems }) => (
           <ToolbarMenuGroup key={group} label={group}>

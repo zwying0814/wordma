@@ -192,9 +192,7 @@ export function FontColorToolbarButton({
         }
       />
 
-      {/* 色板是 10 列网格，通用弹层默认锁成触发器宽度（w-(--anchor-width)）
-          会把右侧几列裁掉，这里按内容自适应宽度 */}
-      <DropdownMenuContent align="start" className="w-fit!">
+      <DropdownMenuContent align="start">
         <ColorPicker
           clearColor={clearColor}
           color={selectedColor || color}
