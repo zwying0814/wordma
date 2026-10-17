@@ -34,6 +34,7 @@ test('Insert 菜单插入代码块并可输入', async () => {
   await page.getByRole('menuitem', { name: 'Code' }).click();
 
   await expect(page.locator('[data-slate-editor] pre')).toBeVisible();
+  await waitForEditorFocus(page);
   await page.keyboard.type('const answer = 42');
   await expect(
     page.locator('[data-slate-editor] pre').filter({ hasText: 'const answer = 42' })
