@@ -4,11 +4,13 @@ import { ArrowLeft, Dices } from 'lucide-react';
 import { useLocation, useParams } from 'wouter';
 import type { Value } from 'platejs';
 import { createSlateEditor } from 'platejs';
-import { serializeHtml } from 'platejs/static';
+import { createStaticEditor, serializeHtml } from 'platejs/static';
 import { Plate, usePlateEditor } from 'platejs/react';
 
+import { BlogEditorBaseKit } from '@/components/editor/plugins/blog-editor-base-kit';
 import { BlogEditorKit } from '@/components/editor/plugins/blog-editor-kit';
 import { Editor, EditorContainer } from '@/components/ui/editor';
+import { EditorStatic } from '@/components/ui/editor-static';
 import { FixedToolbar } from '@/components/ui/fixed-toolbar';
 import { FixedToolbarButtons } from '@/components/ui/fixed-toolbar-buttons';
 import { Button } from '@/components/ui/button';
@@ -121,7 +123,17 @@ function PageEditorForm({ page }: { page: SitePage }) {
     setSaving(true);
     setSaveError(null);
     try {
-      const html = await serializeHtml(editor);
+      // 用 base 套件的静态编辑器序列化：实时套件里的 dnd/块选中插件是
+      // React-only（useDraggable 需要 DndProvider），直接序列化实时编辑器
+      // 会抛「Expected drag drop context」
+      const staticEditor = createStaticEditor({
+        plugins: BlogEditorBaseKit,
+        value: editor.children,
+      });
+      const html = await serializeHtml(staticEditor, {
+        editorComponent: EditorStatic,
+        props: { style: { padding: 0 } },
+      });
       const saved = await updatePage({
         id: page.id,
         title: title.trim() || '未命名页面',
