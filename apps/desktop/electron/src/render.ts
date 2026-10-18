@@ -32,7 +32,10 @@ type PostRef = { id: number; name: string };
 type PostView = {
   id: number;
   title: string;
+  /** 模板里用的站内链接（含站点子目录前缀） */
   url: string;
+  /** 站点根相对路径（写文件、RSS 用，不含前缀） */
+  path: string;
   date: string;
   status: 'draft' | 'published';
   contentHtml: string;
@@ -71,6 +74,26 @@ function copyKatexAssets(outputDir: string): void {
   });
 }
 
+/** 站点地址里的子目录前缀（如 https://user.github.io/repo/ → '/repo/'；域名根目录 → '/'） */
+function basePathOf(baseUrl: string): string {
+  try {
+    const { pathname } = new URL(baseUrl);
+    if (!pathname || pathname === '/') return '/';
+    return pathname.endsWith('/') ? pathname : `${pathname}/`;
+  } catch {
+    return '/';
+  }
+}
+
+/**
+ * 站内链接统一加站点子目录前缀。
+ * 文件仍写在站点根相对位置（写文件、RSS 用不带前缀的 path），只有链接带前缀，
+ * 这样部署到子目录（如 GitHub Pages 项目页）时页面之间才点得通。
+ */
+function withBase(path: string, basePath: string): string {
+  return `${basePath}${path.replace(/^\//, '')}`;
+}
+
 /** 主题设置里的数值（宽松：非法回退默认值） */
 function toPositiveInt(value: unknown, fallback: number): number {
   const num = typeof value === 'string' ? Number(value) : value;
@@ -89,6 +112,7 @@ export async function renderSiteTo(options: {
   baseUrl: string;
 }): Promise<RenderReport> {
   const { site, siteId, outputDir, includeDrafts, baseUrl } = options;
+  const basePath = basePathOf(baseUrl);
 
   const rules = getRoutingRulesFor(siteId);
   const articles = listArticles(siteId);
@@ -117,25 +141,30 @@ export async function renderSiteTo(options: {
   const mediaPrefix = `wordma-media://media/${siteId}/`;
   const mediaReplacement = `${baseUrl}media/`;
 
-  const postViews: PostView[] = detailArticles.map((a) => ({
-    id: a.id,
-    title: a.title,
-    url: generatePath(rules.post, {
+  const postViews: PostView[] = detailArticles.map((a) => {
+    const path = generatePath(rules.post, {
       slug: a.slug,
       id: String(a.id),
       year: a.createdAt.slice(0, 4),
       month: a.createdAt.slice(5, 7),
       day: a.createdAt.slice(8, 10),
-    }),
-    date: a.createdAt.slice(0, 10),
-    status: a.status,
-    contentHtml: a.content.replaceAll(mediaPrefix, mediaReplacement),
-    categories: a.categories,
-    tags: a.tags,
-    categoriesText: a.categories.map((c) => c.name).join('、'),
-    tagsText: a.tags.map((t) => t.name).join('、'),
-    wordCount: countWords(a.content),
-  }));
+    });
+
+    return {
+      id: a.id,
+      title: a.title,
+      url: withBase(path, basePath),
+      path,
+      date: a.createdAt.slice(0, 10),
+      status: a.status,
+      contentHtml: a.content.replaceAll(mediaPrefix, mediaReplacement),
+      categories: a.categories,
+      tags: a.tags,
+      categoriesText: a.categories.map((c) => c.name).join('、'),
+      tagsText: a.tags.map((t) => t.name).join('、'),
+      wordCount: countWords(a.content),
+    };
+  });
 
   // 3) URL 冲突检测（全站唯一）
   const urlOwners = new Map<string, string>();
@@ -185,7 +214,10 @@ export async function renderSiteTo(options: {
   // 4) 渲染上下文
   const navPages = pages
     .filter((p) => p.showInNav)
-    .map((p) => ({ title: p.title, url: pageUrls.get(p.id) ?? '/' }));
+    .map((p) => ({
+      title: p.title,
+      url: withBase(pageUrls.get(p.id) ?? '/', basePath),
+    }));
 
   // 主题模板加载：激活主题 templates/*.ejs 优先，缺失回退内置布局
   const themeTemplates: Record<string, string> = {};
@@ -212,12 +244,12 @@ export async function renderSiteTo(options: {
   const baseContext = {
     site: { name: site.name, description: site.description ?? '', url: baseUrl },
     urls: {
-      archive: archiveUrl,
+      archive: withBase(archiveUrl, basePath),
       // 注意：这里要的是「总览页」地址；rules.category/rules.tag 是详情页的
       // 路由模板（形如 /category/[slug]/），直接当链接用会 404
-      categories: CATEGORIES_URL,
-      tags: TAGS_URL,
-      feed: feedUrl,
+      categories: withBase(CATEGORIES_URL, basePath),
+      tags: withBase(TAGS_URL, basePath),
+      feed: withBase(feedUrl, basePath),
     },
     navPages,
     theme: themeContext,
@@ -265,7 +297,7 @@ export async function renderSiteTo(options: {
   const postTpl = tpl('post', POST_TEMPLATE);
   for (const view of postViews) {
     const body = ejs.render(postTpl, { post: view });
-    writePage(view.url, body, view.title);
+    writePage(view.path, body, view.title);
   }
 
   // 6) 独立页面
@@ -300,8 +332,11 @@ export async function renderSiteTo(options: {
       pagination: {
         current: page,
         total: totalPages,
-        prevUrl: page > 1 ? indexPaginationUrl(page - 1) : null,
-        nextUrl: page < totalPages ? indexPaginationUrl(page + 1) : null,
+        prevUrl: page > 1 ? withBase(indexPaginationUrl(page - 1), basePath) : null,
+        nextUrl:
+          page < totalPages
+            ? withBase(indexPaginationUrl(page + 1), basePath)
+            : null,
       },
       taxonomy,
     });
@@ -361,7 +396,7 @@ export async function renderSiteTo(options: {
     heading: '分类',
     items: categoryViews.map((c) => ({
       name: c.name,
-      url: categoryUrls.get(c.id) ?? '/',
+      url: withBase(categoryUrls.get(c.id) ?? '/', basePath),
       count: c.count,
     })),
   });
@@ -371,7 +406,7 @@ export async function renderSiteTo(options: {
     heading: '标签',
     items: tagViews.map((t) => ({
       name: t.name,
-      url: tagUrls.get(t.id) ?? '/',
+      url: withBase(tagUrls.get(t.id) ?? '/', basePath),
       count: t.count,
     })),
   });
@@ -465,8 +500,8 @@ function buildRss(site: Site, posts: PostView[], baseUrl: string): string {
     .map(
       (post) => `    <item>
       <title>${escape(post.title)}</title>
-      <link>${escape(baseUrl.replace(/\/$/, '') + post.url)}</link>
-      <guid isPermaLink="true">${escape(baseUrl.replace(/\/$/, '') + post.url)}</guid>
+      <link>${escape(baseUrl.replace(/\/$/, '') + post.path)}</link>
+      <guid isPermaLink="true">${escape(baseUrl.replace(/\/$/, '') + post.path)}</guid>
       <pubDate>${new Date(post.date).toUTCString()}</pubDate>
       <description><![CDATA[${post.contentHtml}]]></description>
     </item>`

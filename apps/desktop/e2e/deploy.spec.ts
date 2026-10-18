@@ -78,6 +78,52 @@ test('T23: 站点地址作为渲染 baseUrl', async () => {
   fs.rmSync(folder, { recursive: true, force: true });
 });
 
+test('T23: 站点地址带子目录时站内链接带前缀，文件不嵌套', async () => {
+  // 模拟 GitHub Pages 项目页（user.github.io/repo/）：先给种子文章一个确定的 slug
+  await page.evaluate(async () => {
+    const api = (window as any).api;
+    const active = await api.invoke('get_active_site');
+    const articles = await api.invoke('list_articles', { siteId: active.id });
+    await api.invoke('update_article', {
+      id: articles[0].id,
+      status: 'published',
+      slug: 'sub-path-post',
+    });
+  });
+
+  const folder = tempFolder();
+  await page
+    .getByTestId('deploy-site-url')
+    .fill('https://user.github.io/repo');
+  await page.getByTestId('deploy-folder').fill(folder);
+  await page.getByTestId('deploy-run').click();
+  await expect(page.getByTestId('deploy-result')).toContainText('已发布');
+
+  // 站内链接带 /repo 前缀（修复前是根绝对路径，子目录部署后全 404）
+  const indexHtml = fs.readFileSync(path.join(folder, 'index.html'), 'utf8');
+  expect(indexHtml).toContain('href="/repo/categories/"');
+  expect(indexHtml).toContain('href="/repo/tags/"');
+  expect(indexHtml).toContain('href="/repo/post/sub-path-post.html"');
+
+  // 资源仍用完整站点地址
+  expect(indexHtml).toContain('https://user.github.io/repo/assets/style.css');
+
+  // 前缀只影响链接：文件仍写在站点根相对位置，不能嵌套出 folder/repo/
+  expect(fs.existsSync(path.join(folder, 'post', 'sub-path-post.html'))).toBe(
+    true
+  );
+  expect(fs.existsSync(path.join(folder, 'repo'))).toBe(false);
+
+  // RSS 用完整地址，且前缀不能叠加成 /repo/repo/
+  const feed = fs.readFileSync(path.join(folder, 'feed.xml'), 'utf8');
+  expect(feed).toContain(
+    'https://user.github.io/repo/post/sub-path-post.html'
+  );
+  expect(feed).not.toContain('/repo/repo/');
+
+  fs.rmSync(folder, { recursive: true, force: true });
+});
+
 test('T23: 未配置目标文件夹时发布报错', async () => {
   await page.getByTestId('deploy-folder').fill('');
   await page.getByTestId('deploy-run').click();
