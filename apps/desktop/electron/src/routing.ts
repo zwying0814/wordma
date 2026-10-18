@@ -171,8 +171,23 @@ export function getRoutingRules(siteId: number): RoutingRules {
   }
 }
 
-export function setRoutingRules(siteId: number, rules: RoutingRules): void {
+/**
+ * 保存站点路由规则：先逐条校验，任一条不通过直接抛错（整体不落库）。
+ * 渲染期仍会再校验一次（防御存储被外部改坏）。
+ */
+export function setRoutingRules(siteId: number, rules: RoutingRules): RouteCheck[] {
+  const checks = validateRoutingRules(rules);
+  const failed = checks.filter((check) => !check.ok);
+  if (failed.length > 0) {
+    throw new Error(
+      failed
+        .map((check) => `${check.key}：${check.message ?? '规则不合法'}`)
+        .join('；')
+    );
+  }
+
   setSetting(`routing_rules:${siteId}`, JSON.stringify(rules));
+  return checks;
 }
 
 export function getRoutingRulesFor(siteId: number): RoutingRules {

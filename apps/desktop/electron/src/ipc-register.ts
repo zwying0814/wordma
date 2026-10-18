@@ -37,7 +37,9 @@ import {
   renameTag,
 } from './taxonomy';
 import {
+  getRoutingRules,
   getRoutingRulesFor,
+  setRoutingRules,
   validateRoutingRules,
 } from './routing';
 import {
@@ -119,6 +121,14 @@ export function registerAllIpc(): void {
   );
   handleIpc('get_routing_rules', (payload) =>
     getRoutingRulesFor(payload.siteId as number)
+  );
+  handleIpc('validate_routing_rules', (payload) =>
+    validateRoutingRules(
+      (payload?.rules ?? getRoutingRules(payload.siteId as number)) as RoutingRules
+    )
+  );
+  handleIpc('set_routing_rules', (payload) =>
+    setRoutingRules(payload.siteId as number, payload.rules as RoutingRules)
   );
   handleIpc('debug_fetch', async (payload) => {
     try {
