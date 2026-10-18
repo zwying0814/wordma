@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -46,18 +47,104 @@ export function themesDir(): string {
 
 export const DEFAULT_THEME_NAME = 'default';
 
-/** 首次启动提取内置默认主题（已存在则跳过；精细覆盖归二期指纹机制 T20） */
+/** 内置主题指纹文件：记录每个内置文件的 SHA-256，用于区分「用户改过」与「只是旧版本」 */
+const BUILTIN_MANIFEST_FILE = '.builtin-manifest.json';
+
+type BuiltinManifest = {
+  /** 生成该 manifest 时的内置主题版本（theme.yaml 的 version） */
+  version: string;
+  /** 相对主题根目录的路径 → 内容 SHA-256 */
+  files: Record<string, string>;
+};
+
+/** 内置默认主题的全部文件（相对路径 → 内容） */
+function builtinThemeFiles(): Record<string, string> {
+  const files: Record<string, string> = {
+    'theme.yaml': BUILTIN_THEME_YAML,
+    'assets/style.css': STYLE_CSS,
+  };
+
+  for (const [name, content] of Object.entries(BUILTIN_THEME_TEMPLATES)) {
+    files[`templates/${name}`] = content;
+  }
+
+  return files;
+}
+
+function sha256(content: string): string {
+  return createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+function readBuiltinManifest(manifestPath: string): BuiltinManifest | null {
+  if (!existsSync(manifestPath)) return null;
+
+  try {
+    const parsed = JSON.parse(readFileSync(manifestPath, 'utf8')) as BuiltinManifest;
+    if (!parsed || typeof parsed !== 'object' || typeof parsed.files !== 'object') {
+      return null;
+    }
+    return parsed;
+  } catch {
+    // 损坏的 manifest 按「没有」处理，下次提取会重建
+    return null;
+  }
+}
+
+function builtinThemeVersion(): string {
+  const match = /^version:\s*(.+)$/m.exec(BUILTIN_THEME_YAML);
+  return match?.[1]?.trim() ?? '';
+}
+
+function writeBuiltinFile(dir: string, rel: string, content: string): void {
+  const target = path.join(dir, rel);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, content);
+}
+
+/**
+ * 提取 / 更新内置默认主题（启动时调用）。
+ *
+ * 主题目录里存一份 `.builtin-manifest.json`（每个内置文件的 SHA-256）。逐文件比对：
+ * - 磁盘内容与 manifest 记录一致 ⇒ 用户没动过 ⇒ 用当前版本覆盖（升级生效）
+ * - 不一致 ⇒ 用户改过 ⇒ 保留
+ * - 文件缺失 ⇒ 补回
+ *
+ * 没有 manifest（首次提取，或从没有该机制的旧版本升级上来）时无法判断哪些文件被改过，
+ * 此时只补缺失文件、不覆盖已存在的，并写入 manifest 供以后比对。
+ */
 export function ensureBuiltinThemes(): void {
   const dir = path.join(themesDir(), DEFAULT_THEME_NAME);
-  if (existsSync(dir)) return;
+  const files = builtinThemeFiles();
+  const manifestPath = path.join(dir, BUILTIN_MANIFEST_FILE);
+  const previous = readBuiltinManifest(manifestPath);
 
-  mkdirSync(path.join(dir, 'templates'), { recursive: true });
-  mkdirSync(path.join(dir, 'assets'), { recursive: true });
-  writeFileSync(path.join(dir, 'theme.yaml'), BUILTIN_THEME_YAML);
-  for (const [filename, content] of Object.entries(BUILTIN_THEME_TEMPLATES)) {
-    writeFileSync(path.join(dir, 'templates', filename), content);
+  for (const [rel, content] of Object.entries(files)) {
+    const target = path.join(dir, rel);
+
+    if (!existsSync(target)) {
+      writeBuiltinFile(dir, rel, content);
+      continue;
+    }
+
+    const current = readFileSync(target, 'utf8');
+    if (current === content) continue;
+
+    const known = previous?.files[rel];
+    if (known && sha256(current) === known) {
+      writeBuiltinFile(dir, rel, content);
+    }
   }
-  writeFileSync(path.join(dir, 'assets', 'style.css'), STYLE_CSS);
+
+  const next: BuiltinManifest = {
+    version: builtinThemeVersion(),
+    files: Object.fromEntries(
+      Object.entries(files).map(([rel, content]) => [rel, sha256(content)])
+    ),
+  };
+  const serialized = `${JSON.stringify(next, null, 2)}\n`;
+  if (!existsSync(manifestPath) || readFileSync(manifestPath, 'utf8') !== serialized) {
+    writeFileSync(manifestPath, serialized);
+  }
 }
 
 export function getActiveThemeName(siteId: number): string {

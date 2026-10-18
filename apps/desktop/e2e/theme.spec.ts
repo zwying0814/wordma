@@ -116,3 +116,72 @@ test('T19: theme.yaml 损坏 → invalid 标记不阻塞列表', async () => {
   // 清理
   fs.rmSync(brokenDir, { recursive: true, force: true });
 });
+
+// T20 · 内置主题指纹提取：升级时「没改过的文件覆盖、改过的保留」
+
+const THEME_DIR = () => path.join(dataDir, 'themes', 'default');
+const MANIFEST = () => path.join(THEME_DIR(), '.builtin-manifest.json');
+const readManifest = () => JSON.parse(fs.readFileSync(MANIFEST(), 'utf8'));
+const readThemeFile = (rel: string) =>
+  fs.readFileSync(path.join(THEME_DIR(), rel), 'utf8');
+
+/** 重启应用（同一数据目录）以触发启动时的提取逻辑 */
+async function restart() {
+  const launched = await launchDesktop({ dataDir, seed: true });
+  app = launched.app;
+  page = launched.page;
+}
+
+test('T20: 首次提取写入指纹 manifest', async () => {
+  expect(fs.existsSync(MANIFEST())).toBe(true);
+
+  const manifest = readManifest();
+  expect(manifest.version).toBeTruthy();
+  // 内置文件都有哈希，且与磁盘内容一致
+  for (const rel of ['theme.yaml', 'assets/style.css', 'templates/post.ejs']) {
+    expect(manifest.files[rel]).toMatch(/^[0-9a-f]{64}$/);
+  }
+});
+
+test('T20: 升级时未修改的内置文件被新版覆盖', async () => {
+  const rel = 'templates/post.ejs';
+  const target = path.join(THEME_DIR(), rel);
+  const oldContent = '<!-- 旧版本内置模板 -->';
+  const currentContent = readThemeFile(rel);
+  expect(currentContent).not.toBe(oldContent);
+
+  // 模拟「上一版内置内容」：磁盘写旧内容，并把 manifest 里该文件的哈希改成旧内容的哈希
+  const manifest = readManifest();
+  const { createHash } = await import('node:crypto');
+  manifest.files[rel] = createHash('sha256').update(oldContent, 'utf8').digest('hex');
+  fs.writeFileSync(target, oldContent);
+  fs.writeFileSync(MANIFEST(), `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await restart();
+
+  // 没被用户改过 ⇒ 覆盖为当前版本
+  expect(readThemeFile(rel)).toBe(currentContent);
+});
+
+test('T20: 用户改过的内置文件在升级时保留', async () => {
+  const rel = 'assets/style.css';
+  const target = path.join(THEME_DIR(), rel);
+  const custom = '/* 用户自定义样式 */\nbody { background: #000; }\n';
+
+  fs.writeFileSync(target, custom);
+  await restart();
+
+  expect(readThemeFile(rel)).toBe(custom);
+});
+
+test('T20: 内置文件缺失时补回', async () => {
+  const rel = 'templates/index.ejs';
+  const target = path.join(THEME_DIR(), rel);
+  const expected = readThemeFile(rel);
+
+  fs.rmSync(target);
+  await restart();
+
+  expect(fs.existsSync(target)).toBe(true);
+  expect(readThemeFile(rel)).toBe(expected);
+});
