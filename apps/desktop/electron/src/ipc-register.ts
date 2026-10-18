@@ -53,6 +53,8 @@ import {
   themesDir,
 } from './theme';
 import type { RoutingRules } from './routing';
+import { deploySite, getDeployConfig, setDeployConfig } from './deploy';
+import type { DeployConfig } from './deploy';
 import { renderSitePreview } from './render';
 import {
   deleteMedia,
@@ -130,6 +132,15 @@ export function registerAllIpc(): void {
   handleIpc('set_routing_rules', (payload) =>
     setRoutingRules(payload.siteId as number, payload.rules as RoutingRules)
   );
+
+  // deploy
+  handleIpc('get_deploy_config', (payload) =>
+    getDeployConfig(payload.siteId as number)
+  );
+  handleIpc('set_deploy_config', (payload) =>
+    setDeployConfig(payload.siteId as number, payload.config as DeployConfig)
+  );
+  handleIpc('deploy_site', (payload) => deploySite(payload.siteId as number));
   handleIpc('debug_fetch', async (payload) => {
     try {
       const res = await net.fetch(payload.url as string);

@@ -12,6 +12,7 @@ import {
   type RouteKey,
   type RoutingRules,
 } from '@/lib/routing';
+import { errorMessage } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 
 /** 8 条路由的中文名（与主进程 routing.ts 的 RouteKey 一一对应） */
@@ -66,7 +67,7 @@ export function RoutingSection({ siteId }: { siteId: number }) {
         setRules(stored);
         setChecks(await validateRoutingRules(siteId, stored));
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!cancelled) setError(errorMessage(err));
       }
     })();
     return () => {
@@ -79,7 +80,7 @@ export function RoutingSection({ siteId }: { siteId: number }) {
       try {
         setChecks(await validateRoutingRules(siteId, next));
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(errorMessage(err));
       }
     },
     [siteId]
@@ -102,7 +103,7 @@ export function RoutingSection({ siteId }: { siteId: number }) {
       setChecks(await setRoutingRules(siteId, rules));
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }

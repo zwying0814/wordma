@@ -1,5 +1,6 @@
 import * as React from 'react';
 
+import { DeploySection } from '@/components/settings-deploy-section';
 import { RoutingSection } from '@/components/settings-routing-section';
 import { ThemeSection } from '@/components/settings-theme-section';
 import { useSite } from '@/context/SiteContext';
@@ -204,6 +205,8 @@ export function SettingsPage() {
       {activeSite && <ThemeSection siteId={activeSite.id} />}
 
       {activeSite && <RoutingSection siteId={activeSite.id} />}
+
+      {activeSite && <DeploySection siteId={activeSite.id} />}
     </div>
   );
 }

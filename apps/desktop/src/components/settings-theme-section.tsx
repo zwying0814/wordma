@@ -15,6 +15,7 @@ import {
   type ThemeSettingSchema,
   type ThemeSettings,
 } from '@/lib/theme';
+import { errorMessage } from '@/lib/errors';
 import { cn } from '@/lib/utils';
 
 /** 主题区：主题卡片列表 + 按 theme.yaml 的 settings schema 渲染的设置表单 */
@@ -40,7 +41,7 @@ export function ThemeSection({ siteId }: { siteId: number }) {
     setError(null);
     setSaved(false);
     void reload().catch((err) =>
-      setError(err instanceof Error ? err.message : String(err))
+      setError(errorMessage(err))
     );
   }, [reload]);
 
@@ -53,7 +54,7 @@ export function ThemeSection({ siteId }: { siteId: number }) {
       // 切换主题后表单跟随新主题的 schema
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -67,7 +68,7 @@ export function ThemeSection({ siteId }: { siteId: number }) {
       await deleteTheme(name);
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -87,7 +88,7 @@ export function ThemeSection({ siteId }: { siteId: number }) {
       setValues({ ...next });
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
