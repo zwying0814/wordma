@@ -94,9 +94,11 @@ test('复制按钮存在且代码块内容可被复制', async () => {
 test('mod+alt+8 快捷键切换代码块', async () => {
   await page.locator('[data-slate-node="element"]').last().click();
   await page.keyboard.type('shortcut text');
-  await page.keyboard.press('Shift+Home');
 
+  // 不按 Shift+Home：macOS 下它有时会选到文档开头，导致整篇一起被转成代码块
   await page.keyboard.press('ControlOrMeta+Alt+8');
 
-  await expect(page.locator('[data-slate-editor] pre')).toBeVisible();
+  const pres = page.locator('[data-slate-editor] pre');
+  await expect(pres).toHaveCount(1);
+  await expect(pres).toContainText('shortcut text');
 });
