@@ -172,7 +172,7 @@ export function InlineEquationElement(
                 ((texExpression.length > 0 && open) || selected) &&
                   'after:bg-brand/15',
                 texExpression.length === 0 &&
-                  'text-muted-foreground after:bg-neutral-500/10'
+                  'text-muted-foreground after:bg-muted-foreground/10'
               )}
               contentEditable={false}
             />

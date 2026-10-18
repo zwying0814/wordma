@@ -72,7 +72,7 @@ export function InlineEquationElementStatic(
         className={cn(
           'relative h-6',
           texExpression.length === 0 &&
-            'text-muted-foreground after:absolute after:inset-0 after:-top-0.5 after:-left-1 after:h-[calc(100%+4px)] after:w-[calc(100%+8px)] after:rounded-sm after:bg-neutral-500/10 after:content-[""]'
+            'text-muted-foreground after:absolute after:inset-0 after:-top-0.5 after:-left-1 after:h-[calc(100%+4px)] after:w-[calc(100%+8px)] after:rounded-sm after:bg-muted-foreground/10 after:content-[""]'
         )}
       >
         <span

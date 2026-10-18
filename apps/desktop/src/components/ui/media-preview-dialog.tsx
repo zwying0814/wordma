@@ -125,7 +125,7 @@ export function MediaPreviewDialog() {
               <div className="mx-px">
                 {isEditingScale ? (
                   <>
-                    <ScaleInput className="w-10 rounded px-1 text-slate-500 outline" />{' '}
+                    <ScaleInput className="w-10 rounded px-1 text-muted-foreground outline" />{' '}
                     <span>%</span>
                   </>
                 ) : (
