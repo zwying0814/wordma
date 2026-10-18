@@ -67,14 +67,15 @@ test('图片对齐可连续设置（菜单开关后选区保持）', async () =>
   };
 
   // 第一次：点图片选中 → 右对齐
+  // （像素值随编辑器列宽（design：780px 居中）变化，改排版时同步更新）
   await page.locator('[data-slate-editor] img').click();
   await alignBtn.click();
   await page.getByRole('menuitemradio', { name: 'Align right' }).click();
   await page.waitForTimeout(250);
-  expect(await getImgX()).toBe(530);
+  expect(await getImgX()).toBe(570);
 
   // 后续：不重新点图片，直接连续切换对齐
   await alignOnce('center', 330);
-  await alignOnce('left', 130);
-  await alignOnce('right', 530);
+  await alignOnce('left', 90);
+  await alignOnce('right', 570);
 });

@@ -1,13 +1,15 @@
 import * as React from 'react';
 
-import { PenLine, Plus, Trash2 } from 'lucide-react';
+import { FileText, PenLine, Plus, Search, Trash2 } from 'lucide-react';
 import { useLocation } from 'wouter';
 
 import { useSite } from '@/context/SiteContext';
 import { createArticle, deleteArticle } from '@/lib/article';
+import { countWordsInHtml } from '@/lib/words';
 import type { Article } from '@/types/api';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardList } from '@/components/ui/card';
+import { StatusChip } from '@/components/ui/chip';
 import {
   Dialog,
   DialogContent,
@@ -15,53 +17,61 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
+import { ListRow } from '@/components/ui/list-row';
+import { PageHeader } from '@/components/ui/page-header';
+import { Segmented } from '@/components/ui/segmented';
 
 type StatusFilter = 'all' | 'draft' | 'published';
 
 const filters: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: '全部' },
-  { value: 'draft', label: '草稿' },
   { value: 'published', label: '已发布' },
+  { value: 'draft', label: '草稿' },
 ];
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-CN', {
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
   });
 }
 
-/** 文章列表页：/articles */
+/** 文章列表页：/articles —— 状态筛选 + 搜索 + 行列表 */
 export function ArticlesPage() {
   const { activeSite, articles, reloadArticles } = useSite();
   const [, navigate] = useLocation();
 
   const [filter, setFilter] = React.useState<StatusFilter>('all');
+  const [query, setQuery] = React.useState('');
   const [pendingDelete, setPendingDelete] = React.useState<Article | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [creating, setCreating] = React.useState(false);
 
-  const filtered =
-    filter === 'all'
-      ? articles
-      : articles.filter((article) => article.status === filter);
+  const keyword = query.trim().toLowerCase();
+  const filtered = articles.filter((article) => {
+    if (filter !== 'all' && article.status !== filter) return false;
+    if (!keyword) return true;
+    return (
+      article.title.toLowerCase().includes(keyword) ||
+      article.slug.toLowerCase().includes(keyword) ||
+      article.tags.some((t) => t.name.toLowerCase().includes(keyword)) ||
+      article.categories.some((c) => c.name.toLowerCase().includes(keyword))
+    );
+  });
 
   const handleCreate = async () => {
-    if (!activeSite) return;
-    const article = await createArticle({ siteId: activeSite.id });
-    await reloadArticles();
-    void article;
-    navigate(`/editor/${article.id}`);
+    if (!activeSite || creating) return;
+    setCreating(true);
+    try {
+      const article = await createArticle({ siteId: activeSite.id });
+      await reloadArticles();
+      navigate(`/editor/${article.id}`);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -76,108 +86,115 @@ export function ArticlesPage() {
     }
   };
 
-  return (
-    <div className="flex h-full flex-col p-8" data-testid="articles-page">
-      <div className="flex items-center justify-between">
-        <h1 className="font-bold text-xl tracking-tight">文章</h1>
-        <Button data-testid="create-article" onClick={handleCreate}>
-          <Plus className="size-4" />
-          新建文章
-        </Button>
-      </div>
+  const listMeta = (article: Article) => {
+    const bits: string[] = [];
+    const categories = article.categories.map((c) => c.name).join('、');
+    if (categories) bits.push(categories);
+    const tags = article.tags.map((t) => t.name).join(' · ');
+    if (tags) bits.push(tags);
+    bits.push(formatDate(article.updatedAt));
+    bits.push(`约 ${countWordsInHtml(article.content).toLocaleString('zh-CN')} 字`);
+    return bits.join(' · ');
+  };
 
-      <div className="mt-4 flex items-center gap-1">
-        {filters.map(({ value, label }) => (
+  return (
+    <div className="flex flex-col p-9" data-testid="articles-page">
+      <PageHeader
+        actions={
           <Button
-            key={value}
-            onClick={() => setFilter(value)}
-            size="sm"
-            variant={filter === value ? 'secondary' : 'ghost'}
+            data-testid="create-article"
+            disabled={creating}
+            onClick={() => void handleCreate()}
           >
-            {label}
+            <Plus className="size-4" />
+            新建文章
           </Button>
-        ))}
+        }
+        subtitle={`共 ${articles.length} 篇 · ${activeSite?.name ?? ''}`}
+        title="文章"
+      />
+
+      <div className="mb-3.5 flex items-center gap-3">
+        <Segmented
+          aria-label="状态筛选"
+          onValueChange={setFilter}
+          options={filters}
+          value={filter}
+        />
+        <div className="relative ml-auto w-56 max-w-[45%]">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label="搜索文章"
+            className="pl-9"
+            data-testid="articles-search"
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索标题、标签或分类…"
+            type="search"
+            value={query}
+          />
+        </div>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-          <p>{filter === 'all' ? '还没有文章，从第一篇开始吧。' : '该状态下暂无文章。'}</p>
-          {filter === 'all' && (
-            <Button onClick={handleCreate} variant="outline">
-              <Plus className="size-4" />
-              新建文章
-            </Button>
-          )}
-        </div>
+        <Card>
+          <EmptyState
+            description={
+              articles.length === 0
+                ? '第一篇文章往往最难，也最重要。'
+                : '换个关键词，或清除筛选条件试试。'
+            }
+            icon={articles.length === 0 ? FileText : Search}
+            title={articles.length === 0 ? '还没有文章' : '没有匹配的文章'}
+          >
+            {articles.length === 0 && (
+              <Button onClick={() => void handleCreate()}>
+                <Plus className="size-4" />
+                写一篇文章
+              </Button>
+            )}
+          </EmptyState>
+        </Card>
       ) : (
-        <div className="mt-4 rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>标题</TableHead>
-                <TableHead className="w-20">状态</TableHead>
-                <TableHead>分类</TableHead>
-                <TableHead>标签</TableHead>
-                <TableHead className="w-36">更新时间</TableHead>
-                <TableHead className="w-24 text-right">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((article) => (
-                <TableRow key={article.id}>
-                  <TableCell className="max-w-0">
-                    <button
-                      className="block max-w-full truncate font-medium hover:underline"
-                      onClick={() => navigate(`/editor/${article.id}`)}
-                      type="button"
+        <Card>
+          <CardList>
+            {filtered.map((article) => (
+              <ListRow
+                actions={
+                  <>
+                    <StatusChip status={article.status} />
+                    <Button
+                      aria-label={`编辑 ${article.title}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(`/editor/${article.id}`);
+                      }}
+                      size="icon-sm"
+                      variant="ghost"
                     >
-                      {article.title}
-                    </button>
-                    <span className="block truncate text-muted-foreground text-xs">
-                      /{article.slug}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {article.status === 'published' ? (
-                      <Badge>已发布</Badge>
-                    ) : (
-                      <Badge variant="secondary">草稿</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="max-w-40 truncate text-muted-foreground text-sm">
-                    {article.categories.map((c) => c.name).join('、') || '—'}
-                  </TableCell>
-                  <TableCell className="max-w-40 truncate text-muted-foreground text-sm">
-                    {article.tags.map((t) => t.name).join('、') || '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {formatDateTime(article.updatedAt)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        aria-label={`编辑 ${article.title}`}
-                        onClick={() => navigate(`/editor/${article.id}`)}
-                        size="icon"
-                        variant="ghost"
-                      >
-                        <PenLine className="size-4" />
-                      </Button>
-                      <Button
-                        aria-label={`删除 ${article.title}`}
-                        onClick={() => setPendingDelete(article)}
-                        size="icon"
-                        variant="ghost"
-                      >
-                        <Trash2 className="size-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                      <PenLine />
+                    </Button>
+                    <Button
+                      aria-label={`删除 ${article.title}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPendingDelete(article);
+                      }}
+                      size="icon-sm"
+                      variant="destructiveGhost"
+                    >
+                      <Trash2 />
+                    </Button>
+                  </>
+                }
+                data-testid={`article-row-${article.id}`}
+                key={article.id}
+                meta={listMeta(article)}
+                onClick={() => navigate(`/editor/${article.id}`)}
+                title={article.title || '（无标题）'}
+              />
+            ))}
+          </CardList>
+        </Card>
       )}
 
       <Dialog
@@ -192,10 +209,7 @@ export function ArticlesPage() {
             确认删除文章「{pendingDelete?.title}」？此操作不可撤销。
           </DialogDescription>
           <DialogFooter>
-            <Button
-              onClick={() => setPendingDelete(null)}
-              variant="ghost"
-            >
+            <Button onClick={() => setPendingDelete(null)} variant="outline">
               取消
             </Button>
             <Button

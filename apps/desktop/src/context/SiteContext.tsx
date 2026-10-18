@@ -3,12 +3,15 @@ import * as React from 'react';
 import type { Article, Site } from '@/types/api';
 import { getActiveSite, listSites, setActiveSite as setActiveSiteApi } from '@/lib/site';
 import { listArticles } from '@/lib/article';
+import { listCategories, listTags } from '@/lib/taxonomy';
 
 type SiteContextValue = {
   activeSite: Site | null;
   sites: Site[];
   /** 激活站点的文章列表（切换站点时自动刷新） */
   articles: Article[];
+  /** 侧边导航用的计数（分类 + 标签） */
+  taxonomyCount: number;
   loading: boolean;
   /** 重新加载站点列表与激活站点 */
   reload: () => Promise<void>;
@@ -24,6 +27,7 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
   const [sites, setSites] = React.useState<Site[]>([]);
   const [activeSite, setActiveSiteState] = React.useState<Site | null>(null);
   const [articles, setArticles] = React.useState<Article[]>([]);
+  const [taxonomyCount, setTaxonomyCount] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
 
   const activeSiteId = activeSite?.id ?? null;
@@ -36,6 +40,21 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
     setSites(siteList);
     setActiveSiteState(active);
     setLoading(false);
+
+    // 导航计数：站点切换后一并刷新（分类/标签页 CRUD 也会调 reload）
+    if (active) {
+      try {
+        const [tags, categories] = await Promise.all([
+          listTags(active.id),
+          listCategories(active.id),
+        ]);
+        setTaxonomyCount(tags.length + categories.length);
+      } catch {
+        setTaxonomyCount(0);
+      }
+    } else {
+      setTaxonomyCount(0);
+    }
   }, []);
 
   const reloadArticles = React.useCallback(async () => {
@@ -70,12 +89,22 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
       activeSite,
       sites,
       articles,
+      taxonomyCount,
       loading,
       reload,
       reloadArticles,
       setActiveSite,
     }),
-    [activeSite, sites, articles, loading, reload, reloadArticles, setActiveSite]
+    [
+      activeSite,
+      sites,
+      articles,
+      taxonomyCount,
+      loading,
+      reload,
+      reloadArticles,
+      setActiveSite,
+    ]
   );
 
   return <SiteContext.Provider value={value}>{children}</SiteContext.Provider>;

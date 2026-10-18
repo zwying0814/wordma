@@ -97,8 +97,9 @@ test('T8: 状态切换 draft→published → 列表徽标更新', async () => {
       .getByRole('button', { name: /演示文章/ })
       .first()
   ).toBeVisible();
+  // 列表改行列表后不再有 table cell：断言行内状态胶囊
   await expect(
-    page.getByTestId('articles-page').getByRole('cell', { name: '已发布' })
+    page.getByTestId('articles-page').getByText('已发布').first()
   ).toBeVisible();
 });
 

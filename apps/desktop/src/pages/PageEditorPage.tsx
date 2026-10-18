@@ -1,5 +1,6 @@
 import * as React from 'react';
 
+import { Button } from '@/components/ui/button';
 import { ArrowLeft, Dices } from 'lucide-react';
 import { useLocation, useParams } from 'wouter';
 import type { Value } from 'platejs';
@@ -13,7 +14,6 @@ import { Editor, EditorContainer } from '@/components/ui/editor';
 import { EditorStatic } from '@/components/ui/editor-static';
 import { FixedToolbar } from '@/components/ui/fixed-toolbar';
 import { FixedToolbarButtons } from '@/components/ui/fixed-toolbar-buttons';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { errorMessage } from '@/lib/errors';
@@ -63,17 +63,17 @@ export function PageEditorPage() {
   }, [id]);
 
   const backBar = (
-    <div className="flex items-center gap-3 border-b px-3 py-2">
-      <Button
-        aria-label="Back"
+    <div className="flex items-center gap-2.5 border-b border-border bg-card px-5 py-3">
+      <button
+        className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-accent hover:text-foreground"
         data-testid="page-editor-back"
         onClick={() => navigate('/pages')}
-        size="icon"
-        variant="ghost"
+        type="button"
       >
         <ArrowLeft className="size-4" />
-      </Button>
-      <span className="font-medium text-sm">编辑页面</span>
+        返回列表
+      </button>
+      <span className="font-semibold text-sm">编辑页面</span>
     </div>
   );
 
@@ -81,7 +81,7 @@ export function PageEditorPage() {
     return (
       <div className="flex h-screen flex-col">
         {backBar}
-        <div className="flex flex-1 items-center justify-center text-muted-foreground">
+        <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
           {error}
         </div>
       </div>
@@ -92,7 +92,7 @@ export function PageEditorPage() {
     return (
       <div className="flex h-screen flex-col">
         {backBar}
-        <div className="flex flex-1 items-center justify-center text-muted-foreground">
+        <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
           加载中…
         </div>
       </div>
@@ -174,16 +174,16 @@ function PageEditorForm({ page }: { page: SitePage }) {
   return (
     <div className="flex h-screen flex-col">
       {/* 顶栏：返回 / 标题 / 导航开关 / 保存 */}
-      <div className="flex items-center gap-3 border-b px-3 py-2">
-        <Button
-          aria-label="Back"
+      <div className="flex items-center gap-2.5 border-b border-border bg-card px-5 py-3">
+        <button
+          className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-accent hover:text-foreground"
           data-testid="page-editor-back"
           onClick={() => navigate('/pages')}
-          size="icon"
-          variant="ghost"
+          type="button"
         >
           <ArrowLeft className="size-4" />
-        </Button>
+          返回列表
+        </button>
         <Input
           className="h-8 flex-1 border-none bg-transparent px-1 font-semibold text-base shadow-none focus-visible:ring-0"
           data-testid="page-title"
@@ -191,7 +191,7 @@ function PageEditorForm({ page }: { page: SitePage }) {
           placeholder="页面标题（≤60 字）"
           value={title}
         />
-        <label className="flex items-center gap-1.5 text-muted-foreground text-sm">
+        <label className="flex items-center gap-1.5 text-muted-foreground text-xs">
           加入导航
           <Switch
             checked={showInNav}
@@ -208,6 +208,7 @@ function PageEditorForm({ page }: { page: SitePage }) {
           data-testid="page-preview"
           disabled={saving || previewing}
           onClick={() => void handlePreview()}
+          size="sm"
           variant="outline"
         >
           {previewing ? '预览中…' : '预览'}
@@ -216,13 +217,14 @@ function PageEditorForm({ page }: { page: SitePage }) {
           data-testid="page-save"
           disabled={saving || previewing}
           onClick={() => void handleSave()}
+          size="sm"
         >
           {saving ? '保存中…' : '保存'}
         </Button>
       </div>
 
       {/* 元信息栏：slug / 随机 / 排序 */}
-      <div className="flex items-center gap-2 border-b px-3 py-1.5">
+      <div className="flex items-center gap-2 border-b border-border bg-card px-5 py-2">
         <div className="flex items-center gap-1 text-muted-foreground text-xs">
           <span>/</span>
           <Input

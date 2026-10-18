@@ -1,6 +1,7 @@
 import * as React from 'react';
 
 import { useSite } from '@/context/SiteContext';
+import { PageHeader } from '@/components/ui/page-header';
 import { TaxonomyColumn } from '@/components/TaxonomyColumn';
 import {
   createCategory,
@@ -16,7 +17,7 @@ import type { Category, Tag } from '@/types/api';
 
 /** 分类与标签管理页：/taxonomy（两栏，各含新建/重命名/删除） */
 export function TaxonomyPage() {
-  const { activeSite } = useSite();
+  const { activeSite, reload: reloadNav } = useSite();
   const siteId = activeSite?.id ?? null;
 
   const [tags, setTags] = React.useState<Tag[]>([]);
@@ -41,24 +42,30 @@ export function TaxonomyPage() {
   }, [reload]);
 
   return (
-    <div className="flex h-full flex-col p-8" data-testid="taxonomy-page">
-      <h1 className="font-bold text-xl tracking-tight">分类与标签</h1>
+    <div className="flex h-full flex-col p-9" data-testid="taxonomy-page">
+      <PageHeader
+        subtitle={`${categories.length} 个分类 · ${tags.length} 个标签`}
+        title="分类与标签"
+      />
 
-      <div className="mt-4 flex flex-1 gap-10">
+      <div className="flex min-h-0 flex-1 gap-6">
         <TaxonomyColumn
           items={categories}
           kindLabel="分类"
           onCreate={async (name) => {
             await createCategory({ siteId: siteId as number, name });
             await reload();
+            await reloadNav();
           }}
           onDelete={async (id) => {
             await deleteCategory(id);
             await reload();
+            await reloadNav();
           }}
           onRename={async (id, name) => {
             await renameCategory({ id, name });
             await reload();
+            await reloadNav();
           }}
           testId="category"
           title="分类"
@@ -70,14 +77,17 @@ export function TaxonomyPage() {
           onCreate={async (name) => {
             await createTag({ siteId: siteId as number, name });
             await reload();
+            await reloadNav();
           }}
           onDelete={async (id) => {
             await deleteTag(id);
             await reload();
+            await reloadNav();
           }}
           onRename={async (id, name) => {
             await renameTag({ id, name });
             await reload();
+            await reloadNav();
           }}
           testId="tag"
           title="标签"

@@ -32,7 +32,7 @@ export function WelcomePage() {
         dir: dir.trim(),
       });
       await setActiveSite(site.id);
-      window.location.hash = '#/articles';
+      window.location.hash = '#/dashboard';
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -43,9 +43,12 @@ export function WelcomePage() {
   const canCreate = !creating && name.trim().length > 0 && dir.trim().length > 0;
 
   return (
-    <div className="flex h-screen items-center justify-center bg-background">
-      <div className="flex w-[480px] flex-col gap-5 rounded-xl border bg-card p-8 shadow-sm">
+    <div className="flex h-screen items-center justify-center bg-background p-6">
+      <div className="flex w-[480px] flex-col gap-6 rounded-2xl border border-border bg-card p-8 shadow-pop">
         <div className="flex flex-col gap-1.5">
+          <span className="mb-1 grid size-11 place-items-center rounded-xl bg-primary/10 font-bold text-lg text-primary">
+            W
+          </span>
           <h1 className="font-bold text-2xl tracking-tight">欢迎使用 Wordma</h1>
           <p className="text-muted-foreground text-sm">
             选择一个本地目录存放站点数据（文章、媒体、主题），创建你的第一个站点。
@@ -53,7 +56,7 @@ export function WelcomePage() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="font-medium text-sm" htmlFor="site-name">
+          <label className="font-semibold text-xs" htmlFor="site-name">
             站点名称
           </label>
           <Input
@@ -64,7 +67,7 @@ export function WelcomePage() {
             placeholder="例如：我的博客"
             value={name}
           />
-          <label className="mt-2 font-medium text-sm" htmlFor="site-desc">
+          <label className="mt-2 font-semibold text-xs" htmlFor="site-desc">
             站点描述（可选）
           </label>
           <Input
@@ -75,7 +78,7 @@ export function WelcomePage() {
             placeholder="一句话介绍你的站点"
             value={description}
           />
-          <label className="mt-2 font-medium text-sm" htmlFor="site-dir">
+          <label className="mt-2 font-semibold text-xs" htmlFor="site-dir">
             数据目录
           </label>
           <div className="flex items-center gap-2">
@@ -90,12 +93,15 @@ export function WelcomePage() {
             <Button
               className="shrink-0"
               data-testid="welcome-choose-dir"
-              size="sm"
               onClick={() => void handleChooseDir()}
+              variant="outline"
             >
               选择…
             </Button>
           </div>
+          <span className="text-muted-foreground text-xs">
+            数据完全存在你选的目录里：拷走目录即完整备份，换电脑拷回来即可继续写。
+          </span>
           {error && (
             <p className="text-destructive text-sm" data-testid="welcome-error">
               {error}

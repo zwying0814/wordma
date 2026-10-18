@@ -1,9 +1,10 @@
 import * as React from 'react';
 
-import { PenLine, Plus, Trash2 } from 'lucide-react';
+import { PenLine, Plus, Tags, Trash2 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardList, CardHeader, CardTitle } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
 import {
   Dialog,
   DialogContent,
@@ -11,13 +12,15 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { ListRow } from '@/components/ui/list-row';
 
 export type TaxonomyItem = { id: number; name: string; articleCount: number };
 
 const NAME_MAX = 20;
 
-/** 分类/标签管理栏：新建 + 列表（计数）+ 重命名/删除弹窗 */
+/** 分类/标签管理栏（design 的卡片 + 行列表）：新建 + 列表（计数）+ 重命名/删除弹窗 */
 export function TaxonomyColumn({
   title,
   kindLabel,
@@ -93,74 +96,81 @@ export function TaxonomyColumn({
   };
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col" data-testid={`${testId}-column`}>
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-sm">{title}</h2>
-        <Badge variant="secondary">{items.length}</Badge>
-      </div>
+    <section
+      className="flex min-w-0 flex-1 flex-col"
+      data-testid={`${testId}-column`}
+    >
+      <Card className="flex min-h-0 flex-1 flex-col">
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          <Chip className="ml-auto" variant="outline">
+            {items.length}
+          </Chip>
+        </CardHeader>
 
-      <div className="mt-3 flex items-center gap-2">
-        <Input
-          className="h-8 flex-1"
-          data-testid={`${testId}-name-input`}
-          maxLength={NAME_MAX}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void handleCreate();
-          }}
-          placeholder={`新建${kindLabel}（≤${NAME_MAX} 字）`}
-          value={newName}
-        />
-        <Button
-          className="h-8"
-          data-testid={`${testId}-create`}
-          disabled={!newName.trim() || creating}
-          onClick={() => void handleCreate()}
-          size="sm"
-        >
-          <Plus className="size-4" />
-          新建
-        </Button>
-      </div>
+        <div className="flex items-center gap-2 border-b border-border px-5 py-3.5">
+          <Input
+            data-testid={`${testId}-name-input`}
+            maxLength={NAME_MAX}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleCreate();
+            }}
+            placeholder={`新建${kindLabel}（≤${NAME_MAX} 字）`}
+            value={newName}
+          />
+          <Button
+            data-testid={`${testId}-create`}
+            disabled={!newName.trim() || creating}
+            onClick={() => void handleCreate()}
+          >
+            <Plus className="size-4" />
+            新建
+          </Button>
+        </div>
 
-      <div className="mt-3 flex-1 overflow-y-auto rounded-lg border">
-        {items.length === 0 ? (
-          <div className="p-4 text-center text-muted-foreground text-sm">
-            暂无{kindLabel}
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {items.map((item) => (
-              <li
-                className="flex items-center justify-between gap-2 px-3 py-2"
-                data-testid={`${testId}-item-${item.name}`}
-                key={item.id}
-              >
-                <span className="truncate">{item.name}</span>
-                <div className="flex items-center gap-1">
-                  <Badge variant="secondary">{item.articleCount} 篇</Badge>
-                  <Button
-                    aria-label={`重命名 ${item.name}`}
-                    onClick={() => openRename(item)}
-                    size="icon"
-                    variant="ghost"
-                  >
-                    <PenLine className="size-3.5" />
-                  </Button>
-                  <Button
-                    aria-label={`删除 ${item.name}`}
-                    onClick={() => setPendingDelete(item)}
-                    size="icon"
-                    variant="ghost"
-                  >
-                    <Trash2 className="size-3.5 text-destructive" />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {items.length === 0 ? (
+            <EmptyState
+              description={`${kindLabel}帮助读者按主题找到相关文章。`}
+              icon={Tags}
+              title={`还没有${kindLabel}`}
+            />
+          ) : (
+            <CardList>
+              {items.map((item) => (
+                <ListRow
+                  actions={
+                    <>
+                      <Chip variant="secondary">{item.articleCount} 篇</Chip>
+                      <Button
+                        aria-label={`重命名 ${item.name}`}
+                        onClick={() => openRename(item)}
+                        size="icon-sm"
+                        variant="ghost"
+                      >
+                        <PenLine />
+                      </Button>
+                      <Button
+                        aria-label={`删除 ${item.name}`}
+                        onClick={() => setPendingDelete(item)}
+                        size="icon-sm"
+                        variant="destructiveGhost"
+                      >
+                        <Trash2 />
+                      </Button>
+                    </>
+                  }
+                  data-testid={`${testId}-item-${item.name}`}
+                  key={item.id}
+                  meta={`${item.articleCount} 篇文章`}
+                  title={item.name}
+                />
+              ))}
+            </CardList>
+          )}
+        </div>
+      </Card>
 
       {/* 重命名弹窗 */}
       <Dialog
@@ -172,7 +182,7 @@ export function TaxonomyColumn({
         <DialogContent className="max-w-[400px]">
           <DialogTitle>重命名{kindLabel}</DialogTitle>
           <DialogDescription>
-            将「{renaming?.name}」重命名为新名称。
+            将「{renaming?.name}」重命名为新名称，修改会同步到使用它的文章。
           </DialogDescription>
           <Input
             data-testid={`${testId}-rename-input`}
@@ -181,12 +191,15 @@ export function TaxonomyColumn({
             value={renameValue}
           />
           {renameError && (
-            <p className="text-destructive text-sm" data-testid={`${testId}-rename-error`}>
+            <p
+              className="text-destructive text-sm"
+              data-testid={`${testId}-rename-error`}
+            >
               {renameError}
             </p>
           )}
           <DialogFooter>
-            <Button onClick={() => setRenaming(null)} variant="ghost">
+            <Button onClick={() => setRenaming(null)} variant="outline">
               取消
             </Button>
             <Button
@@ -213,7 +226,7 @@ export function TaxonomyColumn({
             确认删除{kindLabel}「{pendingDelete?.name}」？已关联文章将解除关联。
           </DialogDescription>
           <DialogFooter>
-            <Button onClick={() => setPendingDelete(null)} variant="ghost">
+            <Button onClick={() => setPendingDelete(null)} variant="outline">
               取消
             </Button>
             <Button

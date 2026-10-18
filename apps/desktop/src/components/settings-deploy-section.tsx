@@ -3,6 +3,13 @@
 import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardBody,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   deploySite,
@@ -57,14 +64,19 @@ export function DeploySection({ siteId }: { siteId: number }) {
   };
 
   return (
-    <section className="flex max-w-2xl flex-col gap-3" data-testid="deploy-section">
-      <h2 className="font-semibold text-sm">发布</h2>
+    <Card data-testid="deploy-section">
+      <CardHeader>
+        <CardTitle>发布</CardTitle>
+        <span className="ml-auto text-muted-foreground text-xs">
+          产物不含草稿
+        </span>
+      </CardHeader>
 
-      <div className="flex flex-col gap-2">
+      <CardBody className="grid-cols-1 gap-2.5">
         <label className="flex items-center gap-2 text-sm">
-          <span className="w-24 shrink-0 text-muted-foreground">发布方式</span>
+          <span className="w-24 shrink-0 font-semibold text-xs">发布方式</span>
           <select
-            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+            className="h-9 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/15"
             data-testid="deploy-provider"
             onChange={(event) =>
               setConfig((prev) => ({
@@ -79,9 +91,9 @@ export function DeploySection({ siteId }: { siteId: number }) {
         </label>
 
         <label className="flex items-center gap-2 text-sm">
-          <span className="w-24 shrink-0 text-muted-foreground">站点地址</span>
+          <span className="w-24 shrink-0 font-semibold text-xs">站点地址</span>
           <Input
-            className="h-9 text-xs"
+            className="text-xs"
             data-testid="deploy-site-url"
             onChange={(event) =>
               setConfig((prev) => ({ ...prev, siteUrl: event.target.value }))
@@ -92,9 +104,9 @@ export function DeploySection({ siteId }: { siteId: number }) {
         </label>
 
         <label className="flex items-center gap-2 text-sm">
-          <span className="w-24 shrink-0 text-muted-foreground">目标文件夹</span>
+          <span className="w-24 shrink-0 font-semibold text-xs">目标文件夹</span>
           <Input
-            className="h-9 font-mono text-xs"
+            className="font-mono text-xs"
             data-testid="deploy-folder"
             onChange={(event) =>
               setConfig((prev) => ({ ...prev, folder: event.target.value }))
@@ -103,34 +115,28 @@ export function DeploySection({ siteId }: { siteId: number }) {
             value={config.folder ?? ''}
           />
         </label>
-      </div>
+      </CardBody>
 
-      <div className="flex items-center gap-3">
+      <CardFooter className="justify-between">
+        <span className="min-w-0 flex-1 truncate text-muted-foreground text-xs">
+          {(error || result) && (
+            <span
+              className={cn(error ? 'text-destructive' : 'text-muted-foreground')}
+              data-testid="deploy-result"
+            >
+              {error ?? `已发布 ${result?.files} 个文件到 ${result?.target}`}
+            </span>
+          )}
+          {!error && !result && '资源与媒体链接使用上面的站点地址。'}
+        </span>
         <Button
           data-testid="deploy-run"
           disabled={busy}
           onClick={() => void handleDeploy()}
-          size="sm"
         >
           {busy ? '发布中…' : '发布站点'}
         </Button>
-        {(error || result) && (
-          <span
-            className={cn(
-              'text-sm',
-              error ? 'text-destructive' : 'text-muted-foreground'
-            )}
-            data-testid="deploy-result"
-          >
-            {error ??
-              `已发布 ${result?.files} 个文件到 ${result?.target}`}
-          </span>
-        )}
-      </div>
-
-      <p className="text-muted-foreground text-xs">
-        发布产物不含草稿，资源与媒体链接使用上面的站点地址；发布构建目录与本地预览互相独立。
-      </p>
-    </section>
+      </CardFooter>
+    </Card>
   );
 }

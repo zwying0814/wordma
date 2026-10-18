@@ -3,6 +3,14 @@
 import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardBody,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -100,30 +108,32 @@ export function ThemeSection({ siteId }: { siteId: number }) {
   };
 
   return (
-    <section className="flex flex-col gap-3" data-testid="theme-section">
-      <h2 className="font-semibold text-sm">主题</h2>
+    <Card data-testid="theme-section">
+      <CardHeader>
+        <CardTitle>主题</CardTitle>
+        <span className="ml-auto text-muted-foreground text-xs">
+          装在站点目录的 themes/ 下
+        </span>
+      </CardHeader>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 p-5">
         {themes.map((theme) => (
           <div
             className={cn(
-              'flex w-52 flex-col gap-2 rounded-lg border p-3',
-              theme.active && 'border-primary'
+              'flex w-56 flex-col gap-2 rounded-xl border border-border bg-card p-4 shadow-card transition-shadow',
+              theme.active && 'border-primary/45 shadow-pop'
             )}
             data-testid="theme-card"
             key={theme.name}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="truncate font-medium text-sm">
+              <span className="truncate font-bold text-sm">
                 {theme.displayName}
               </span>
               {theme.active && (
-                <span
-                  className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-primary-foreground text-xs"
-                  data-testid="theme-card-active"
-                >
+                <Chip data-testid="theme-card-active" variant="accent">
                   使用中
-                </span>
+                </Chip>
               )}
             </div>
             <span className="text-muted-foreground text-xs">
@@ -134,7 +144,7 @@ export function ThemeSection({ siteId }: { siteId: number }) {
                 {theme.invalidMessage}
               </span>
             )}
-            <div className="mt-auto flex gap-2">
+            <div className="mt-auto flex gap-2 pt-2">
               <Button
                 data-testid={`theme-activate-${theme.name}`}
                 disabled={busy || theme.active}
@@ -149,7 +159,7 @@ export function ThemeSection({ siteId }: { siteId: number }) {
                 disabled={busy || theme.active}
                 onClick={() => void handleDelete(theme.name)}
                 size="sm"
-                variant="ghost"
+                variant="destructiveGhost"
               >
                 删除
               </Button>
@@ -159,33 +169,25 @@ export function ThemeSection({ siteId }: { siteId: number }) {
       </div>
 
       {settings && settings.schema.length > 0 && (
-        <div className="flex max-w-xl flex-col gap-3 rounded-lg border p-3">
-          <span className="font-medium text-sm">
-            主题设置 · {settings.themeName}
-          </span>
-
-          {settings.schema.map((setting) => (
-            <ThemeSettingField
-              key={`${settings.themeName}:${setting.key}`}
-              onChange={(value) => setValue(setting.key, value)}
-              setting={setting}
-              value={values[setting.key]}
-            />
-          ))}
-
-          <div className="flex items-center gap-3">
-            <Button
-              data-testid="theme-settings-save"
-              disabled={busy}
-              onClick={() => void handleSave()}
-              size="sm"
-            >
-              保存主题设置
-            </Button>
+        <>
+          <CardHeader className="border-t border-border">
+            <CardTitle>主题设置 · {settings.themeName}</CardTitle>
+          </CardHeader>
+          <CardBody className="grid-cols-1 gap-3 lg:grid-cols-2">
+            {settings.schema.map((setting) => (
+              <ThemeSettingField
+                key={`${settings.themeName}:${setting.key}`}
+                onChange={(value) => setValue(setting.key, value)}
+                setting={setting}
+                value={values[setting.key]}
+              />
+            ))}
+          </CardBody>
+          <CardFooter>
             {(error || saved) && (
               <span
                 className={cn(
-                  'text-sm',
+                  'text-xs',
                   error ? 'text-destructive' : 'text-muted-foreground'
                 )}
                 data-testid="theme-settings-result"
@@ -193,10 +195,17 @@ export function ThemeSection({ siteId }: { siteId: number }) {
                 {error ?? '已保存'}
               </span>
             )}
-          </div>
-        </div>
+            <Button
+              data-testid="theme-settings-save"
+              disabled={busy}
+              onClick={() => void handleSave()}
+            >
+              保存主题设置
+            </Button>
+          </CardFooter>
+        </>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -212,8 +221,8 @@ function ThemeSettingField({
   const testId = `theme-setting-${setting.key}`;
 
   return (
-    <label className="flex flex-col gap-1 text-sm" key={setting.key}>
-      <span className="text-muted-foreground">{setting.label || setting.key}</span>
+    <label className="flex flex-col gap-1.5 text-sm" key={setting.key}>
+      <span className="font-semibold text-xs">{setting.label || setting.key}</span>
       <ThemeSettingControl
         onChange={onChange}
         setting={setting}
@@ -247,7 +256,7 @@ function ThemeSettingControl({
     case 'select':
       return (
         <select
-          className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+          className="h-9 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/15"
           data-testid={testId}
           onChange={(event) => onChange(event.target.value)}
           value={typeof value === 'string' ? value : ''}
@@ -272,7 +281,7 @@ function ThemeSettingControl({
     case 'textarea':
       return (
         <textarea
-          className="min-h-20 rounded-md border border-input bg-transparent p-2 text-sm"
+          className="min-h-20 rounded-lg border border-input bg-card p-2.5 text-sm outline-none focus-visible:border-primary focus-visible:ring-3 focus-visible:ring-primary/15"
           data-testid={testId}
           onChange={(event) => onChange(event.target.value)}
           value={typeof value === 'string' ? value : ''}

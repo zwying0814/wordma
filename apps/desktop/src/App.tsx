@@ -6,6 +6,7 @@ import { SidebarNav } from '@/components/SidebarNav';
 import { SiteSwitcher } from '@/components/SiteSwitcher';
 import { ArticleEditorPage } from '@/pages/ArticleEditorPage';
 import { ArticlesPage } from '@/pages/ArticlesPage';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { PageEditorPage } from '@/pages/PageEditorPage';
 import { PagesPage } from '@/pages/PagesPage';
 import { TaxonomyPage } from '@/pages/TaxonomyPage';
@@ -43,15 +44,24 @@ function Routes() {
         ) : !activeSite ? (
           <WelcomePage />
         ) : (
-          <div className="flex h-screen">
-            <aside className="flex w-56 shrink-0 flex-col border-r bg-background">
-              <div className="border-b p-3">
-                <SiteSwitcher />
-              </div>
+          <div className="flex h-screen bg-background">
+            <aside className="flex w-(--sidebar-width) shrink-0 flex-col gap-2 border-r border-sidebar-border bg-sidebar px-3 pt-3.5 pb-3">
+              <SiteSwitcher />
               <SidebarNav />
+              <div className="mt-auto flex items-baseline justify-between border-t border-sidebar-border px-2.5 pt-2.5">
+                <span className="font-semibold text-muted-foreground text-xs tracking-wide">
+                  Wordma
+                </span>
+                <span className="text-muted-foreground/70 text-xs">
+                  本地写作
+                </span>
+              </div>
             </aside>
             <main className="min-w-0 flex-1 overflow-y-auto">
               <Switch>
+                <Route path="/dashboard">
+                  <DashboardPage />
+                </Route>
                 <Route path="/articles">
                   <ArticlesPage />
                 </Route>
@@ -71,7 +81,7 @@ function Routes() {
                   <SettingsPage />
                 </Route>
                 <Route>
-                  <ArticlesPage />
+                  <DashboardPage />
                 </Route>
               </Switch>
             </main>

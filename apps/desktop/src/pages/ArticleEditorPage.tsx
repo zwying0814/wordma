@@ -4,7 +4,6 @@ import { ArrowLeft } from 'lucide-react';
 import { useLocation, useParams } from 'wouter';
 
 import { ArticleEditor } from '@/components/editor/plate-editor';
-import { Button } from '@/components/ui/button';
 import { getArticle } from '@/lib/article';
 import type { Article } from '@/types/api';
 import { useSite } from '@/context/SiteContext';
@@ -40,17 +39,17 @@ export function ArticleEditorPage() {
   }, [id]);
 
   const backBar = (
-    <div className="flex items-center gap-3 border-b px-3 py-2">
-      <Button
-        aria-label="Back"
+    <div className="flex items-center gap-2.5 border-b border-border bg-card px-5 py-3">
+      <button
+        className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-accent hover:text-foreground"
         data-testid="editor-back"
         onClick={() => navigate('/articles')}
-        size="icon"
-        variant="ghost"
+        type="button"
       >
         <ArrowLeft className="size-4" />
-      </Button>
-      <span className="font-medium text-sm">编辑文章</span>
+        返回列表
+      </button>
+      <span className="font-semibold text-sm">编辑文章</span>
     </div>
   );
 
@@ -58,7 +57,7 @@ export function ArticleEditorPage() {
     return (
       <div className="flex h-screen flex-col">
         {backBar}
-        <div className="flex flex-1 items-center justify-center text-muted-foreground">
+        <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
           {error}
         </div>
       </div>
@@ -69,7 +68,7 @@ export function ArticleEditorPage() {
     return (
       <div className="flex h-screen flex-col">
         {backBar}
-        <div className="flex flex-1 items-center justify-center text-muted-foreground">
+        <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
           加载中…
         </div>
       </div>

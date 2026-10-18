@@ -3,6 +3,13 @@
 import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardBody,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   getRoutingRules,
@@ -117,20 +124,25 @@ export function RoutingSection({ siteId }: { siteId: number }) {
   };
 
   return (
-    <section className="flex max-w-2xl flex-col gap-3" data-testid="routing-section">
-      <h2 className="font-semibold text-sm">路由规则</h2>
+    <Card data-testid="routing-section">
+      <CardHeader>
+        <CardTitle>路由规则</CardTitle>
+        <span className="ml-auto text-muted-foreground text-xs">
+          决定静态产物的路径结构
+        </span>
+      </CardHeader>
 
-      <div className="flex flex-col gap-2">
+      <CardBody className="grid-cols-1 gap-2.5">
         {ROUTE_ORDER.map((key) => {
           const check = checks.find((item) => item.key === key);
           return (
             <div className="flex flex-col gap-1" key={key}>
               <div className="flex items-center gap-2">
-                <span className="w-24 shrink-0 text-muted-foreground text-sm">
+                <span className="w-24 shrink-0 font-semibold text-xs">
                   {ROUTE_LABELS[key]}
                 </span>
                 <Input
-                  className="h-8 font-mono text-xs"
+                  className="font-mono text-xs"
                   data-testid={`route-${key}`}
                   onChange={(event) => updateRule(key, event.target.value)}
                   value={rules[key]}
@@ -154,30 +166,13 @@ export function RoutingSection({ siteId }: { siteId: number }) {
             </div>
           );
         })}
-      </div>
+      </CardBody>
 
-      <div className="flex items-center gap-3">
-        <Button
-          data-testid="routing-save"
-          disabled={busy || hasError}
-          onClick={() => void handleSave()}
-          size="sm"
-        >
-          保存路由规则
-        </Button>
-        <Button
-          data-testid="routing-reset"
-          disabled={busy}
-          onClick={() => void handleReset()}
-          size="sm"
-          variant="outline"
-        >
-          恢复默认
-        </Button>
+      <CardFooter>
         {(error || saved) && (
           <span
             className={cn(
-              'text-sm',
+              'text-xs',
               error ? 'text-destructive' : 'text-muted-foreground'
             )}
             data-testid="routing-result"
@@ -185,7 +180,22 @@ export function RoutingSection({ siteId }: { siteId: number }) {
             {error ?? '已保存'}
           </span>
         )}
-      </div>
-    </section>
+        <Button
+          data-testid="routing-reset"
+          disabled={busy}
+          onClick={() => void handleReset()}
+          variant="outline"
+        >
+          恢复默认
+        </Button>
+        <Button
+          data-testid="routing-save"
+          disabled={busy || hasError}
+          onClick={() => void handleSave()}
+        >
+          保存路由规则
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }

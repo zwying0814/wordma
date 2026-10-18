@@ -2,40 +2,60 @@ import {
   FileText,
   Files,
   Image as ImageIcon,
+  LayoutDashboard,
   Settings,
   Tags,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 
-const items = [
-  { href: '/articles', icon: FileText, label: '文章' },
-  { href: '/pages', icon: Files, label: '页面' },
-  { href: '/taxonomy', icon: Tags, label: '分类与标签' },
-  { href: '/media', icon: ImageIcon, label: '媒体库' },
-  { href: '/settings', icon: Settings, label: '设置' },
-];
+import { useSite } from '@/context/SiteContext';
+import { cn } from '@/lib/utils';
 
-/** 侧边导航（一期页面入口；未实现的页面显示建设中占位） */
+/** 侧边导航（design .nav）：图标 + 名称 + 计数，选中态用主色浅底 */
 export function SidebarNav() {
   const [location] = useLocation();
+  const { articles, taxonomyCount } = useSite();
+
+  const items = [
+    { href: '/dashboard', icon: LayoutDashboard, label: '概览' },
+    { href: '/articles', icon: FileText, label: '文章', count: articles.length },
+    { href: '/pages', icon: Files, label: '页面' },
+    { href: '/taxonomy', icon: Tags, label: '分类与标签', count: taxonomyCount },
+    { href: '/media', icon: ImageIcon, label: '媒体库' },
+    { href: '/settings', icon: Settings, label: '设置' },
+  ];
 
   return (
-    <nav className="flex flex-col gap-1 p-2">
-      {items.map(({ href, icon: Icon, label }) => {
+    <nav aria-label="主导航" className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+      {items.map(({ href, icon: Icon, label, count }) => {
         const isActive = location === href;
         return (
           <Link
-            className={`flex items-center gap-2.5 rounded-md px-3 py-2 font-medium text-sm transition-colors hover:bg-accent hover:text-accent-foreground ${
+            aria-current={isActive ? 'page' : undefined}
+            className={cn(
+              'flex items-center gap-2.5 rounded-lg px-2.5 py-2 font-medium text-sm transition-colors duration-150',
               isActive
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground'
-            }`}
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/85 hover:bg-accent hover:text-foreground'
+            )}
             data-testid={`nav-${href.slice(1)}`}
             href={href}
             key={href}
           >
-            <Icon className="size-4" />
-            {label}
+            <Icon className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+            {count !== undefined && count > 0 && (
+              <span
+                className={cn(
+                  'shrink-0 rounded-full px-1.5 text-xs leading-5 tabular-nums',
+                  isActive
+                    ? 'bg-primary/15 text-sidebar-accent-foreground'
+                    : 'bg-muted text-muted-foreground'
+                )}
+              >
+                {count}
+              </span>
+            )}
           </Link>
         );
       })}

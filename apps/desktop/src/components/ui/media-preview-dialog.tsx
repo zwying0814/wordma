@@ -13,14 +13,15 @@ import type * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-const buttonVariants = cva('rounded bg-[rgba(0,0,0,0.5)] px-1', {
+// 全屏预览的浮层控件：深色遮罩上的浅色图标（用 card 反色 token）
+const buttonVariants = cva('rounded bg-background/50 px-1', {
   defaultVariants: {
     variant: 'default',
   },
   variants: {
     variant: {
-      default: 'text-white',
-      disabled: 'cursor-not-allowed text-gray-400',
+      default: 'text-foreground',
+      disabled: 'cursor-not-allowed text-muted-foreground',
     },
   },
 });
@@ -71,8 +72,8 @@ export function MediaPreviewDialog() {
       onContextMenu={(e) => e.stopPropagation()}
       {...maskLayerProps}
     >
-      <div className="absolute inset-0 size-full bg-black opacity-30" />
-      <div className="absolute inset-0 size-full bg-black opacity-30" />
+      <div className="absolute inset-0 size-full bg-foreground opacity-30" />
+      <div className="absolute inset-0 size-full bg-foreground opacity-30" />
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="relative flex max-h-screen w-full items-center">
           <PreviewImage
@@ -81,7 +82,7 @@ export function MediaPreviewDialog() {
             )}
           />
           <div
-            className="absolute bottom-0 left-1/2 z-40 flex w-fit -translate-x-1/2 justify-center gap-4 p-2 text-center text-white"
+            className="absolute bottom-0 left-1/2 z-40 flex w-fit -translate-x-1/2 justify-center gap-4 p-2 text-center text-foreground"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex gap-1">

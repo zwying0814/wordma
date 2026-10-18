@@ -4,7 +4,7 @@ import * as React from 'react';
 
 import { createStaticEditor, serializeHtml } from 'platejs/static';
 import { createSlateEditor, type Value } from 'platejs';
-import { ArrowLeftIcon, ChevronDown, Dices } from 'lucide-react';
+import { ArrowLeftIcon, ChevronDown, Dices, Folder, Tag } from 'lucide-react';
 import { Plate, useEditorSelector, usePlateEditor } from 'platejs/react';
 import { useLocation } from 'wouter';
 
@@ -186,19 +186,19 @@ export function ArticleEditor({
 
   return (
     <Plate editor={editor}>
-      {/* 顶栏：返回 / 标题 / 状态 / 保存 */}
-      <div className="flex items-center gap-3 border-b px-3 py-2">
-        <Button
-          aria-label="Back"
+      {/* 顶栏：返回 / 标题 / 状态 / 保存（design .editor-top） */}
+      <div className="flex items-center gap-2.5 border-b border-border bg-card px-5 py-3">
+        <button
+          className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-accent hover:text-foreground"
           data-testid="editor-back"
           onClick={() => navigate('/articles')}
-          size="icon"
-          variant="ghost"
+          type="button"
         >
           <ArrowLeftIcon className="size-4" />
-        </Button>
+          返回列表
+        </button>
         <Input
-          className="h-8 flex-1 border-none bg-transparent px-1 font-semibold text-base shadow-none focus-visible:ring-0"
+          className="h-8 flex-1 border-none bg-transparent px-1 font-bold text-lg shadow-none focus-visible:ring-0"
           data-testid="article-title"
           onChange={(e) => setTitle(e.target.value)}
           placeholder="文章标题"
@@ -211,7 +211,7 @@ export function ArticleEditor({
           title="点击切换草稿/已发布"
           type="button"
         >
-          <Badge variant={status === 'published' ? 'default' : 'secondary'}>
+          <Badge variant={status === 'published' ? 'default' : 'muted'}>
             {status === 'published' ? '已发布' : '草稿'}
           </Badge>
         </button>
@@ -224,6 +224,7 @@ export function ArticleEditor({
           data-testid="article-preview"
           disabled={saving || previewing}
           onClick={() => void handlePreview()}
+          size="sm"
           variant="outline"
         >
           {previewing ? '预览中…' : '预览'}
@@ -232,13 +233,14 @@ export function ArticleEditor({
           data-testid="article-save"
           disabled={saving || previewing}
           onClick={() => void handleSave()}
+          size="sm"
         >
           {saving ? '保存中…' : '保存'}
         </Button>
       </div>
 
       {/* 元信息栏：slug / 分类 / 标签 / 字数 */}
-      <div className="flex items-center gap-2 border-b px-3 py-1.5">
+      <div className="flex items-center gap-2 border-b border-border bg-card px-5 py-2">
         <div className="flex items-center gap-1 text-muted-foreground text-xs">
           <span>/</span>
           <Input
@@ -264,11 +266,16 @@ export function ArticleEditor({
           <DropdownMenuTrigger
             render={
               <Button
+                className="rounded-full border border-input px-2.5"
                 data-testid="category-selector"
                 size="sm"
-                variant="ghost"
+                variant="outline"
               >
-                分类
+                <Folder className="size-3.5" />
+                {categories
+                  .filter((c) => categoryIds.includes(c.id))
+                  .map((c) => c.name)
+                  .join('、') || '选择分类'}
                 <ChevronDown className="size-3.5 text-muted-foreground" />
               </Button>
             }
@@ -296,8 +303,19 @@ export function ArticleEditor({
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger
             render={
-              <Button data-testid="tag-selector" size="sm" variant="ghost">
-                标签
+              <Button
+                className="rounded-full border border-input px-2.5"
+                data-testid="tag-selector"
+                size="sm"
+                variant="outline"
+              >
+                <Tag className="size-3.5" />
+                {tags
+                  .filter((t) => tagIds.includes(t.id))
+                  .map((t) => t.name)
+                  .slice(0, 2)
+                  .join('、') || '添加标签'}
+                {tagIds.length > 2 && ` +${tagIds.length - 2}`}
                 <ChevronDown className="size-3.5 text-muted-foreground" />
               </Button>
             }
