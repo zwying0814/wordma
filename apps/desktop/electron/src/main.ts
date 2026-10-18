@@ -28,11 +28,14 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-/** 应用私有根（registry.json 所在）：WORDMA_DATA_DIR 覆盖（E2E/CI 隔离用），默认 userData */
+/**
+ * 应用私有根（registry.json 所在）：WORDMA_DATA_DIR 覆盖（E2E/CI 隔离用），
+ * 默认 {userData}/wordma —— 与 Chromium 自己的文件分开，站点数据则在用户选的目录里。
+ */
 function resolveAppRoot(): string {
   return (
     process.env.WORDMA_DATA_DIR ||
-    app.getPath('userData')
+    path.join(app.getPath('userData'), 'wordma')
   );
 }
 
