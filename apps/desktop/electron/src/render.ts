@@ -45,6 +45,10 @@ type PostView = {
 
 const POSTS_PER_PAGE = 10;
 
+/** 分类/标签总览页路径（路由规则里没有总览页的键，与 Rust 版一致固定为这两个） */
+const CATEGORIES_URL = '/categories/';
+const TAGS_URL = '/tags/';
+
 /** 正文里是否用到了公式（保存下来的 HTML 里带 slate-equation / slate-inline_equation 类名） */
 function containsEquation(html: string): boolean {
   return /slate-(inline_)?equation/.test(html);
@@ -207,7 +211,14 @@ export async function renderSiteTo(options: {
   const files: string[] = [];
   const baseContext = {
     site: { name: site.name, description: site.description ?? '', url: baseUrl },
-    urls: { archive: archiveUrl, categories: rules.category, tags: rules.tag, feed: feedUrl },
+    urls: {
+      archive: archiveUrl,
+      // 注意：这里要的是「总览页」地址；rules.category/rules.tag 是详情页的
+      // 路由模板（形如 /category/[slug]/），直接当链接用会 404
+      categories: CATEGORIES_URL,
+      tags: TAGS_URL,
+      feed: feedUrl,
+    },
     navPages,
     theme: themeContext,
     footerText: String(themeContext.footerText),
@@ -354,7 +365,7 @@ export async function renderSiteTo(options: {
       count: c.count,
     })),
   });
-  writePage('/categories/', taxonomiesBody, `分类 - ${site.name}`);
+  writePage(CATEGORIES_URL, taxonomiesBody, `分类 - ${site.name}`);
 
   const tagOverviewBody = ejs.render(taxonomiesTpl, {
     heading: '标签',
@@ -364,7 +375,7 @@ export async function renderSiteTo(options: {
       count: t.count,
     })),
   });
-  writePage('/tags/', tagOverviewBody, `标签 - ${site.name}`);
+  writePage(TAGS_URL, tagOverviewBody, `标签 - ${site.name}`);
 
   writeFileSync(path.join(outputDir, toRelativeFile(feedUrl)), buildRss(site, publishedSorted, baseUrl));
   files.push(toRelativeFile(feedUrl));

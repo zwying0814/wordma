@@ -256,3 +256,28 @@ test('T15: 正文含公式时引入 KaTeX 样式与字体', async () => {
   const indexHtml = fs.readFileSync(path.join(report.outputDir, 'index.html'), 'utf8');
   expect(indexHtml).toContain('katex/katex.min.css');
 });
+
+test('T15: 导航里的分类/标签链接指向总览页（不是 [slug] 路由模板）', async () => {
+  const seeded = await seedRenderData();
+  await invokeRender();
+
+  const dist = path.join(dataDir, 'preview', String(seeded.siteId));
+  const indexHtml = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+
+  // 链接不能是详情页的路由模板字面量
+  expect(indexHtml).not.toContain('[slug]');
+  expect(indexHtml).toContain('href="/categories/"');
+  expect(indexHtml).toContain('href="/tags/"');
+
+  // 链接指向的总览页确实生成了
+  expect(fs.existsSync(path.join(dist, 'categories', 'index.html'))).toBe(true);
+  expect(fs.existsSync(path.join(dist, 'tags', 'index.html'))).toBe(true);
+
+  // 总览页里指向具体分类/标签的链接是替换过 slug 的真实路径
+  const categoriesHtml = fs.readFileSync(
+    path.join(dist, 'categories', 'index.html'),
+    'utf8'
+  );
+  expect(categoriesHtml).not.toContain('[slug]');
+  expect(categoriesHtml).toContain('/category/');
+});

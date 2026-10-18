@@ -16,6 +16,7 @@ import { FixedToolbarButtons } from '@/components/ui/fixed-toolbar-buttons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { errorMessage } from '@/lib/errors';
 import { generateSlug } from '@/lib/slug';
 import { updatePage } from '@/lib/pages';
 import type { SitePage } from '@/types/api';
@@ -116,6 +117,7 @@ function PageEditorForm({ page }: { page: SitePage }) {
   const [slug, setSlug] = React.useState(page.slug);
   const [showInNav, setShowInNav] = React.useState(page.showInNav);
   const [saving, setSaving] = React.useState(false);
+  const [previewing, setPreviewing] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [savedAt, setSavedAt] = React.useState<string | null>(null);
 
@@ -143,10 +145,29 @@ function PageEditorForm({ page }: { page: SitePage }) {
       });
       setSlug(saved.slug);
       setSavedAt(new Date().toLocaleTimeString('zh-CN'));
+      return saved.slug;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
+      return null;
     } finally {
       setSaving(false);
+    }
+  };
+
+  /** 预览 = 先保存（渲染读的是库里的内容）→ 渲染整站 → 浏览器直接打开这个页面 */
+  const handlePreview = async () => {
+    setPreviewing(true);
+    try {
+      const savedSlug = await handleSave();
+      if (!savedSlug) return;
+      await window.api.invoke('open_preview', {
+        siteId: page.siteId,
+        target: { kind: 'page', slug: savedSlug },
+      });
+    } catch (err) {
+      setSaveError(errorMessage(err));
+    } finally {
+      setPreviewing(false);
     }
   };
 
@@ -183,7 +204,19 @@ function PageEditorForm({ page }: { page: SitePage }) {
             已保存 {savedAt}
           </span>
         )}
-        <Button data-testid="page-save" disabled={saving} onClick={() => void handleSave()}>
+        <Button
+          data-testid="page-preview"
+          disabled={saving || previewing}
+          onClick={() => void handlePreview()}
+          variant="outline"
+        >
+          {previewing ? '预览中…' : '预览'}
+        </Button>
+        <Button
+          data-testid="page-save"
+          disabled={saving || previewing}
+          onClick={() => void handleSave()}
+        >
           {saving ? '保存中…' : '保存'}
         </Button>
       </div>

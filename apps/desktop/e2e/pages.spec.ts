@@ -120,3 +120,34 @@ test('T13: 加入导航开关持久化', async () => {
     'false'
   );
 });
+
+test('T13: 页面编辑器的「预览」按钮打开该页面的 URL', async () => {
+  await page.getByTestId('create-page').click();
+  await expect(page.getByTestId('page-title')).toHaveValue('未命名页面');
+
+  await page.getByTestId('page-title').fill('关于预览');
+  await page.getByTestId('page-preview').click();
+
+  // 保存被触发
+  await expect(page.getByTestId('page-saved-at')).toBeVisible();
+
+  // 预览 URL 指向这个页面（按当前 page 路由规则），不是首页
+  const slug = await page.getByTestId('page-slug').inputValue();
+  const opened = (await page.evaluate(
+    ({ siteId, slug: s }) =>
+      (window as any).api.invoke('open_preview', {
+        siteId,
+        target: { kind: 'page', slug: s },
+      }),
+    {
+      siteId: await page.evaluate(async () => {
+        const api = (window as any).api;
+        const active = await api.invoke('get_active_site');
+        return active.id as number;
+      }),
+      slug,
+    }
+  )) as { url: string };
+
+  expect(opened.url).toContain(`/${slug}.html`);
+});
