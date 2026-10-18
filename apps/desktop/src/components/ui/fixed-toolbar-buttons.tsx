@@ -165,16 +165,24 @@ export function FixedToolbarButtons() {
   const widthsRef = React.useRef<number[]>([]);
   const [fitCount, setFitCount] = React.useState(groups.length);
 
-  /** 测量全部组的自然宽度（任一组被收纳后 offsetWidth=0，需先全量展开） */
+  // 供 ResizeObserver 回调读取当前值（避免闭包过期）
+  const fitCountRef = React.useRef(fitCount);
+  fitCountRef.current = fitCount;
+
+  /** 测量各组自然宽度：只在「全部可见」时测（收纳后的组 offsetWidth 为 0） */
+  const measure = React.useCallback(() => {
+    if (fitCountRef.current !== groups.length) return;
+    widthsRef.current = groupRefs.current.map((el) => el?.offsetWidth ?? 0);
+  }, [groups.length]);
+
   const fit = React.useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
+
     const moreWidth = 44;
     const available = container.clientWidth - moreWidth;
-    // 组宽在首次渲染时缓存一次；收纳只读缓存，不再依赖当前 DOM 宽度
-    if (widthsRef.current.length === 0) {
-      widthsRef.current = groupRefs.current.map((el) => el?.offsetWidth ?? 0);
-    }
+    if (widthsRef.current.length === 0) measure();
+
     let used = 0;
     let count = 0;
     for (const width of widthsRef.current) {
@@ -185,24 +193,22 @@ export function FixedToolbarButtons() {
         break;
       }
     }
-    setFitCount((prev) => (prev === Math.max(1, count) ? prev : Math.max(1, count)));
-  }, []);
 
-  React.useEffect(() => {
-    // 组内容变化（如 readOnly 切换）时刷新宽度缓存
-    widthsRef.current = [];
-  }, [groups]);
+    const next = Math.max(1, count);
+    setFitCount((prev) => (prev === next ? prev : next));
+  }, [measure]);
 
   React.useLayoutEffect(() => {
+    // 首帧 fitCount = groups.length，全部可见，此时测量才准
+    measure();
     fit();
     const ro = new ResizeObserver(() => {
       fit();
     });
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, [fit]);
+  }, [fit, measure]);
 
-  const visible = groups.slice(0, fitCount);
   const overflowed = groups.slice(fitCount);
 
   if (readOnly) {
@@ -211,11 +217,19 @@ export function FixedToolbarButtons() {
 
   return (
     <div className="flex w-full" data-testid="toolbar-groups" ref={containerRef}>
-      {visible.map((group) => (
+      {/*
+        始终渲染全部组，溢出的只用 CSS 隐藏：
+        若按 fitCount 条件渲染，分组在「可见 ↔ 溢出」之间切换时 React 会卸载再挂载，
+        DOM 节点被重建 —— 鼠标正好在那一刻点击就会点空（E2E 里表现为
+        element was detached from the DOM）。
+        隐藏的副本不参与可访问性树，getByRole 不会匹配到，因此不会与 More 菜单里的
+        副本撞 strict mode。
+      */}
+      {groups.map((group, index) => (
         <div
+          className={index >= fitCount ? 'hidden' : undefined}
           key={group.key}
           ref={(el) => {
-            const index = groups.findIndex((g) => g.key === group.key);
             groupRefs.current[index] = el;
           }}
         >

@@ -98,3 +98,38 @@ test('固定工具栏与浮动工具栏共存', async () => {
     page.locator('strong').filter({ hasText: 'CoexistText' })
   ).toBeVisible();
 });
+
+test('固定工具栏：窗口变窄收纳分组时不重建按钮节点', async () => {
+  // 给工具栏里的 Table 按钮打标记（记录 DOM 节点身份）
+  const marked = await page.evaluate(() => {
+    const btn = document.querySelector(
+      '[data-testid="fixed-toolbar"] [aria-label="Table"]'
+    ) as (HTMLElement & { __wordmaMark?: string }) | null;
+    if (!btn) return false;
+    btn.__wordmaMark = 'keep';
+    return true;
+  });
+  expect(marked).toBe(true);
+
+  // 缩窄窗口 → 触发收纳（部分分组进 More 菜单）
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const [w, h] = win.getSize();
+    win.setSize(Math.max(640, Math.round(w * 0.6)), h);
+  });
+  await page.waitForTimeout(400);
+
+  // 节点仍是同一个（没被卸载重建）
+  const stillSame = await page.evaluate(() => {
+    const btn = document.querySelector(
+      '[data-testid="fixed-toolbar"] [aria-label="Table"]'
+    ) as (HTMLElement & { __wordmaMark?: string }) | null;
+    return btn?.__wordmaMark === 'keep';
+  });
+  expect(stillSame).toBe(true);
+
+  // 确实发生了收纳：More 菜单里能找到 Table
+  await page.getByTestId('fixed-toolbar').getByRole('button', { name: 'More' }).click();
+  await expect(page.getByRole('menu').getByRole('button', { name: 'Table' })).toBeVisible();
+  await page.keyboard.press('Escape');
+});
