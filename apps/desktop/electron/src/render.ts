@@ -44,6 +44,14 @@ type PostView = {
 };
 
 const POSTS_PER_PAGE = 10;
+
+/** 主题设置里的数值（宽松：非法回退默认值） */
+function toPositiveInt(value: unknown, fallback: number): number {
+  const num = typeof value === 'string' ? Number(value) : value;
+  return typeof num === 'number' && Number.isFinite(num) && num >= 1
+    ? Math.floor(num)
+    : fallback;
+}
 const FOOTER_TEXT = '由 Wordma 驱动';
 
 /** 预览/构建共用入口：渲染站点到 outputDir */
@@ -69,7 +77,6 @@ export async function renderSiteTo(options: {
 
   // 主题设置解析（宽松：坏值回退 schema 默认）
   const themeSettingsMap = resolveThemeSettings(themeName, siteId);
-  const themeSettingsRaw = ''; // 兼容占位（不再直接读原始 JSON）
 
   // 1) 清空输出目录
   rmSync(outputDir, { recursive: true, force: true });
@@ -169,17 +176,11 @@ export async function renderSiteTo(options: {
   const tpl = (name: string, fallback: string): string =>
     themeTemplates[`${name}.ejs`] ?? fallback;
 
-  // 主题设置解析（宽松：坏值回退 schema 默认）
-  const themeContext: Record<string, unknown> = {};
-  try {
-    const schemas = JSON.parse(themeSettingsRaw ?? '[]') as never;
-    void schemas;
-  } catch {
-    /* theme_settings 存储的是 schema 键值对，见下 */
-  }
-
+  // 主题设置注入模板上下文（宽松解析：坏值已在 resolveThemeSettings 里回退 schema 默认）
+  const themeContext: Record<string, unknown> = { ...themeSettingsMap };
   themeContext.footerText = themeSettingsMap.footerText ?? FOOTER_TEXT;
-  themeContext.postsPerPage = themeSettingsMap.postsPerPage ?? POSTS_PER_PAGE;
+  const perPage = toPositiveInt(themeSettingsMap.postsPerPage, POSTS_PER_PAGE);
+  themeContext.postsPerPage = perPage;
 
   const files: string[] = [];
   const baseContext = {
@@ -235,7 +236,7 @@ export async function renderSiteTo(options: {
   );
   const totalPages = Math.max(
     1,
-    Math.ceil(publishedSorted.length / POSTS_PER_PAGE)
+    Math.ceil(publishedSorted.length / perPage)
   );
   const indexPaginationUrl = (page: number): string =>
     page <= 1 ? '/' : generatePath(rules.indexPagination, { num: String(page) });
@@ -260,8 +261,8 @@ export async function renderSiteTo(options: {
   };
 
   for (let page = 1; page <= totalPages; page += 1) {
-    const start = (page - 1) * POSTS_PER_PAGE;
-    renderIndex(publishedSorted.slice(start, start + POSTS_PER_PAGE), page);
+    const start = (page - 1) * perPage;
+    renderIndex(publishedSorted.slice(start, start + perPage), page);
   }
 
   // 分类/标签列表页（各自全量文章）

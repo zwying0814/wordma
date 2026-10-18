@@ -44,8 +44,10 @@ import {
   deleteTheme,
   ensureBuiltinThemes,
   getActiveThemeName,
+  getThemeSettings,
   listThemes,
   setActiveTheme,
+  setThemeSettings,
   themesDir,
 } from './theme';
 import type { RoutingRules } from './routing';
@@ -282,6 +284,19 @@ export function registerAllIpc(): void {
     )
   );
   handleIpc('delete_theme', (payload) => deleteTheme(payload.name as string));
+  handleIpc('get_theme_settings', (payload) =>
+    getThemeSettings(
+      (payload?.siteId ?? getActiveSite()?.id) as number,
+      payload?.themeName as string | undefined
+    )
+  );
+  handleIpc('set_theme_settings', (payload) =>
+    setThemeSettings(
+      (payload?.siteId ?? getActiveSite()?.id) as number,
+      payload?.themeName as string,
+      (payload?.values ?? {}) as Record<string, unknown>
+    )
+  );
 
   // pages
   handleIpc('list_pages', (payload) => listPages(payload.siteId));

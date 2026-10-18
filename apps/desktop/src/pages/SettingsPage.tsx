@@ -1,5 +1,6 @@
 import * as React from 'react';
 
+import { ThemeSection } from '@/components/settings-theme-section';
 import { useSite } from '@/context/SiteContext';
 import { updateSite } from '@/lib/site';
 import type { Site } from '@/types/api';
@@ -198,6 +199,8 @@ export function SettingsPage() {
           </Button>
         </div>
       </section>
+
+      {activeSite && <ThemeSection siteId={activeSite.id} />}
     </div>
   );
 }

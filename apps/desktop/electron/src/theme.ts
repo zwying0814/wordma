@@ -219,6 +219,113 @@ export function deleteTheme(name: string): void {
 }
 
 /** 主题设置解析（宽松）：合并 schema 默认值与存储值，坏值回退默认 */
+/** 读取主题的 settings schema（缺失/损坏返回空数组） */
+export function readThemeSchema(themeName: string): ThemeSettingSchema[] {
+  const yamlPath = path.join(themesDir(), themeName, 'theme.yaml');
+  if (!existsSync(yamlPath)) return [];
+
+  try {
+    const meta = yaml.parse(readFileSync(yamlPath, 'utf8')) as {
+      settings?: ThemeSettingSchema[];
+    };
+    return Array.isArray(meta.settings) ? meta.settings : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 按 schema 严格校验单个设置值（保存路径用；渲染路径是宽松解析） */
+function validateThemeSetting(
+  setting: ThemeSettingSchema,
+  raw: unknown
+): string | number | boolean {
+  const label = setting.label || setting.key;
+
+  switch (setting.type) {
+    case 'number': {
+      const value = typeof raw === 'string' ? Number(raw.trim()) : raw;
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new Error(`「${label}」必须是数字`);
+      }
+      return value;
+    }
+    case 'switch': {
+      if (typeof raw === 'boolean') return raw;
+      if (raw === 'true') return true;
+      if (raw === 'false') return false;
+      throw new Error(`「${label}」必须是开关值`);
+    }
+    case 'select': {
+      const options = setting.options ?? [];
+      if (typeof raw !== 'string' || !options.includes(raw)) {
+        throw new Error(`「${label}」必须是以下之一：${options.join('、')}`);
+      }
+      return raw;
+    }
+    case 'color': {
+      if (typeof raw !== 'string' || !/^#([\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(raw)) {
+        throw new Error(`「${label}」必须是十六进制颜色（如 #336699）`);
+      }
+      return raw;
+    }
+    case 'text':
+    case 'textarea':
+    default: {
+      if (typeof raw !== 'string') {
+        throw new Error(`「${label}」必须是文本`);
+      }
+      return raw;
+    }
+  }
+}
+
+export type ThemeSettings = {
+  themeName: string;
+  schema: ThemeSettingSchema[];
+  /** 当前生效值（schema 默认值 + 存储值） */
+  values: Record<string, string | number | boolean>;
+};
+
+/** 读取主题设置：schema + 生效值（不传 themeName 时取当前站点激活的主题） */
+export function getThemeSettings(
+  siteId: number,
+  themeName?: string
+): ThemeSettings {
+  const name = themeName ?? getActiveThemeName(siteId);
+  return {
+    themeName: name,
+    schema: readThemeSchema(name),
+    values: resolveThemeSettings(name, siteId),
+  };
+}
+
+/**
+ * 保存主题设置：只接受 schema 里声明的键，逐个严格校验；
+ * 任一非法值直接抛错（整体不落库）。返回保存后的生效值。
+ */
+export function setThemeSettings(
+  siteId: number,
+  themeName: string,
+  values: Record<string, unknown>
+): Record<string, string | number | boolean> {
+  const schema = readThemeSchema(themeName);
+  const byKey = new Map(schema.map((setting) => [setting.key, setting]));
+
+  // 在既有值上合并：UI 只提交当前主题的键，未提交的保持原值
+  const next: Record<string, string | number | boolean> = {
+    ...resolveThemeSettings(themeName, siteId),
+  };
+
+  for (const [key, raw] of Object.entries(values ?? {})) {
+    const setting = byKey.get(key);
+    if (!setting) continue;
+    next[key] = validateThemeSetting(setting, raw);
+  }
+
+  setSetting(`theme_settings:${siteId}:${themeName}`, JSON.stringify(next));
+  return next;
+}
+
 export function resolveThemeSettings(
   themeName: string,
   siteId: number
