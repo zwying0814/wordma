@@ -9,7 +9,9 @@ import { ArticlesPage } from '@/pages/ArticlesPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { PageEditorPage } from '@/pages/PageEditorPage';
 import { PagesPage } from '@/pages/PagesPage';
-import { TaxonomyPage } from '@/pages/TaxonomyPage';
+import { CategoriesPage } from '@/pages/CategoriesPage';
+import { TagsPage } from '@/pages/TagsPage';
+import { ThemesPage } from '@/pages/ThemesPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { WelcomePage } from '@/pages/WelcomePage';
 import { MediaPage } from '@/pages/MediaPage';
@@ -71,8 +73,14 @@ function Routes() {
                 <Route path="/pages">
                   <PagesPage />
                 </Route>
-                <Route path="/taxonomy">
-                  <TaxonomyPage />
+                <Route path="/tags">
+                  <TagsPage />
+                </Route>
+                <Route path="/categories">
+                  <CategoriesPage />
+                </Route>
+                <Route path="/themes">
+                  <ThemesPage />
                 </Route>
                 <Route path="/media">
                   <MediaPage />

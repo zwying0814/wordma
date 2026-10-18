@@ -145,7 +145,7 @@ export function PagesPage() {
         }}
         open={pendingDelete !== null}
       >
-        <DialogContent className="max-w-[420px]">
+        <DialogContent className="max-w-[420px] sm:max-w-[420px]">
           <DialogTitle>删除页面</DialogTitle>
           <DialogDescription>
             确认删除页面「{pendingDelete?.title}」？此操作不可撤销。

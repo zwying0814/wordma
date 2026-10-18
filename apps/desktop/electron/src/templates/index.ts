@@ -170,6 +170,13 @@ layout: single
 tags:
   - 单栏
   - 浅色
+preview:
+  bg: "#FFFFFF"
+  chromeBg: "#FAFAFA"
+  ink: "#1F2328"
+  muted: "#6B7280"
+  line: "#E5E7EB"
+  accent: "#3563D9"
 settings:
   - key: footerText
     label: 页脚文案

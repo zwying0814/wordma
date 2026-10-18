@@ -1,8 +1,10 @@
 import {
   FileText,
   Files,
+  Folder,
   Image as ImageIcon,
   LayoutDashboard,
+  Palette,
   Settings,
   Tags,
 } from 'lucide-react';
@@ -14,13 +16,15 @@ import { cn } from '@/lib/utils';
 /** 侧边导航（design .nav）：图标 + 名称 + 计数，选中态用主色浅底 */
 export function SidebarNav() {
   const [location] = useLocation();
-  const { articles, taxonomyCount } = useSite();
+  const { articles, categoryCount, tagCount } = useSite();
 
   const items = [
     { href: '/dashboard', icon: LayoutDashboard, label: '概览' },
     { href: '/articles', icon: FileText, label: '文章', count: articles.length },
     { href: '/pages', icon: Files, label: '页面' },
-    { href: '/taxonomy', icon: Tags, label: '分类与标签', count: taxonomyCount },
+    { href: '/tags', icon: Tags, label: '标签', count: tagCount },
+    { href: '/categories', icon: Folder, label: '分类', count: categoryCount },
+    { href: '/themes', icon: Palette, label: '主题' },
     { href: '/media', icon: ImageIcon, label: '媒体库' },
     { href: '/settings', icon: Settings, label: '设置' },
   ];

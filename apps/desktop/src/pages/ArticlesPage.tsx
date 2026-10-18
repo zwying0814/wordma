@@ -203,7 +203,7 @@ export function ArticlesPage() {
         }}
         open={pendingDelete !== null}
       >
-        <DialogContent className="max-w-[420px]">
+        <DialogContent className="max-w-[420px] sm:max-w-[420px]">
           <DialogTitle>删除文章</DialogTitle>
           <DialogDescription>
             确认删除文章「{pendingDelete?.title}」？此操作不可撤销。

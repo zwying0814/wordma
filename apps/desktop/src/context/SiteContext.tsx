@@ -10,8 +10,9 @@ type SiteContextValue = {
   sites: Site[];
   /** 激活站点的文章列表（切换站点时自动刷新） */
   articles: Article[];
-  /** 侧边导航用的计数（分类 + 标签） */
-  taxonomyCount: number;
+  /** 侧边导航用的计数 */
+  tagCount: number;
+  categoryCount: number;
   loading: boolean;
   /** 重新加载站点列表与激活站点 */
   reload: () => Promise<void>;
@@ -27,7 +28,8 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
   const [sites, setSites] = React.useState<Site[]>([]);
   const [activeSite, setActiveSiteState] = React.useState<Site | null>(null);
   const [articles, setArticles] = React.useState<Article[]>([]);
-  const [taxonomyCount, setTaxonomyCount] = React.useState(0);
+  const [tagCount, setTagCount] = React.useState(0);
+  const [categoryCount, setCategoryCount] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
 
   const activeSiteId = activeSite?.id ?? null;
@@ -48,12 +50,15 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
           listTags(active.id),
           listCategories(active.id),
         ]);
-        setTaxonomyCount(tags.length + categories.length);
+        setTagCount(tags.length);
+        setCategoryCount(categories.length);
       } catch {
-        setTaxonomyCount(0);
+        setTagCount(0);
+        setCategoryCount(0);
       }
     } else {
-      setTaxonomyCount(0);
+      setTagCount(0);
+      setCategoryCount(0);
     }
   }, []);
 
@@ -89,7 +94,8 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
       activeSite,
       sites,
       articles,
-      taxonomyCount,
+      tagCount,
+      categoryCount,
       loading,
       reload,
       reloadArticles,
@@ -99,7 +105,8 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
       activeSite,
       sites,
       articles,
-      taxonomyCount,
+      tagCount,
+      categoryCount,
       loading,
       reload,
       reloadArticles,

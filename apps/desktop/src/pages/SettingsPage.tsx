@@ -2,7 +2,6 @@ import * as React from 'react';
 
 import { DeploySection } from '@/components/settings-deploy-section';
 import { RoutingSection } from '@/components/settings-routing-section';
-import { ThemeSection } from '@/components/settings-theme-section';
 import { useSite } from '@/context/SiteContext';
 import {
   createSite,
@@ -337,15 +336,13 @@ export function SettingsPage() {
           </Card>
         )}
 
-        {activeSite && <ThemeSection siteId={activeSite.id} />}
-
         {activeSite && <RoutingSection siteId={activeSite.id} />}
 
         {activeSite && <DeploySection siteId={activeSite.id} />}
       </div>
 
       <Dialog onOpenChange={setConfirmRemove} open={confirmRemove}>
-        <DialogContent className="max-w-[420px]">
+        <DialogContent className="max-w-[420px] sm:max-w-[420px]">
           <DialogTitle>移除站点</DialogTitle>
           <DialogDescription>
             确认从 Wordma 移除「{activeSite?.name}」？站点数据仍保留在

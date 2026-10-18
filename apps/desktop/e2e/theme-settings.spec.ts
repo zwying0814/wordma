@@ -17,10 +17,11 @@ test.beforeEach(async () => {
   dataDir = launched.dataDir;
   siteDir = launched.seeded?.siteDir ?? path.join(launched.dataDir, 'site-1');
 
+  // 主题卡片与主题设置都在主题页
   await page.evaluate(() => {
-    window.location.hash = '#/settings';
+    window.location.hash = '#/themes';
   });
-  await expect(page.getByTestId('settings-page')).toBeVisible();
+  await expect(page.getByTestId('themes-page')).toBeVisible();
 });
 
 test.afterEach(async () => {
@@ -88,7 +89,7 @@ async function seedTheme(name: string, displayName: string) {
 
   // 让设置页重新拉取主题列表
   await page.reload();
-  await expect(page.getByTestId('settings-page')).toBeVisible();
+  await expect(page.getByTestId('themes-page')).toBeVisible();
 }
 
 test('T21: 主题卡片列表与 schema 驱动表单', async () => {
