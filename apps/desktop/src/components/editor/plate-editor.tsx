@@ -8,6 +8,7 @@ import { ArrowLeftIcon, ChevronDown, Dices } from 'lucide-react';
 import { Plate, useEditorSelector, usePlateEditor } from 'platejs/react';
 import { useLocation } from 'wouter';
 
+import { errorMessage } from '@/lib/errors';
 import { generateSlug } from '@/lib/slug';
 import { countWords } from '@/lib/words';
 import { updateArticle } from '@/lib/article';
@@ -89,6 +90,7 @@ export function ArticleEditor({
     { id: number; name: string }[]
   >([]);
   const [saving, setSaving] = React.useState(false);
+  const [previewing, setPreviewing] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
   const [savedAt, setSavedAt] = React.useState<string | null>(null);
 
@@ -140,10 +142,26 @@ export function ArticleEditor({
       setSlug(saved.slug);
       setSavedAt(new Date().toLocaleTimeString('zh-CN'));
       onSaved?.();
+      return true;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
+      return false;
     } finally {
       setSaving(false);
+    }
+  };
+
+  /** 预览 = 先保存（渲染读的是库里的内容）→ 渲染整站 → 系统浏览器打开 */
+  const handlePreview = async () => {
+    setPreviewing(true);
+    try {
+      const saved = await handleSave();
+      if (!saved) return;
+      await window.api.invoke('open_preview', { siteId: article.siteId });
+    } catch (err) {
+      setSaveError(errorMessage(err));
+    } finally {
+      setPreviewing(false);
     }
   };
 
@@ -200,8 +218,16 @@ export function ArticleEditor({
           </span>
         )}
         <Button
+          data-testid="article-preview"
+          disabled={saving || previewing}
+          onClick={() => void handlePreview()}
+          variant="outline"
+        >
+          {previewing ? '预览中…' : '预览'}
+        </Button>
+        <Button
           data-testid="article-save"
-          disabled={saving}
+          disabled={saving || previewing}
           onClick={() => void handleSave()}
         >
           {saving ? '保存中…' : '保存'}
