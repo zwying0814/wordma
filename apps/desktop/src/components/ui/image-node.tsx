@@ -59,17 +59,14 @@ export const ImageElement = withHOC(
             data-testid="image-resizable"
             options={{ align, readOnly, maxWidth }}
           >
+            {/* known-issues #2 根因：左手柄多挂的 onMouseDownCapture preventDefault
+                会吞掉 @platejs/resizable 自己的 mousedown（setInitialPosition/
+                setIsResizing），拖拽从未启动。参考实现左右手柄用法完全一致，
+                这个 preventDefault 是我们移植时多加的。 */}
             <ResizeHandle
               className={mediaResizeHandleVariants({ direction: 'left' })}
               data-testid="image-resize-handle-left"
-              onMouseDownCapture={(e) => e.preventDefault()}
-              onPointerUp={restoreSelection}
-              options={{
-                direction: 'left',
-                onResize: ({ finished }: { finished: boolean }) => {
-                  if (finished) restoreSelection();
-                },
-              }}
+              options={{ direction: 'left' }}
             />
             <div>
               <Image

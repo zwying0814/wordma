@@ -101,6 +101,48 @@ test('拖拽左右手柄调整图片宽度', async () => {
     .toBeTruthy();
 });
 
+test('拖拽左手柄也能调整图片宽度（known-issues #2）', async () => {
+  await insertImageByUrl(IMG_URL);
+  await expect(page.locator('[data-slate-editor] img')).toBeVisible();
+
+  const widthBefore = await page.evaluate(
+    () =>
+      (
+        document.querySelector(
+          '[data-testid="image-resizable"]'
+        ) as HTMLElement | null
+      )?.style.width
+  );
+
+  const handle = page.getByTestId('image-resize-handle-left');
+  await expect(handle).toBeAttached();
+  await handle.hover();
+  const box = await handle.boundingBox();
+  if (!box) throw new Error('left handle not found');
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2, {
+    steps: 8,
+  });
+  await page.mouse.up();
+
+  // 左手柄向右拖 → 图片变窄（delta 取负），宽度必须变化
+  await expect
+    .poll(async () => {
+      const widthAfter = await page.evaluate(
+        () =>
+          (
+            document.querySelector(
+              '[data-testid="image-resizable"]'
+            ) as HTMLElement | null
+          )?.style.width
+      );
+      return widthAfter && widthAfter !== widthBefore;
+    }, { timeout: 5_000 })
+    .toBeTruthy();
+});
+
 test('点击图片选中后可删除', async () => {
   await insertImageByUrl(IMG_URL);
   await expect(page.locator('[data-slate-editor] img')).toBeVisible();
