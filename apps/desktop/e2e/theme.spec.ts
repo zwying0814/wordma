@@ -7,12 +7,14 @@ import { launchDesktop } from './launch';
 let app: any;
 let page: any;
 let dataDir: string;
+let siteDir: string;
 
 test.beforeEach(async () => {
   const launched = await launchDesktop({ seed: true });
   app = launched.app;
   page = launched.page;
   dataDir = launched.dataDir;
+  siteDir = launched.seeded?.siteDir ?? path.join(launched.dataDir, 'site-1');
 });
 
 test.afterEach(async () => { if (app) await app.close(); });
@@ -26,11 +28,11 @@ test('T19: 内置默认主题提取并激活', async () => {
   expect(def).toBeDefined();
   expect(def.displayName).toBe('默认主题');
   expect(def.active).toBe(true);
-  expect(fs.existsSync(path.join(dataDir, 'themes', 'default', 'theme.yaml'))).toBe(true);
+  expect(fs.existsSync(path.join(siteDir, 'themes', 'default', 'theme.yaml'))).toBe(true);
 });
 
 test('T19: 自制主题激活 → 渲染产物使用主题模板与样式', async () => {
-  const themeDir = path.join(dataDir, 'themes', 'mytheme');
+  const themeDir = path.join(siteDir, 'themes', 'mytheme');
   fs.mkdirSync(path.join(themeDir, 'templates'), { recursive: true });
   fs.mkdirSync(path.join(themeDir, 'assets'), { recursive: true });
   fs.writeFileSync(
@@ -57,14 +59,14 @@ test('T19: 自制主题激活 → 渲染产物使用主题模板与样式', asyn
   })) as { files: number };
 
   expect(report.files).toBeGreaterThan(3);
-  const indexHtml = fs.readFileSync(path.join(dataDir, 'preview', '1', 'index.html'), 'utf8');
+  const indexHtml = fs.readFileSync(path.join(siteDir, 'preview', 'index.html'), 'utf8');
   expect(indexHtml).toContain('MYTHEME-SHELL');
   expect(indexHtml).toContain('MYTHEME-INDEX');
-  expect(fs.readFileSync(path.join(dataDir, 'preview', '1', 'assets', 'style.css'), 'utf8')).toContain('.mytheme');
+  expect(fs.readFileSync(path.join(siteDir, 'preview', 'assets', 'style.css'), 'utf8')).toContain('.mytheme');
 });
 
 test('T19: 主题模板缺失文件 → 回退内置布局', async () => {
-  const themeDir = path.join(dataDir, 'themes', 'partial');
+  const themeDir = path.join(siteDir, 'themes', 'partial');
   fs.mkdirSync(path.join(themeDir, 'templates'), { recursive: true });
   fs.writeFileSync(path.join(themeDir, 'theme.yaml'), 'name: partial\ndisplayName: 部分主题\n');
   // 只提供 base.ejs，不提供 index.ejs
@@ -82,12 +84,12 @@ test('T19: 主题模板缺失文件 → 回退内置布局', async () => {
   })) as { files: number };
 
   expect(report.files).toBeGreaterThan(2);
-  const indexHtml = fs.readFileSync(path.join(dataDir, 'preview', '1', 'index.html'), 'utf8');
+  const indexHtml = fs.readFileSync(path.join(siteDir, 'preview', 'index.html'), 'utf8');
   expect(indexHtml).toContain('PARTIAL-SHELL');
 });
 
 test('T19: 删除使用中的主题被拒；删除未使用的成功', async () => {
-  const themeDir = path.join(dataDir, 'themes', 'temp-theme');
+  const themeDir = path.join(siteDir, 'themes', 'temp-theme');
   fs.mkdirSync(themeDir, { recursive: true });
   fs.writeFileSync(path.join(themeDir, 'theme.yaml'), 'name: temp-theme\ndisplayName: 临时\n');
 
@@ -104,7 +106,7 @@ test('T19: 删除使用中的主题被拒；删除未使用的成功', async () 
 });
 
 test('T19: theme.yaml 损坏 → invalid 标记不阻塞列表', async () => {
-  const brokenDir = path.join(dataDir, 'themes', 'broken');
+  const brokenDir = path.join(siteDir, 'themes', 'broken');
   fs.mkdirSync(brokenDir, { recursive: true });
   fs.writeFileSync(path.join(brokenDir, 'theme.yaml'), 'name: [unclosed');
 
@@ -119,7 +121,7 @@ test('T19: theme.yaml 损坏 → invalid 标记不阻塞列表', async () => {
 
 // T20 · 内置主题指纹提取：升级时「没改过的文件覆盖、改过的保留」
 
-const THEME_DIR = () => path.join(dataDir, 'themes', 'default');
+const THEME_DIR = () => path.join(siteDir, 'themes', 'default');
 const MANIFEST = () => path.join(THEME_DIR(), '.builtin-manifest.json');
 const readManifest = () => JSON.parse(fs.readFileSync(MANIFEST(), 'utf8'));
 const readThemeFile = (rel: string) =>

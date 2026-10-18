@@ -12,11 +12,12 @@ let page: Page;
 // T1 · 主进程打包管线 + 启动骨架
 
 test('T1: 隔离数据目录下生成 wordma.db', async () => {
-  const launched = await launchDesktop({ seed: false });
+  const launched = await launchDesktop();
   app = launched.app;
   page = launched.page;
 
-  expect(fs.existsSync(path.join(launched.dataDir, 'wordma.db'))).toBeTruthy();
+  // 站点目录模型：库在站点目录 site-1 下（seed 会经 create_site 创建它）
+  expect(fs.existsSync(path.join(launched.dataDir, 'site-1', 'wordma.db'))).toBeTruthy();
 
   await app.close();
 });
@@ -51,8 +52,8 @@ test('T1: 未注册的通道被拒绝', async () => {
 
 // T2 · 数据库层
 
-test('T2: 全部 9 张表已创建', async () => {
-  const launched = await launchDesktop({ seed: false });
+test('T2: 全部 8 张表已创建（站点目录模型无 sites 表）', async () => {
+  const launched = await launchDesktop();
   app = launched.app;
   page = launched.page;
 
@@ -61,7 +62,6 @@ test('T2: 全部 9 张表已创建', async () => {
   )) as string[];
 
   for (const table of [
-    'sites',
     'settings',
     'categories',
     'tags',
@@ -73,6 +73,7 @@ test('T2: 全部 9 张表已创建', async () => {
   ]) {
     expect(tables).toContain(table);
   }
+  expect(tables).not.toContain('sites');
 
   await app.close();
 });
@@ -87,15 +88,23 @@ test('T3: 站点 CRUD、激活持久化、校验、级联清理', async () => {
   app = first.app;
   page = first.page;
 
-  const site = (await page.evaluate(() =>
-    (window as any).api.invoke('create_site', {
-      name: '我的博客',
-      description: '测试站点',
-    })
-  )) as { id: number; name: string; description: string | null };
+  const siteDir = path.join(dataDir, 'site-1');
+  const site = (await page.evaluate(
+    (dir: string) =>
+      (window as any).api.invoke('create_site', {
+        name: '我的博客',
+        description: '测试站点',
+        dir,
+      }),
+    siteDir
+  )) as { id: number; name: string; description: string | null; dir: string };
 
   expect(Number(site.id)).toBeGreaterThan(0);
   expect(site.name).toBe('我的博客');
+  expect(site.dir).toBe(siteDir);
+  // 站点目录模型：库与站点名片直接落在所选目录
+  expect(fs.existsSync(path.join(siteDir, 'wordma.db'))).toBe(true);
+  expect(fs.existsSync(path.join(siteDir, 'wordma.site.yaml'))).toBe(true);
 
   await page.evaluate((id: number) =>
     (window as any).api.invoke('set_active_site', { id })
@@ -113,11 +122,12 @@ test('T3: 站点 CRUD、激活持久化、校验、级联清理', async () => {
   )) as { id: number } | null;
   expect(Number(active?.id)).toBe(Number(site.id));
 
-  // 更新：清空描述
+  // 更新：显式 null 清空描述
   const updated = (await page.evaluate((id: number) =>
     (window as any).api.invoke('update_site', {
       id,
       name: '改名博客',
+      description: null,
     })
   , Number(site.id))) as { name: string; description: string | null };
   expect(updated.name).toBe('改名博客');

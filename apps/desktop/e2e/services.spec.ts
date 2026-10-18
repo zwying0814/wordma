@@ -6,14 +6,24 @@ import { launchDesktop } from './launch';
 let app: ElectronApplication;
 let page: Page;
 let siteId: number;
+let rootDir: string;
+let siteDir: string;
 
 test.beforeEach(async () => {
   const launched = await launchDesktop({ seed: false });
   app = launched.app;
   page = launched.page;
+  rootDir = launched.dataDir;
+  siteDir = `${rootDir}/site-svc`;
 
-  const site = (await page.evaluate(() =>
-    (window as any).api.invoke('create_site', { name: '服务测试站点' })
+  // 站点目录模型：create_site 必须带 dir（worker 根下的固定子目录）
+  const site = (await page.evaluate(
+    (dir: string) =>
+      (window as any).api.invoke('create_site', {
+        name: '服务测试站点',
+        dir,
+      }),
+    siteDir
   )) as { id: number };
   siteId = Number(site.id);
 });
@@ -53,20 +63,21 @@ test('T5: 非法 slug 被拒（大写/空格/首尾连字符/超长）', async (
 });
 
 test('T5: 同站点 slug 唯一', async () => {
-  await invoke('create_article', { siteId, slug: 'dup-slug', title: 'A' });
+  await invoke('create_article', { slug: 'dup-slug', title: 'A' });
   await expect(
-    invoke('create_article', { siteId, slug: 'dup-slug', title: 'B' })
+    invoke('create_article', { slug: 'dup-slug', title: 'B' })
   ).rejects.toThrow(/已被本站点其他文章使用/);
 
-  // 不同站点互不影响
-  const site2 = (await invoke('create_site', { name: '另一个站' })) as {
-    id: number;
-  };
-  const other = (await invoke('create_article', {
-    siteId: Number(site2.id),
+  // 删除后 slug 可复用（单站点库：唯一性就是全库唯一）
+  await invoke('delete_article', {
+    id: ((await invoke('list_articles')) as { id: number; slug: string }[]).find(
+      (a) => a.slug === 'dup-slug'
+    )!.id,
+  });
+  const reuse = (await invoke('create_article', {
     slug: 'dup-slug',
   })) as { id: number };
-  expect(Number(other.id)).toBeGreaterThan(0);
+  expect(Number(reuse.id)).toBeGreaterThan(0);
 });
 
 test('T5: 分类/标签全量替换语义', async () => {
@@ -107,21 +118,16 @@ test('T5: 分类/标签全量替换语义', async () => {
   expect(kept.tags.map((t) => Number(t.id))).toEqual([Number(tag2.id)]);
 });
 
-test('T5: 关联不属于当前站点的分类/标签被拒', async () => {
-  const otherSite = (await invoke('create_site', { name: '外部站' })) as {
-    id: number;
-  };
-  const foreignTag = (await invoke('create_tag', {
-    siteId: Number(otherSite.id),
-    name: '外部标签',
+test('T5: 站点间库彻底隔离（站点目录模型）', async () => {
+  // 建第二个站点（独立目录/库）并切过去；原来站点的数据在新库不可见
+  const other = (await invoke('create_site', {
+    name: '外部站',
+    dir: `${rootDir}/site-ext`,
   })) as { id: number };
-
-  await expect(
-    invoke('create_article', {
-      siteId,
-      tagIds: [Number(foreignTag.id)],
-    })
-  ).rejects.toThrow(/不属于当前站点/);
+  expect(Number(other.id)).toBeGreaterThan(0);
+  // create 后自动激活并切库：list 已切到新库
+  const tagsInNew = (await invoke('list_tags')) as unknown[];
+  expect(tagsInNew).toHaveLength(0);
 });
 
 test('T5: 删除文章后标签计数归零（级联清理关联）', async () => {

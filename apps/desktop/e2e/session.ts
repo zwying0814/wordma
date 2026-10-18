@@ -8,14 +8,20 @@ import path from 'node:path';
  * 每个 Playwright worker 复用一个 Electron 进程。
  *
  * 以前每个用例都 `electron.launch` 一次（约 0.6~0.7s），是套件耗时的大头。
- * 现在进程在 worker 内启动一次，用例之间通过「清空数据目录 + 重挂载渲染层」
- * 回到干净状态（`debug_reset_data` 通道，主进程侧见 electron/src/ipc-register.ts）。
+ * 现在进程在 worker 内启动一次，用例之间通过「清空数据 + 重挂载渲染层」
+ * 回到干净状态（`debug_reset_data` 通道：删登记的所有站点目录 + 重置 registry）。
+ *
+ * 站点目录模型：WORDMA_DATA_DIR 指向应用私有根（registry.json 所在），
+ * 站点数据在 worker 里固定的子目录 site-1（seedArticle 传给 create_site）。
  */
 
 type Session = {
   app: ElectronApplication;
   page: Page;
+  /** 应用私有根（WORDMA_DATA_DIR），registry.json 在这里 */
   dataDir: string;
+  /** 播种站点的数据目录（dataDir/site-1），launchDesktop({dataDir}) 显式路径时为 dataDir 本身 */
+  siteDir: string;
   /** 无 hash 的入口 URL（首屏加载完成后才可靠） */
   baseUrl: string;
 };
@@ -32,6 +38,11 @@ export function getSharedDataDir(): string {
     );
   }
   return sharedDataDir;
+}
+
+/** 站点数据目录：应用私有根下的 site-1（与应用私有文件隔离开） */
+export function siteDirFor(root: string): string {
+  return path.join(root, 'site-1');
 }
 
 /** 关闭当前进程（真正的 app.close()，与测试里那个空操作的 close 不同） */
@@ -59,7 +70,13 @@ export async function startSession(dataDir: string): Promise<Session> {
   // 首屏加载完成后 url 才稳定（早于 loadFile 时可能是 about:blank）
   const baseUrl = page.url().split('#')[0];
 
-  session = { app, page, dataDir, baseUrl };
+  session = {
+    app,
+    page,
+    dataDir,
+    siteDir: siteDirFor(dataDir),
+    baseUrl,
+  };
   return session;
 }
 
@@ -69,7 +86,7 @@ export async function ensureSession(dataDir: string): Promise<Session> {
   return startSession(dataDir);
 }
 
-/** 清空数据目录（主进程侧同步完成：停预览 → 关库 → 删目录 → 重建 → 提取内置主题） */
+/** 清空数据（主进程侧同步完成：停预览 → 关库 → 删所有站点目录 → 重置 registry） */
 export async function wipeState(): Promise<void> {
   if (!session) throw new Error('会话尚未启动');
   try {
@@ -78,7 +95,7 @@ export async function wipeState(): Promise<void> {
     );
   } catch (err) {
     throw new Error(
-      `重置数据目录失败（${err instanceof Error ? err.message : String(err)}）。` +
+      `重置数据失败（${err instanceof Error ? err.message : String(err)}）。` +
         '该通道由主进程提供，改过 electron/src 后请先 `pnpm build:main` 重新打包。'
     );
   }
@@ -118,7 +135,7 @@ function cleanupSync(): void {
     try {
       process.kill(pid, 'SIGKILL');
     } catch {
-      /* 已退出 */
+      /* 进程可能已退出 */
     }
   }
   if (sharedDataDir) {
@@ -127,13 +144,9 @@ function cleanupSync(): void {
     } catch {
       /* 目录可能已不存在 */
     }
+    sharedDataDir = null;
   }
+  process.off('exit', cleanupSync);
 }
 
-process.once('exit', cleanupSync);
-for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-  process.once(signal, () => {
-    cleanupSync();
-    process.exit(0);
-  });
-}
+process.on('exit', cleanupSync);

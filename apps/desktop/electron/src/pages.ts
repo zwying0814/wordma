@@ -1,4 +1,5 @@
 import { all, get, run, tx } from './db';
+import { getCurrentSiteId } from './site';
 
 export type SitePage = {
   id: number;
@@ -14,7 +15,6 @@ export type SitePage = {
 
 type PageRow = {
   id: number;
-  site_id: number;
   title: string;
   slug: string;
   content: string;
@@ -60,20 +60,19 @@ export function validateSlug(slug: string): void {
   }
 }
 
-function slugExists(siteId: number, slug: string, excludeId?: number): boolean {
+function slugExists(slug: string, excludeId?: number): boolean {
   const row = get<{ id: number }>(
-    'SELECT id FROM pages WHERE site_id = ? AND slug = ? AND id != ?',
-    siteId,
+    'SELECT id FROM pages WHERE slug = ? AND id != ?',
     slug,
     excludeId ?? 0
   );
   return row !== undefined;
 }
 
-function uniqueSlug(siteId: number): string {
+function uniqueSlug(): string {
   for (let attempt = 0; attempt < SLUG_RANDOM_ATTEMPTS; attempt += 1) {
     const slug = generateSlug();
-    if (!slugExists(siteId, slug)) return slug;
+    if (!slugExists(slug)) return slug;
   }
   throw new Error('无法生成唯一 slug，请重试');
 }
@@ -81,7 +80,7 @@ function uniqueSlug(siteId: number): string {
 function toPage(row: PageRow): SitePage {
   return {
     id: row.id,
-    siteId: row.site_id,
+    siteId: getCurrentSiteId(),
     title: row.title,
     slug: row.slug,
     content: row.content,
@@ -92,10 +91,9 @@ function toPage(row: PageRow): SitePage {
   };
 }
 
-export function listPages(siteId: number): SitePage[] {
+export function listPages(): SitePage[] {
   return all<PageRow>(
-    'SELECT * FROM pages WHERE site_id = ? ORDER BY sort_order, id',
-    siteId
+    'SELECT * FROM pages ORDER BY sort_order, id'
   ).map(toPage);
 }
 
@@ -106,29 +104,24 @@ export function getPage(id: number): SitePage {
 }
 
 export function createPage(payload: {
-  siteId: number;
   title?: string;
   slug?: string;
   content?: string;
   showInNav?: boolean;
   sortOrder?: number;
 }): SitePage {
-  const site = get<{ id: number }>('SELECT id FROM sites WHERE id = ?', payload.siteId);
-  if (!site) throw new Error('站点不存在');
-
   const title = payload.title ?? '未命名页面';
   validateTitle(title);
 
   return tx(() => {
     const slug = payload.slug
-      ? (validateSlug(payload.slug), slugExists(payload.siteId, payload.slug) ? (() => {
+      ? (validateSlug(payload.slug), slugExists(payload.slug) ? (() => {
           throw new Error(`slug '${payload.slug}' 已被本站点其他页面使用`);
         })() : payload.slug)
-      : uniqueSlug(payload.siteId);
+      : uniqueSlug();
 
     const { lastInsertRowid } = run(
-      'INSERT INTO pages (site_id, title, slug, content, show_in_nav, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
-      payload.siteId,
+      'INSERT INTO pages (title, slug, content, show_in_nav, sort_order) VALUES (?, ?, ?, ?, ?)',
       title,
       slug,
       payload.content ?? '',
@@ -157,7 +150,7 @@ export function updatePage(payload: {
     }
     if (payload.slug !== undefined) {
       validateSlug(payload.slug);
-      if (slugExists(existing.site_id, payload.slug, payload.id)) {
+      if (slugExists(payload.slug, payload.id)) {
         throw new Error(`slug '${payload.slug}' 已被本站点其他页面使用`);
       }
       run('UPDATE pages SET slug = ? WHERE id = ?', payload.slug, payload.id);

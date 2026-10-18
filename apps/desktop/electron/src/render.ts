@@ -4,10 +4,10 @@ import path from 'node:path';
 
 import { listArticles } from './article';
 import { getDataDir } from './db';
-import { getSite, type Site } from './site';
+import { generatePath, getRoutingRules } from './routing';
+import { getCurrentSiteId, getSite, type Site } from './site';
 import { listPages } from './pages';
 import { listCategories, listTags } from './taxonomy';
-import { generatePath, getRoutingRulesFor } from './routing';
 import { getPreviewPort } from './preview';
 import { getActiveThemeName, resolveThemeSettings, themesDir } from './theme';
 import {
@@ -114,11 +114,11 @@ export async function renderSiteTo(options: {
   const { site, siteId, outputDir, includeDrafts, baseUrl } = options;
   const basePath = basePathOf(baseUrl);
 
-  const rules = getRoutingRulesFor(siteId);
-  const articles = listArticles(siteId);
-  const pages = listPages(siteId);
-  const tags = listTags(siteId);
-  const categories = listCategories(siteId);
+  const rules = getRoutingRules(getCurrentSiteId());
+  const articles = listArticles();
+  const pages = listPages();
+  const tags = listTags();
+  const categories = listCategories();
 
   // 0) 激活主题（模板与 assets 优先于内置布局）
   const themeName = getActiveThemeName(siteId);
@@ -429,7 +429,8 @@ export async function renderSiteTo(options: {
   }
   files.push('assets/');
 
-  const mediaSrc = path.join(getDataDir(), 'media', String(siteId));
+  // 站点目录模型：media/ 直接挂在站点目录下（wordma-media:// URL 里的 siteId 只是兼容形式）
+  const mediaSrc = path.join(getDataDir(), 'media');
   if (existsSync(mediaSrc)) {
     cpSync(mediaSrc, path.join(outputDir, 'media'), { recursive: true });
     files.push('media/');
@@ -445,7 +446,7 @@ export async function renderSitePreview(siteId: number): Promise<RenderReport> {
   return renderSiteTo({
     site,
     siteId,
-    outputDir: path.join(getDataDir(), 'preview', String(siteId)),
+    outputDir: path.join(getDataDir(), 'preview'),
     includeDrafts: true,
     baseUrl: `http://127.0.0.1:${port}/`,
   });

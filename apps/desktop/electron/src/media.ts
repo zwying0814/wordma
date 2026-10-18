@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } 
 import path from 'node:path';
 
 import { all, get, getDataDir, run } from './db';
+import { getCurrentSiteId } from './site';
 
 export type MediaItem = {
   id: number;
@@ -17,7 +18,6 @@ export type MediaItem = {
 
 type MediaRow = {
   id: number;
-  site_id: number;
   filename: string;
   original_name: string;
   mime_type: string;
@@ -49,14 +49,15 @@ function extFromName(name: string): string | null {
   return match ? match[1].toLowerCase() : null;
 }
 
-function mediaDirFor(siteId: number): string {
-  return path.join(getDataDir(), 'media', String(siteId));
+/** 站点目录下的扁平媒体目录（站点目录模型不再按 siteId 分层） */
+function mediaDirFor(): string {
+  return path.join(getDataDir(), 'media');
 }
 
 function toMediaItem(row: MediaRow): MediaItem {
   return {
     id: row.id,
-    siteId: row.site_id,
+    siteId: getCurrentSiteId(),
     filename: row.filename,
     originalName: row.original_name,
     mimeType: row.mime_type,
@@ -73,7 +74,6 @@ function toMediaItems(rows: MediaRow[]): MediaItem[] {
 
 /** 写入文件 + DB 登记；DB 失败时回滚删除文件 */
 function persistMedia(
-  siteId: number,
   srcAbsPath: string | null,
   bytes: Buffer | null,
   ext: string,
@@ -82,7 +82,7 @@ function persistMedia(
   originalName: string,
   size: number
 ): MediaItem {
-  const dir = mediaDirFor(siteId);
+  const dir = mediaDirFor();
   mkdirSync(dir, { recursive: true });
 
   const nanos = process.hrtime.bigint() & 0xffffffffn;
@@ -99,8 +99,7 @@ function persistMedia(
     }
 
     const { lastInsertRowid } = run(
-      'INSERT INTO media (site_id, filename, original_name, mime_type, kind, size, path) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      siteId,
+      'INSERT INTO media (filename, original_name, mime_type, kind, size, path) VALUES (?, ?, ?, ?, ?, ?)',
       filename,
       originalName,
       mimeType,
@@ -122,7 +121,6 @@ function persistMedia(
 
 /** 路径上传通道：Electron 渲染层经 webUtils 拿到真实文件路径后复制 */
 export function uploadMediaFromPath(payload: {
-  siteId: number;
   filePath: string;
   originalName?: string;
 }): MediaItem {
@@ -145,7 +143,6 @@ export function uploadMediaFromPath(payload: {
   const originalName = payload.originalName ?? path.basename(payload.filePath);
 
   return persistMedia(
-    payload.siteId,
     payload.filePath,
     null,
     ext,
@@ -158,7 +155,6 @@ export function uploadMediaFromPath(payload: {
 
 /** base64 兜底通道（剪贴板粘贴等无路径场景），上限 25MB */
 export function uploadMediaData(payload: {
-  siteId: number;
   base64: string;
   originalName: string;
 }): MediaItem {
@@ -176,7 +172,6 @@ export function uploadMediaData(payload: {
   const kind = IMAGE_EXTS.has(ext) ? 'image' : 'video';
 
   return persistMedia(
-    payload.siteId,
     null,
     bytes,
     ext,
@@ -187,9 +182,9 @@ export function uploadMediaData(payload: {
   );
 }
 
-export function listMedia(siteId: number): MediaItem[] {
+export function listMedia(): MediaItem[] {
   return toMediaItems(
-    all<MediaRow>('SELECT * FROM media WHERE site_id = ? ORDER BY created_at DESC, id DESC', siteId)
+    all<MediaRow>('SELECT * FROM media ORDER BY created_at DESC, id DESC')
   );
 }
 
@@ -205,8 +200,10 @@ export function deleteMedia(id: number): void {
   if (!row) throw new Error('媒体不存在');
 
   run('DELETE FROM media WHERE id = ?', id);
+  // path 列是上传时的绝对路径快照，站点可搬动 —— 删除一律按 filename 现算
+  const currentPath = path.join(mediaDirFor(), row.filename);
   try {
-    if (existsSync(row.path)) rmSync(row.path);
+    if (existsSync(currentPath)) rmSync(currentPath);
   } catch (err) {
     console.error('删除媒体文件失败:', err);
   }

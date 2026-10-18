@@ -8,23 +8,26 @@ import { runMigrations } from './migrations';
 let db: DatabaseSync | null = null;
 let dataDir: string | null = null;
 
-/** 当前数据目录（media/preview 等磁盘布局的根） */
+/**
+ * 单站点库：当前打开的库对应的站点目录。
+ * media/themes/preview/publish 等磁盘布局都挂在这个目录下（一一站点一目录）。
+ */
 export function getDataDir(): string {
-  if (!dataDir) throw new Error('数据目录尚未初始化');
+  if (!dataDir) throw new Error('站点库尚未打开');
   return dataDir;
 }
 
-/** 初始化数据目录与数据库连接（主进程启动时调用一次） */
-export function initDataDir(dir: string): void {
-  mkdirSync(dir, { recursive: true });
-  dataDir = dir;
-  db = new DatabaseSync(path.join(dir, 'wordma.db'));
+/** 为站点目录打开 wordma.db（目录不存在则创建）并跑建表迁移 */
+export function openSiteDb(siteDir: string): void {
+  mkdirSync(siteDir, { recursive: true });
+  dataDir = siteDir;
+  db = new DatabaseSync(path.join(siteDir, 'wordma.db'));
   db.exec('PRAGMA foreign_keys = ON');
   runMigrations(db);
 }
 
 export function getDb(): DatabaseSync {
-  if (!db) throw new Error('数据库尚未初始化');
+  if (!db) throw new Error('站点库尚未打开');
   return db;
 }
 

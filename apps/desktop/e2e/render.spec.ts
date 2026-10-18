@@ -9,6 +9,7 @@ import { launchDesktop } from './launch';
 let app: ElectronApplication;
 let page: Page;
 let dataDir: string;
+let siteDir: string;
 
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -18,6 +19,7 @@ test.beforeEach(async () => {
   app = launched.app;
   page = launched.page;
   dataDir = launched.dataDir;
+  siteDir = launched.seeded?.siteDir ?? path.join(launched.dataDir, 'site-1');
 });
 
 test.afterEach(async () => {
@@ -115,11 +117,7 @@ test('T15: 渲染全套输出物（首页/文章/页面/分类/标签/归档/RSS
   };
   expect(report.files).toBeGreaterThan(8);
 
-  const dist = path.join(
-    dataDir,
-    'preview',
-    String(seeded.siteId)
-  );
+  const dist = path.join(siteDir, 'preview');
 
   // 首页：2 篇发布，草稿不在列表
   const indexHtml = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
@@ -261,7 +259,7 @@ test('T15: 导航里的分类/标签链接指向总览页（不是 [slug] 路由
   const seeded = await seedRenderData();
   await invokeRender();
 
-  const dist = path.join(dataDir, 'preview', String(seeded.siteId));
+  const dist = path.join(siteDir, 'preview');
   const indexHtml = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
 
   // 链接不能是详情页的路由模板字面量

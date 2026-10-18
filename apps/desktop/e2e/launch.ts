@@ -4,6 +4,7 @@ import {
   ensureSession,
   getSharedDataDir,
   remount,
+  siteDirFor,
   startSession,
   wipeState,
 } from './session';
@@ -38,7 +39,7 @@ export type LaunchOptions = {
   articleContent?: string;
 };
 
-type Seeded = { siteId: number; articleId: number };
+type Seeded = { siteId: number; articleId: number; siteDir: string };
 
 /** `app.close()` 在本套件里是空操作：进程由 session 统一管理（见文件头说明） */
 function withSharedLifecycle(app: ElectronApplication): ElectronApplication {
@@ -69,10 +70,12 @@ export async function launchDesktop(
     articleContent = DEMO_ARTICLE_HTML,
   } = options;
 
-  // 显式目录：真重启（保留持久化用例的重启语义）
+  // 显式目录：真重启（保留持久化用例的重启语义）。dataDir 是应用私有根，站点固定建在 site-1
   if (explicitDataDir) {
     const session = await startSession(explicitDataDir);
-    const seeded = seed ? await seedArticle(session.page, articleContent) : null;
+    const seeded = seed
+      ? await seedArticle(session.page, articleContent, session.siteDir)
+      : null;
     if (seeded) await openEditor(session.page, seeded.articleId);
     return {
       app: withSharedLifecycle(session.app),
@@ -91,7 +94,9 @@ export async function launchDesktop(
     window.history.replaceState(null, '', window.location.pathname)
   );
   await wipeState();
-  const seeded = seed ? await seedArticle(session.page, articleContent) : null;
+  const seeded = seed
+    ? await seedArticle(session.page, articleContent, session.siteDir)
+    : null;
   await remount();
 
   if (seeded) await openEditor(session.page, seeded.articleId);
@@ -104,16 +109,24 @@ export async function launchDesktop(
   };
 }
 
-/** 播种：确保站点存在并激活，确保有一篇文章 */async function seedArticle(
+/**
+ * 播种：确保站点存在并激活，确保有一篇文章。
+ * 站点目录模型：站点建立在应用私有根下的 site-1（目录路径在 Node 侧算好传入）。
+ */
+async function seedArticle(
   page: Page,
-  articleContent: string
+  articleContent: string,
+  siteDir: string
 ): Promise<Seeded> {
-  return (await page.evaluate(async (content: string) => {
+  return (await page.evaluate(async ([content, dir]: [string, string]) => {
     const api = (window as any).api;
     const active = await api.invoke('get_active_site');
     let siteId = active?.id;
     if (!siteId) {
-      const site = await api.invoke('create_site', { name: '测试站点' });
+      const site = await api.invoke('create_site', {
+        name: '测试站点',
+        dir,
+      });
       siteId = site.id;
       await api.invoke('set_active_site', { id: siteId });
     }
@@ -127,8 +140,8 @@ export async function launchDesktop(
       });
       articleId = article.id;
     }
-    return { siteId: Number(siteId), articleId: Number(articleId) };
-  }, articleContent)) as Seeded;
+    return { siteId: Number(siteId), articleId: Number(articleId), siteDir: dir };
+  }, [articleContent, siteDir])) as Seeded;
 }
 
 async function openEditor(page: Page, articleId: number): Promise<void> {

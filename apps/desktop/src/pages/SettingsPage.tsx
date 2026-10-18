@@ -4,7 +4,7 @@ import { DeploySection } from '@/components/settings-deploy-section';
 import { RoutingSection } from '@/components/settings-routing-section';
 import { ThemeSection } from '@/components/settings-theme-section';
 import { useSite } from '@/context/SiteContext';
-import { updateSite } from '@/lib/site';
+import { createSite, selectDirectory, updateSite } from '@/lib/site';
 import type { Site } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ export function SettingsPage() {
   const [portSaved, setPortSaved] = React.useState(false);
 
   const [newSiteName, setNewSiteName] = React.useState('');
+  const [newSiteDir, setNewSiteDir] = React.useState('');
   const [newSiteError, setNewSiteError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -76,13 +77,24 @@ export function SettingsPage() {
   const handleCreateSite = async () => {
     setNewSiteError(null);
     try {
-      const site = (await window.api.invoke('create_site', {
+      const site = (await createSite({
         name: newSiteName.trim(),
+        dir: newSiteDir.trim(),
       })) as Site;
       await setActiveSite(site.id);
+      await reload();
       setNewSiteName('');
+      setNewSiteDir('');
     } catch (err) {
       setNewSiteError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleChooseNewSiteDir = async () => {
+    const picked = await selectDirectory();
+    if (picked) {
+      setNewSiteDir(picked);
+      setNewSiteError(null);
     }
   };
 
@@ -142,9 +154,28 @@ export function SettingsPage() {
             placeholder="新站点名称"
             value={newSiteName}
           />
+        </div>
+        <div className="flex max-w-sm items-center gap-2">
+          <Input
+            className="h-9 flex-1 font-mono text-xs"
+            data-testid="new-site-dir"
+            readOnly
+            placeholder="数据目录（文章、媒体、主题都会放进这里）"
+            value={newSiteDir}
+          />
+          <Button
+            className="shrink-0"
+            data-testid="new-site-choose-dir"
+            size="sm"
+            onClick={() => void handleChooseNewSiteDir()}
+          >
+            选择…
+          </Button>
+        </div>
+        <div>
           <Button
             data-testid="new-site-create"
-            disabled={!newSiteName.trim()}
+            disabled={!newSiteName.trim() || !newSiteDir.trim()}
             onClick={() => void handleCreateSite()}
           >
             创建并切换

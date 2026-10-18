@@ -4,10 +4,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
 
-import { closeDb, getDataDir, initDataDir } from './db';
+import { closeDb, getDataDir, openSiteDb } from './db';
 import { MIME_BY_EXT } from './media';
 import { registerAllIpc } from './ipc-register';
 import { ensureBuiltinThemes } from './theme';
+import { getActiveSite, setRegistryRoot } from './site';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,12 +28,20 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-/** 数据目录：WORDMA_DATA_DIR 覆盖（E2E/CI 隔离用），默认 userData/wordma */
-function resolveDataDir(): string {
+/** 应用私有根（registry.json 所在）：WORDMA_DATA_DIR 覆盖（E2E/CI 隔离用），默认 userData */
+function resolveAppRoot(): string {
   return (
     process.env.WORDMA_DATA_DIR ||
-    path.join(app.getPath('userData'), 'wordma')
+    app.getPath('userData')
   );
+}
+
+/** 激活站点存在则打开其库（含建表迁移）+ 提取内置主题；无站点则保持 Welcome 状态 */
+function ensureActiveSiteDb(): void {
+  const site = getActiveSite();
+  if (!site) return;
+  openSiteDb(site.dir);
+  ensureBuiltinThemes();
 }
 
 function createWindow(): void {
@@ -89,14 +98,15 @@ function loadWindow(win: BrowserWindow): void {
 
 app.whenReady().then(() => {
   try {
-    initDataDir(resolveDataDir());
-    ensureBuiltinThemes();
+    // 站点目录模型：启动只读 registry；有激活站点才打开其目录下的库
+    setRegistryRoot(resolveAppRoot());
+    ensureActiveSiteDb();
     registerAllIpc();
     registerMediaProtocol();
   } catch (err) {
     dialog.showErrorBox(
       '初始化失败',
-      `数据库初始化失败：\n${err instanceof Error ? err.message : String(err)}`
+      `数据初始化失败：\n${err instanceof Error ? err.message : String(err)}`
     );
     app.quit();
     return;
@@ -145,20 +155,21 @@ function handleMediaRequest(request: Request): Response {
     const url = new URL(request.url);
     // URL 形如 wordma-media://media/{siteId}/{filename}
     // （host 必须是字母段：纯数字段会被 Chromium 当 IPv4 解析毁掉）
+    // 站点目录下的扁平媒体目录；URL 形如 wordma-media://media/{siteId}/{filename}，
+    // siteId 段仅为兼容内容里已存的引用形式，落盘忽略它
+    // （host 必须是字母段：纯数字 host 会被 Chromium 当 IPv4 解析毁掉，所以 siteId 走 pathname）
     const parts = url.pathname.split('/').filter(Boolean);
-    const siteId = parts[0] ?? '';
     const filename = parts[1] ?? '';
 
     // 防路径穿越：文件名形如 {millis}-{nanos}.{ext}，禁止 .. 与子目录
     if (
-      !siteId ||
       !/^[0-9a-f]+-[0-9a-f]+\.[a-z0-9]+$/i.test(filename) ||
       filename.includes('..')
     ) {
       return new Response('Bad Request', { status: 400 });
     }
 
-    const filePath = path.join(getDataDir(), 'media', siteId, filename);
+    const filePath = path.join(getDataDir(), 'media', filename);
     if (!filePath.startsWith(path.join(getDataDir(), 'media'))) {
       return new Response('Bad Request', { status: 400 });
     }

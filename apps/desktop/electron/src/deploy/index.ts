@@ -63,9 +63,9 @@ export function setDeployConfig(
   return next;
 }
 
-/** 发布构建产物目录（与预览目录分离） */
-export function publishDir(siteId: number): string {
-  return path.join(getDataDir(), 'dist-publish', String(siteId));
+/** 发布构建产物目录（站点目录下的 publish/，与预览目录分离） */
+export function publishDir(): string {
+  return path.join(getDataDir(), 'publish');
 }
 
 /**
@@ -87,7 +87,7 @@ export async function deploySite(
   }
 
   const site = getSite(siteId);
-  const outputDir = publishDir(siteId);
+  const outputDir = publishDir();
 
   onProgress?.({ stage: 'render', message: '渲染发布产物（不含草稿）' });
   const report = await renderSiteTo({

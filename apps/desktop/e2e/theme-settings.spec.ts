@@ -8,12 +8,14 @@ import { launchDesktop } from './launch';
 let app: ElectronApplication;
 let page: Page;
 let dataDir: string;
+let siteDir: string;
 
 test.beforeEach(async () => {
   const launched = await launchDesktop({ seed: true });
   app = launched.app;
   page = launched.page;
   dataDir = launched.dataDir;
+  siteDir = launched.seeded?.siteDir ?? path.join(launched.dataDir, 'site-1');
 
   await page.evaluate(() => {
     window.location.hash = '#/settings';
@@ -27,7 +29,7 @@ test.afterEach(async () => {
 
 /** 造一个带 text/number/switch/select 设置项的自制主题并启用 */
 async function seedTheme(name: string, displayName: string) {
-  const themeDir = path.join(dataDir, 'themes', name);
+  const themeDir = path.join(siteDir, 'themes', name);
   fs.mkdirSync(path.join(themeDir, 'templates'), { recursive: true });
   fs.mkdirSync(path.join(themeDir, 'assets'), { recursive: true });
   fs.writeFileSync(

@@ -1,7 +1,13 @@
 import { all, get, run, tx } from './db';
+import { getCurrentSiteId } from './site';
 
 export type ArticleRef = { id: number; name: string };
 
+/**
+ * Article.siteId 是「应用登记表中站点 id」（协议 URL wordma-media://{siteId}/ 里也用它）。
+ * 单站点库不再有 site_id 列：库内记录一律以当前打开的库为准，
+ * siteId 只在返回给渲染层时来自登记表（getCurrentSiteId）。
+ */
 export type Article = {
   id: number;
   siteId: number;
@@ -17,7 +23,6 @@ export type Article = {
 
 type ArticleRow = {
   id: number;
-  site_id: number;
   slug: string;
   title: string;
   content: string;
@@ -54,10 +59,9 @@ function generateSlug(): string {
   return out;
 }
 
-function slugExists(siteId: number, slug: string, excludeId?: number): boolean {
+function slugExists(slug: string, excludeId?: number): boolean {
   const row = get<{ id: number }>(
-    'SELECT id FROM articles WHERE site_id = ? AND slug = ? AND id != ?',
-    siteId,
+    'SELECT id FROM articles WHERE slug = ? AND id != ?',
     slug,
     excludeId ?? 0
   );
@@ -65,10 +69,10 @@ function slugExists(siteId: number, slug: string, excludeId?: number): boolean {
 }
 
 /** 生成随机 slug，撞库重试 ≤5 次（对齐 Rust 版） */
-function uniqueSlug(siteId: number): string {
+function uniqueSlug(): string {
   for (let attempt = 0; attempt < SLUG_RANDOM_ATTEMPTS; attempt += 1) {
     const slug = generateSlug();
-    if (!slugExists(siteId, slug)) return slug;
+    if (!slugExists(slug)) return slug;
   }
   throw new Error('无法生成唯一 slug，请重试');
 }
@@ -90,7 +94,7 @@ function loadTags(articleId: number): ArticleRef[] {
 function toArticle(row: ArticleRow): Article {
   return {
     id: row.id,
-    siteId: row.site_id,
+    siteId: getCurrentSiteId(),
     slug: row.slug,
     title: row.title,
     content: row.content,
@@ -102,10 +106,9 @@ function toArticle(row: ArticleRow): Article {
   };
 }
 
-export function listArticles(siteId: number): Article[] {
+export function listArticles(): Article[] {
   return all<ArticleRow>(
-    'SELECT * FROM articles WHERE site_id = ? ORDER BY updated_at DESC, id DESC',
-    siteId
+    'SELECT * FROM articles ORDER BY updated_at DESC, id DESC'
   ).map(toArticle);
 }
 
@@ -126,7 +129,6 @@ function assertStatus(status: string): void {
  * categoryIds/tagIds 提供时建立关联。
  */
 export function createArticle(payload: {
-  siteId: number;
   title?: string;
   content?: string;
   status?: 'draft' | 'published';
@@ -134,9 +136,6 @@ export function createArticle(payload: {
   categoryIds?: number[];
   tagIds?: number[];
 }): Article {
-  const site = get<{ id: number }>('SELECT id FROM sites WHERE id = ?', payload.siteId);
-  if (!site) throw new Error('站点不存在');
-
   const title = payload.title ?? '未命名文章';
   const content = payload.content ?? '';
   const status = payload.status ?? 'draft';
@@ -144,14 +143,13 @@ export function createArticle(payload: {
 
   return tx(() => {
     const slug = payload.slug
-      ? (validateSlug(payload.slug), slugExists(payload.siteId, payload.slug) ? (() => {
+      ? (validateSlug(payload.slug), slugExists(payload.slug) ? (() => {
           throw new Error(`slug '${payload.slug}' 已被本站点其他文章使用`);
         })() : payload.slug)
-      : uniqueSlug(payload.siteId);
+      : uniqueSlug();
 
     const { lastInsertRowid } = run(
-      'INSERT INTO articles (site_id, slug, title, content, status) VALUES (?, ?, ?, ?, ?)',
-      payload.siteId,
+      'INSERT INTO articles (slug, title, content, status) VALUES (?, ?, ?, ?)',
       slug,
       title,
       content,
@@ -160,10 +158,10 @@ export function createArticle(payload: {
     const articleId = lastInsertRowid;
 
     if (payload.categoryIds) {
-      syncCategories(articleId, payload.siteId, payload.categoryIds);
+      syncCategories(articleId, payload.categoryIds);
     }
     if (payload.tagIds) {
-      syncTags(articleId, payload.siteId, payload.tagIds);
+      syncTags(articleId, payload.tagIds);
     }
 
     return getArticle(articleId);
@@ -186,7 +184,7 @@ export function updateArticle(payload: {
   return tx(() => {
     if (payload.slug !== undefined) {
       validateSlug(payload.slug);
-      if (slugExists(existing.site_id, payload.slug, payload.id)) {
+      if (slugExists(payload.slug, payload.id)) {
         throw new Error(`slug '${payload.slug}' 已被本站点其他文章使用`);
       }
       run('UPDATE articles SET slug = ? WHERE id = ?', payload.slug, payload.id);
@@ -207,10 +205,10 @@ export function updateArticle(payload: {
     );
 
     if (payload.categoryIds) {
-      syncCategories(payload.id, existing.site_id, payload.categoryIds);
+      syncCategories(payload.id, payload.categoryIds);
     }
     if (payload.tagIds) {
-      syncTags(payload.id, existing.site_id, payload.tagIds);
+      syncTags(payload.id, payload.tagIds);
     }
 
     return getArticle(payload.id);
@@ -222,15 +220,15 @@ export function deleteArticle(id: number): void {
   if (result.changes === 0) throw new Error('文章不存在');
 }
 
-function syncCategories(articleId: number, siteId: number, categoryIds: number[]): void {
+/** 归属校验退化为存在性校验：单站点库里的 category/tag 天然属于当前站点 */
+function syncCategories(articleId: number, categoryIds: number[]): void {
   run('DELETE FROM article_categories WHERE article_id = ?', articleId);
   for (const categoryId of categoryIds) {
     const category = get<{ id: number }>(
-      'SELECT id FROM categories WHERE id = ? AND site_id = ?',
-      categoryId,
-      siteId
+      'SELECT id FROM categories WHERE id = ?',
+      categoryId
     );
-    if (!category) throw new Error(`分类 ${categoryId} 不存在或不属于当前站点`);
+    if (!category) throw new Error(`分类 ${categoryId} 不存在`);
     run(
       'INSERT INTO article_categories (article_id, category_id) VALUES (?, ?)',
       articleId,
@@ -239,15 +237,11 @@ function syncCategories(articleId: number, siteId: number, categoryIds: number[]
   }
 }
 
-function syncTags(articleId: number, siteId: number, tagIds: number[]): void {
+function syncTags(articleId: number, tagIds: number[]): void {
   run('DELETE FROM article_tags WHERE article_id = ?', articleId);
   for (const tagId of tagIds) {
-    const tag = get<{ id: number }>(
-      'SELECT id FROM tags WHERE id = ? AND site_id = ?',
-      tagId,
-      siteId
-    );
-    if (!tag) throw new Error(`标签 ${tagId} 不存在或不属于当前站点`);
+    const tag = get<{ id: number }>('SELECT id FROM tags WHERE id = ?', tagId);
+    if (!tag) throw new Error(`标签 ${tagId} 不存在`);
     run('INSERT INTO article_tags (article_id, tag_id) VALUES (?, ?)', articleId, tagId);
   }
 }

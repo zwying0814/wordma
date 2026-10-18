@@ -1,5 +1,10 @@
 import { all, get, run } from './db';
+import { getCurrentSiteId } from './site';
 
+/**
+ * 单站点库：tags/categories 天然属于当前站点，不再有 site_id 列。
+ * Tag/Category.siteId 仅在返回给渲染层时来自登记表（getCurrentSiteId）。
+ */
 export type Tag = {
   id: number;
   siteId: number;
@@ -12,7 +17,6 @@ export type Category = Tag;
 
 type TaxonomyRow = {
   id: number;
-  site_id: number;
   name: string;
   created_at: string;
   article_count: number;
@@ -29,31 +33,24 @@ function validateName(name: string, kind: '标签' | '分类'): void {
   }
 }
 
-function assertSiteExists(siteId: number): void {
-  const site = get<{ id: number }>('SELECT id FROM sites WHERE id = ?', siteId);
-  if (!site) throw new Error('站点不存在');
-}
-
-export function listTags(siteId: number): Tag[] {
+export function listTags(): Tag[] {
   return all<TaxonomyRow>(
     `SELECT t.*, (SELECT COUNT(*) FROM article_tags at2 WHERE at2.tag_id = t.id) AS article_count
-     FROM tags t WHERE t.site_id = ? ORDER BY t.created_at, t.id`,
-    siteId
+     FROM tags t ORDER BY t.created_at, t.id`
   ).map(toTaxonomy);
 }
 
-export function listCategories(siteId: number): Category[] {
+export function listCategories(): Category[] {
   return all<TaxonomyRow>(
     `SELECT c.*, (SELECT COUNT(*) FROM article_categories ac WHERE ac.category_id = c.id) AS article_count
-     FROM categories c WHERE c.site_id = ? ORDER BY c.created_at, c.id`,
-    siteId
+     FROM categories c ORDER BY c.created_at, c.id`
   ).map(toTaxonomy);
 }
 
 function toTaxonomy(row: TaxonomyRow): Tag {
   return {
     id: row.id,
-    siteId: row.site_id,
+    siteId: getCurrentSiteId(),
     name: row.name,
     createdAt: row.created_at,
     articleCount: row.article_count,
@@ -61,40 +58,34 @@ function toTaxonomy(row: TaxonomyRow): Tag {
 }
 
 /** 创建标签。重名时复用已有行（对齐 Rust 版语义）。 */
-export function createTag(payload: { siteId: number; name: string }): Tag {
+export function createTag(payload: { name: string }): Tag {
   validateName(payload.name, '标签');
-  assertSiteExists(payload.siteId);
 
   const existing = get<TaxonomyRow>(
-    'SELECT * FROM tags WHERE site_id = ? AND name = ?',
-    payload.siteId,
+    'SELECT * FROM tags WHERE name = ?',
     payload.name
   );
   if (existing) return toTaxonomy(existing);
 
   const { lastInsertRowid } = run(
-    'INSERT INTO tags (site_id, name) VALUES (?, ?)',
-    payload.siteId,
+    'INSERT INTO tags (name) VALUES (?)',
     payload.name
   );
   return getTag(lastInsertRowid);
 }
 
 /** 创建分类。重名时复用已有行。 */
-export function createCategory(payload: { siteId: number; name: string }): Category {
+export function createCategory(payload: { name: string }): Category {
   validateName(payload.name, '分类');
-  assertSiteExists(payload.siteId);
 
   const existing = get<TaxonomyRow>(
-    'SELECT * FROM categories WHERE site_id = ? AND name = ?',
-    payload.siteId,
+    'SELECT * FROM categories WHERE name = ?',
     payload.name
   );
   if (existing) return toTaxonomy(existing);
 
   const { lastInsertRowid } = run(
-    'INSERT INTO categories (site_id, name) VALUES (?, ?)',
-    payload.siteId,
+    'INSERT INTO categories (name) VALUES (?)',
     payload.name
   );
   return getCategory(lastInsertRowid);
@@ -106,8 +97,7 @@ export function renameTag(payload: { id: number; name: string }): Tag {
   if (!existing) throw new Error('标签不存在');
 
   const conflict = get<TaxonomyRow>(
-    'SELECT * FROM tags WHERE site_id = ? AND name = ? AND id != ?',
-    existing.site_id,
+    'SELECT * FROM tags WHERE name = ? AND id != ?',
     payload.name,
     payload.id
   );
@@ -123,8 +113,7 @@ export function renameCategory(payload: { id: number; name: string }): Category 
   if (!existing) throw new Error('分类不存在');
 
   const conflict = get<TaxonomyRow>(
-    'SELECT * FROM categories WHERE site_id = ? AND name = ? AND id != ?',
-    existing.site_id,
+    'SELECT * FROM categories WHERE name = ? AND id != ?',
     payload.name,
     payload.id
   );

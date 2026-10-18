@@ -4,6 +4,8 @@ export type Site = {
   id: number;
   name: string;
   description: string | null;
+  /** 站点数据根目录（wordma.db / media / themes 都在这里） */
+  dir: string;
   createdAt: string;
 };
 
