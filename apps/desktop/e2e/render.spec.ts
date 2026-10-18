@@ -211,3 +211,48 @@ test('T15: slug 与页面路由冲突 → 渲染失败并报路径冲突', async
 });
 
 
+
+// 公式样式按需引入：正文用到公式才把 KaTeX 的 CSS 与字体拷进产物
+
+const renderWithContent = async (content: string) => {
+  await page.evaluate(async (html: string) => {
+    const api = (window as any).api;
+    const active = await api.invoke('get_active_site');
+    const articles = await api.invoke('list_articles', { siteId: active.id });
+    await api.invoke('update_article', {
+      id: articles[0].id,
+      status: 'published',
+      content: html,
+    });
+  }, content);
+
+  return (await page.evaluate(async () => {
+    const api = (window as any).api;
+    const active = await api.invoke('get_active_site');
+    return api.invoke('render_site', { siteId: active.id });
+  })) as { outputDir: string };
+};
+
+test('T15: 正文不含公式时不引入 KaTeX 样式', async () => {
+  const report = await renderWithContent('<p>普通正文</p>');
+
+  expect(fs.existsSync(path.join(report.outputDir, 'assets', 'katex'))).toBe(false);
+  const indexHtml = fs.readFileSync(path.join(report.outputDir, 'index.html'), 'utf8');
+  expect(indexHtml).not.toContain('katex.min.css');
+});
+
+test('T15: 正文含公式时引入 KaTeX 样式与字体', async () => {
+  const report = await renderWithContent(
+    '<div class="slate-equation my-1"><span class="katex">E = mc^2</span></div>'
+  );
+
+  const cssPath = path.join(report.outputDir, 'assets', 'katex', 'katex.min.css');
+  expect(fs.existsSync(cssPath)).toBe(true);
+  // 字体按 katex/dist 的相对布局一起拷（CSS 里用 url(fonts/...) 引用）
+  const fontsDir = path.join(report.outputDir, 'assets', 'katex', 'fonts');
+  expect(fs.existsSync(fontsDir)).toBe(true);
+  expect(fs.readdirSync(fontsDir).some((f) => f.endsWith('.woff2'))).toBe(true);
+
+  const indexHtml = fs.readFileSync(path.join(report.outputDir, 'index.html'), 'utf8');
+  expect(indexHtml).toContain('katex/katex.min.css');
+});

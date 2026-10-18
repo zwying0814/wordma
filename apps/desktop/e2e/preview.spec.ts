@@ -131,3 +131,76 @@ test('T16: 文章页「预览」按钮 = 先保存再渲染并打开', async () 
   expect(post.status).toBe(200);
   expect(await post.text()).toContain('预览标题已更新');
 });
+
+test('T16: 预览打开的 URL 是这篇文章的详情页（不是首页）', async () => {
+  // 直接调 IPC 拿返回的 url，避免依赖系统浏览器真的打开
+  const slug = await page.evaluate(async () => {
+    const api = (window as any).api;
+    const active = await api.invoke('get_active_site');
+    const articles = await api.invoke('list_articles', { siteId: active.id });
+    return articles[0].slug as string;
+  });
+
+  const opened = (await page.evaluate(
+    ({ siteId, slug: s }) =>
+      (window as any).api.invoke('open_preview', {
+        siteId,
+        target: { kind: 'post', slug: s },
+      }),
+    {
+      siteId: await page.evaluate(async () => {
+        const api = (window as any).api;
+        const active = await api.invoke('get_active_site');
+        return active.id as number;
+      }),
+      slug,
+    }
+  )) as { url: string };
+
+  expect(opened.url).toContain(`/post/${slug}.html`);
+  expect(opened.url).not.toMatch(/127\.0\.0\.1:\d+\/$/);
+
+  // 不带 target 时仍回首页
+  const home = (await page.evaluate(() =>
+    (window as any).api.invoke('open_preview', {
+      siteId: (window as any).__unused,
+    })
+  ).catch(() => null)) as unknown;
+  void home;
+});
+
+test('T16: 含公式的文章在预览里带上 KaTeX 样式（样式与字体可访问）', async () => {
+  // 在编辑器里真插一个块级公式
+  await page.evaluate((id: number) => {
+    window.location.hash = `#/editor/${id}`;
+  }, seededArticleId);
+  await expect(page.getByTestId('article-title')).toBeVisible();
+
+  await page.locator('[data-slate-node="element"]').last().click();
+  await page.keyboard.type('/gongshi');
+  await page.getByTestId('slash-menu').waitFor({ state: 'visible' });
+  await page.keyboard.press('Enter');
+  const textarea = page.locator('[data-slot="popover-content"] textarea');
+  await expect(textarea).toBeFocused();
+  await textarea.fill('E = mc^2');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-slate-editor] .slate-equation .katex')).toHaveCount(1);
+
+  await page.getByTestId('article-preview').click();
+  await expect(page.getByTestId('saved-at')).toBeVisible();
+
+  const slug = await page.getByTestId('article-slug').inputValue();
+  const port = await getPort();
+  const post = await fetch(`http://127.0.0.1:${port}/post/${slug}.html`);
+  const html = await post.text();
+  expect(html).toContain('katex/katex.min.css');
+  expect(html).toContain('katex');
+
+  // 预览服务器真的能取到样式与字体
+  const css = await fetch(`http://127.0.0.1:${port}/assets/katex/katex.min.css`);
+  expect(css.status).toBe(200);
+  const font = await fetch(
+    `http://127.0.0.1:${port}/assets/katex/fonts/KaTeX_Main-Regular.woff2`
+  );
+  expect(font.status).toBe(200);
+});

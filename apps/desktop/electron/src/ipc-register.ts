@@ -37,6 +37,7 @@ import {
   renameTag,
 } from './taxonomy';
 import {
+  generatePath,
   getRoutingRules,
   getRoutingRulesFor,
   setRoutingRules,
@@ -81,6 +82,18 @@ const registeredChannels = new Set<string>();
 function handleIpc(channel: string, handler: IpcHandler): void {
   registeredChannels.add(channel);
   ipcMain.handle(channel, (_event, payload) => handler(payload));
+}
+
+/** 预览要打开的路径：给了 target（文章/页面）就按当前路由规则生成，否则首页 */
+function previewTargetPath(
+  siteId: number,
+  target?: { kind?: 'post' | 'page'; slug?: string }
+): string {
+  if (!target?.slug) return '/';
+
+  const rules = getRoutingRulesFor(siteId);
+  const route = target.kind === 'page' ? rules.page : rules.post;
+  return generatePath(route, { slug: target.slug });
 }
 
 /** 注册全部 IPC 通道（对齐 Rust generate_handler! 的 v1 裁剪清单） */
@@ -277,7 +290,9 @@ export function registerAllIpc(): void {
     const report = await renderSitePreview(siteId);
     setPreviewDir(report.outputDir);
     const port = await startPreviewServer(getPreviewPort());
-    const url = `http://127.0.0.1:${port}/`;
+
+    // target：直接打开对应内容页而不是首页（按当前路由规则生成 URL）
+    const url = `http://127.0.0.1:${port}${previewTargetPath(siteId, payload.target)}`;
     await shell.openExternal(url);
     return { url };
   });

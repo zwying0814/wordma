@@ -142,22 +142,25 @@ export function ArticleEditor({
       setSlug(saved.slug);
       setSavedAt(new Date().toLocaleTimeString('zh-CN'));
       onSaved?.();
-      return true;
+      return saved.slug;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
-      return false;
+      return null;
     } finally {
       setSaving(false);
     }
   };
 
-  /** 预览 = 先保存（渲染读的是库里的内容）→ 渲染整站 → 系统浏览器打开 */
+  /** 预览 = 先保存（渲染读的是库里的内容）→ 渲染整站 → 浏览器直接打开这篇文章 */
   const handlePreview = async () => {
     setPreviewing(true);
     try {
-      const saved = await handleSave();
-      if (!saved) return;
-      await window.api.invoke('open_preview', { siteId: article.siteId });
+      const savedSlug = await handleSave();
+      if (!savedSlug) return;
+      await window.api.invoke('open_preview', {
+        siteId: article.siteId,
+        target: { kind: 'post', slug: savedSlug },
+      });
     } catch (err) {
       setSaveError(errorMessage(err));
     } finally {

@@ -45,6 +45,28 @@ type PostView = {
 
 const POSTS_PER_PAGE = 10;
 
+/** 正文里是否用到了公式（保存下来的 HTML 里带 slate-equation / slate-inline_equation 类名） */
+function containsEquation(html: string): boolean {
+  return /slate-(inline_)?equation/.test(html);
+}
+
+/**
+ * 把 KaTeX 的样式与字体拷进产物（仅在用到公式时调用）。
+ * CSS 里用相对路径引用 fonts/，所以两者要按 katex/dist 的布局一起拷。
+ */
+function copyKatexAssets(outputDir: string): void {
+  // 用 esbuild banner 注入的 require（打包产物里它已按 import.meta.url 建好）
+  const cssPath = require.resolve('katex/dist/katex.min.css');
+  const katexDist = path.dirname(cssPath);
+  const targetDir = path.join(outputDir, 'assets', 'katex');
+
+  mkdirSync(targetDir, { recursive: true });
+  cpSync(cssPath, path.join(targetDir, 'katex.min.css'));
+  cpSync(path.join(katexDist, 'fonts'), path.join(targetDir, 'fonts'), {
+    recursive: true,
+  });
+}
+
 /** 主题设置里的数值（宽松：非法回退默认值） */
 function toPositiveInt(value: unknown, fallback: number): number {
   const num = typeof value === 'string' ? Number(value) : value;
@@ -194,14 +216,29 @@ export async function renderSiteTo(options: {
     body: '',
   };
 
+  // 用到公式才引入 KaTeX 样式（否则产物里多 1MB 字体）
+  const usesEquation =
+    postViews.some((view) => containsEquation(view.contentHtml)) ||
+    pages.some((page) => containsEquation(page.content));
+  const katexLink = usesEquation
+    ? `<link rel="stylesheet" href="${baseUrl}assets/katex/katex.min.css">`
+    : '';
+
   // base 壳：主题 base.ejs 优先
   const baseTpl = themeTemplates['base.ejs'] ?? BASE_TEMPLATE;
-  const renderShell = (bodyHtml: string, title: string): string =>
-    ejs.render(baseTpl, {
+  const renderShell = (bodyHtml: string, title: string): string => {
+    const html = ejs.render(baseTpl, {
       ...baseContext,
       body: bodyHtml,
       title: `${title} - ${site.name}`,
     });
+
+    // 主题模板可能没有 </head>，兜底插到最前面
+    if (!katexLink) return html;
+    return html.includes('</head>')
+      ? html.replace('</head>', `${katexLink}</head>`)
+      : katexLink + html;
+  };
 
   const writePage = (url: string, bodyHtml: string, title: string): void => {
     const html = renderShell(bodyHtml, title);
@@ -340,6 +377,9 @@ export async function renderSiteTo(options: {
     cpSync(themeAssets, assetsDir, { recursive: true });
   } else {
     writeFileSync(path.join(assetsDir, 'style.css'), STYLE_CSS);
+  }
+  if (usesEquation) {
+    copyKatexAssets(outputDir);
   }
   files.push('assets/');
 
