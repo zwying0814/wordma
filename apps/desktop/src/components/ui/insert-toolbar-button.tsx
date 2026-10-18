@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Columns3Icon,
   FileCodeIcon,
   Heading1Icon,
   Heading2Icon,
@@ -11,6 +12,7 @@ import {
   MinusIcon,
   PilcrowIcon,
   PlusIcon,
+  RadicalIcon,
   QuoteIcon,
   SquareIcon,
   TableIcon,
@@ -20,6 +22,7 @@ import { type PlateEditor, useEditorRef } from 'platejs/react';
 import * as React from 'react';
 
 import {
+  ACTION_THREE_COLUMNS,
   insertBlock,
   insertInlineElement,
 } from '@/components/editor/transforms';
@@ -124,12 +127,39 @@ const groups: Group[] = [
     })),
   },
   {
+    group: 'Advanced blocks',
+    items: [
+      {
+        icon: <Columns3Icon />,
+        label: '3 columns',
+        value: ACTION_THREE_COLUMNS,
+      },
+      {
+        focusEditor: false,
+        icon: <RadicalIcon />,
+        label: 'Equation',
+        value: KEYS.equation,
+      },
+    ].map((item) => ({
+      ...item,
+      onSelect: (editor, value) => {
+        insertBlock(editor, value);
+      },
+    })),
+  },
+  {
     group: 'Inline',
     items: [
       {
         icon: <Link2Icon />,
         label: 'Link',
         value: KEYS.link,
+      },
+      {
+        focusEditor: false,
+        icon: <RadicalIcon />,
+        label: 'Inline Equation',
+        value: KEYS.inlineEquation,
       },
     ].map((item) => ({
       ...item,
@@ -165,13 +195,14 @@ export function InsertToolbarButton(props: DropdownMenuProps) {
       >
         {groups.map(({ group, items: nestedItems }) => (
           <ToolbarMenuGroup key={group} label={group}>
-            {nestedItems.map(({ icon, label, value, onSelect }) => (
+            {nestedItems.map(({ focusEditor, icon, label, value, onSelect }) => (
               <DropdownMenuItem
                 className="min-w-[180px]"
                 key={value}
                 onClick={() => {
                   onSelect(editor, value);
-                  editor.tf.focus();
+                  // 公式项由弹层里的输入框接管焦点（focusEditor:false）
+                  if (focusEditor !== false) editor.tf.focus();
                 }}
               >
                 {icon}

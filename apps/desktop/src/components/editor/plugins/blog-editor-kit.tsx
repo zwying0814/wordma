@@ -7,13 +7,16 @@ import { BasicBlocksKit } from './basic-blocks-kit';
 import { BasicMarksKit } from './basic-marks-kit';
 import { BlockSelectionKit } from './block-selection-kit';
 import { CodeBlockKit } from './code-block-kit';
+import { ColumnKit } from './column-kit';
 import { DndKit } from './dnd-kit';
 import { EmojiKit } from './emoji-kit';
 import { ExitBreakKit } from './exit-break-kit';
 import { FontKit } from './font-kit';
 import { LinkKit } from './link-kit';
+import { SlashKit } from './slash-kit';
 import { ListKit } from './list-kit';
 import { MarkdownKit } from './markdown-kit';
+import { MathKit } from './math-kit';
 import { MediaKit } from './media-kit';
 import { TableKit } from './table-kit';
 import { AutoformatKit } from './autoformat-kit';
@@ -25,6 +28,8 @@ export const BlogEditorKit = [
   ...TableKit,
   ...MediaKit,
   ...LinkKit,
+  ...ColumnKit,
+  ...MathKit,
   // Marks
   ...BasicMarksKit,
   ...FontKit,
@@ -32,6 +37,7 @@ export const BlogEditorKit = [
   ...ListKit,
   ...AlignKit,
   // Editing
+  ...SlashKit,
   ...AutoformatKit,
   ...EmojiKit,
   ...ExitBreakKit,

@@ -2,8 +2,10 @@ import { BaseAlignKit } from './align-base-kit';
 import { BaseBasicBlocksKit } from './basic-blocks-base-kit';
 import { BaseBasicMarksKit } from './basic-marks-base-kit';
 import { BaseCodeBlockKit } from './code-block-base-kit';
+import { BaseColumnKit } from './column-base-kit';
 import { BaseLinkKit } from './link-base-kit';
 import { BaseListKit } from './list-base-kit';
+import { BaseMathKit } from './math-base-kit';
 import { BaseMediaKit } from './media-base-kit';
 import { BaseTableKit } from './table-base-kit';
 import { BaseFontKit } from './font-base-kit';
@@ -20,6 +22,9 @@ export const BlogEditorBaseKit = [
   ...BaseTableKit,
   ...BaseMediaKit,
   ...BaseLinkKit,
+  // 分栏与公式：静态套件缺了它们，保存出来的 HTML 会塌成竖排 / 丢掉公式
+  ...BaseColumnKit,
+  ...BaseMathKit,
   // Marks
   ...BaseBasicMarksKit,
   ...BaseFontKit,

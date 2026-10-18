@@ -1,6 +1,8 @@
 'use client';
 
 import { insertCodeBlock, toggleCodeBlock } from '@platejs/code-block';
+import { insertColumnGroup, toggleColumnGroup } from '@platejs/layout';
+import { insertEquation, insertInlineEquation } from '@platejs/math';
 import { triggerFloatingLink } from '@platejs/link/react';
 import { TablePlugin } from '@platejs/table/react';
 import {
@@ -35,6 +37,9 @@ const selectBlockquoteStart = (editor: PlateEditor, path: Path) => {
   }
 };
 
+/** 「插入分栏」这个动作没有对应节点类型，用动作名当 value */
+export const ACTION_THREE_COLUMNS = 'action_three_columns';
+
 const insertBlockMap: Record<
   string,
   (editor: PlateEditor, type: string) => void
@@ -43,6 +48,9 @@ const insertBlockMap: Record<
   [KEYS.ol]: insertList,
   [KEYS.ul]: insertList,
   [KEYS.codeBlock]: (editor) => insertCodeBlock(editor, { select: true }),
+  [ACTION_THREE_COLUMNS]: (editor) =>
+    insertColumnGroup(editor, { columns: 3, select: true }),
+  [KEYS.equation]: (editor) => insertEquation(editor, { select: true }),
   [KEYS.table]: (editor) =>
     editor.getTransforms(TablePlugin).insert.table(
       { header: true },
@@ -55,6 +63,8 @@ const insertInlineMap: Record<
   (editor: PlateEditor, type: string) => void
 > = {
   [KEYS.link]: (editor) => triggerFloatingLink(editor, { focused: true }),
+  [KEYS.inlineEquation]: (editor) =>
+    insertInlineEquation(editor, editor.api.string(editor.selection) ?? ''),
 };
 
 type InsertBlockOptions = {
@@ -144,6 +154,7 @@ const setBlockMap: Record<
   [KEYS.ol]: setList,
   [KEYS.ul]: setList,
   [KEYS.codeBlock]: (editor) => toggleCodeBlock(editor),
+  [ACTION_THREE_COLUMNS]: (editor) => toggleColumnGroup(editor, { columns: 3 }),
 };
 
 export const setBlockType = (

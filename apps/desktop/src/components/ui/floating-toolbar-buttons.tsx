@@ -11,6 +11,7 @@ import { KEYS } from 'platejs';
 import { useEditorReadOnly } from 'platejs/react';
 
 import { MarkToolbarButton } from './mark-toolbar-button';
+import { InlineEquationToolbarButton } from './equation-toolbar-button';
 import { LinkToolbarButton } from './link-toolbar-button';
 import { ToolbarGroup } from './toolbar';
 
@@ -62,6 +63,7 @@ export function FloatingToolbarButtons() {
           </MarkToolbarButton>
 
           <LinkToolbarButton />
+          <InlineEquationToolbarButton />
         </ToolbarGroup>
       )}
     </>
