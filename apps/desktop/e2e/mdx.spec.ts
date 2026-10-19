@@ -239,6 +239,41 @@ test('发布：没有岛的站点产物里不含 react 运行时', async () => {
   expect(indexHtml).not.toContain('importmap');
 });
 
+test('组件里的第三方包：未安装时给出安装提示，装好后无需改源码即可编译', async () => {
+  await go('#/components', 'components-page');
+  await page.getByTestId('component-new').click();
+  await page.getByTestId('component-name-input').fill('with-lib');
+  await page.getByTestId('component-create').click();
+  await expect(page.getByTestId('component-code')).toBeVisible();
+
+  await page
+    .getByTestId('component-code')
+    .fill(
+      "import { hi } from 'wordma-probe-lib';\nexport default function X() { return <b>{hi()}</b>; }\n"
+    );
+  await page.getByTestId('component-save').click();
+  await expect(page.getByTestId('components-error')).toContainText(
+    'wordma-probe-lib'
+  );
+  await expect(page.getByTestId('components-error')).toContainText('npm install');
+
+  // 站点目录里装上同名包（等价用户在站点目录 npm install）
+  const libDir = path.join(siteDir, 'node_modules', 'wordma-probe-lib');
+  fs.mkdirSync(libDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(libDir, 'package.json'),
+    JSON.stringify({ name: 'wordma-probe-lib', version: '1.0.0', main: 'index.js' })
+  );
+  fs.writeFileSync(path.join(libDir, 'index.js'), 'exports.hi = () => "hi from lib";\n');
+
+  // 源码一个字没改，直接再存一次就该通过（失败结果不缓存）
+  await page.getByTestId('component-save').click();
+  await expect(
+    page.getByTestId('toast').filter({ hasText: '已保存' })
+  ).toBeVisible();
+  await expect(page.getByTestId('components-error')).toHaveCount(0);
+});
+
 test('引用不存在的组件：渲染不中断，报告里有 warning', async () => {
   await go('#/articles', 'articles-page');
   await page.getByTestId('create-article').click();

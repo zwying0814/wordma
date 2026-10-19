@@ -129,8 +129,11 @@ export function deleteComponent(name: string): void {
   rmSync(file);
 }
 
-/** 编译结果缓存：源码哈希 → 产物（编辑器每次渲染都会问一次） */
-const cache = new Map<string, CompileResult>();
+/**
+ * 编译结果缓存：源码哈希 → 产物（编辑器每次渲染都会问一次）。
+ * 只缓存成功的结果 —— 失败往往是「包还没装」，缓存了会导致装完包仍报旧错。
+ */
+const cache = new Map<string, Extract<CompileResult, { ok: true }>>();
 
 /** 编译单个组件的源码为 ESM 岛 */
 export function compileSource(name: string, code: string): CompileResult {
@@ -138,7 +141,6 @@ export function compileSource(name: string, code: string): CompileResult {
   const cached = cache.get(hash);
   if (cached) return cached;
 
-  let result: CompileResult;
   try {
     const built = esbuild.buildSync({
       bundle: true,
@@ -146,7 +148,12 @@ export function compileSource(name: string, code: string): CompileResult {
       external: EXTERNAL_MODULES,
       format: 'esm',
       jsx: 'automatic',
-      // 组件里 import 的 npm 包从应用自己的 node_modules 解析
+      /**
+       * npm 包解析顺序：
+       * 1. 站点目录自己的 node_modules（resolveDir 在 {站点目录}/components，
+       *    esbuild 会逐级向上找，所以用户在站点目录 npm install 的包天然可用）
+       * 2. 应用自己的 node_modules（应用直接声明的依赖，如 react / lucide-react）
+       */
       nodePaths: [path.join(appRoot(), 'node_modules')],
       platform: 'browser',
       target: 'es2022',
@@ -158,13 +165,16 @@ export function compileSource(name: string, code: string): CompileResult {
         sourcefile: `${name}.tsx`,
       },
     });
-    result = { ok: true, code: built.outputFiles[0].text, hash };
+    const success: Extract<CompileResult, { ok: true }> = {
+      ok: true,
+      code: built.outputFiles[0].text,
+      hash,
+    };
+    cache.set(hash, success);
+    return success;
   } catch (err) {
-    result = { ok: false, errors: formatEsbuildErrors(err) };
+    return { ok: false, errors: formatEsbuildErrors(err) };
   }
-
-  cache.set(hash, result);
-  return result;
 }
 
 /** 编译站点目录里的组件（读盘） */
@@ -200,8 +210,14 @@ function formatEsbuildErrors(err: unknown): string[] {
   }
   return errors.map((error) => {
     const loc = error.location;
-    if (!loc) return error.text;
+    const message = error.text;
+    // 未安装的包最容易卡住用户，直接把两种安装方式写进报错里
+    const missing = /Could not resolve "([^"./][^"]*)"/.exec(message);
+    const hint = missing
+      ? `\n  如果是第三方包：在站点目录执行 npm install ${missing[1]}（只给这个站点用），或在应用里执行 pnpm --filter desktop add ${missing[1]}（所有站点可用）`
+      : '';
+    if (!loc) return message + hint;
     const file = loc.file ? path.basename(loc.file) : 'component.tsx';
-    return `${file}:${loc.line ?? 0}:${loc.column ?? 0} ${error.text}`;
+    return `${file}:${loc.line ?? 0}:${loc.column ?? 0} ${message}${hint}`;
   });
 }
