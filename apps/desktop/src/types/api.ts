@@ -11,6 +11,13 @@ export type Site = {
 
 export type ArticleRef = { id: number; name: string };
 
+/** 站点 components/ 下的一个 tsx 组件 */
+export type ComponentMeta = {
+  name: string;
+  bytes: number;
+  updatedAt: string;
+};
+
 export type Article = {
   id: number;
   siteId: number;

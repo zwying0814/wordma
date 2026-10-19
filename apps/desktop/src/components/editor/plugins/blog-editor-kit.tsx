@@ -17,6 +17,7 @@ import { SlashKit } from './slash-kit';
 import { ListKit } from './list-kit';
 import { MarkdownKit } from './markdown-kit';
 import { MathKit } from './math-kit';
+import { MdxKit } from './mdx-kit';
 import { MediaKit } from './media-kit';
 import { TableKit } from './table-kit';
 import { AutoformatKit } from './autoformat-kit';
@@ -30,6 +31,7 @@ export const BlogEditorKit = [
   ...LinkKit,
   ...ColumnKit,
   ...MathKit,
+  ...MdxKit,
   // Marks
   ...BasicMarksKit,
   ...FontKit,

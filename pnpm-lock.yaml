@@ -250,6 +250,9 @@ importers:
       cn:
         specifier: ^0.4.0
         version: 0.4.0
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       katex:
         specifier: ^0.16.47
         version: 0.16.47
@@ -332,9 +335,6 @@ importers:
       electron:
         specifier: ^44.7.0
         version: 44.7.0
-      esbuild:
-        specifier: ^0.28.2
-        version: 0.28.2
       oxlint:
         specifier: ^1.81.0
         version: 1.87.0

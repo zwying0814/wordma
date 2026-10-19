@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  BlocksIcon,
   Columns3Icon,
   FileCodeIcon,
   Heading1Icon,
@@ -20,6 +21,7 @@ import { KEYS, type TComboboxInputElement } from 'platejs';
 import { PlateElement, type PlateElementProps, type PlateEditor } from 'platejs/react';
 import * as React from 'react';
 
+import { MDX_KEY } from '@/components/editor/plugins/mdx-kit';
 import {
   ACTION_THREE_COLUMNS,
   insertBlock,
@@ -125,6 +127,13 @@ function slashGroups(editor: PlateEditor): InlineComboboxGroup[] {
     {
       value: '分栏与公式',
       items: [
+        {
+          icon: <BlocksIcon />,
+          keywords: ['mdx', 'island', 'component', 'zujian', '组件', '岛'],
+          label: 'MDX 组件',
+          onSelect: block(MDX_KEY),
+          value: MDX_KEY,
+        },
         {
           icon: <Columns3Icon />,
           keywords: ['columns', 'column', '3 columns', 'fenlan', 'sanlan', '分栏', '三栏'],

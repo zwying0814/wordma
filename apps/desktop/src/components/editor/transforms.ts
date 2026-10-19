@@ -4,6 +4,7 @@ import { insertCodeBlock, toggleCodeBlock } from '@platejs/code-block';
 import { insertColumnGroup, toggleColumnGroup } from '@platejs/layout';
 import { insertEquation, insertInlineEquation } from '@platejs/math';
 import { triggerFloatingLink } from '@platejs/link/react';
+import { MDX_KEY } from './plugins/mdx-kit';
 import { TablePlugin } from '@platejs/table/react';
 import {
   KEYS,
@@ -51,6 +52,11 @@ const insertBlockMap: Record<
   [ACTION_THREE_COLUMNS]: (editor) =>
     insertColumnGroup(editor, { columns: 3, select: true }),
   [KEYS.equation]: (editor) => insertEquation(editor, { select: true }),
+  [MDX_KEY]: (editor) =>
+    editor.tf.insertNodes(
+      editor.api.create.block({ type: MDX_KEY, component: '', props: '' }),
+      { select: true }
+    ),
   [KEYS.table]: (editor) =>
     editor.getTransforms(TablePlugin).insert.table(
       { header: true },

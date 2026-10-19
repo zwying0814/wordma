@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 import { dialog, ipcMain, app, net, protocol, shell } from 'electron';
@@ -57,6 +57,15 @@ import type { RoutingRules } from './routing';
 import { deploySite, getDeployConfig, setDeployConfig } from './deploy';
 import type { DeployConfig } from './deploy';
 import { renderSitePreview } from './render';
+import {
+  compileComponent,
+  componentsDir,
+  deleteComponent,
+  islandUrl,
+  listComponents,
+  readComponent,
+  writeComponent,
+} from './mdx';
 import {
   deleteMedia,
   listMedia,
@@ -373,6 +382,30 @@ export function registerAllIpc(): void {
       (payload?.values ?? {}) as Record<string, unknown>
     )
   );
+
+  // MDX 组件（站点目录 components/*.tsx）
+  handleIpc('list_components', () => listComponents());
+  handleIpc('get_component', (payload) => ({
+    name: payload.name as string,
+    code: readComponent(payload.name as string),
+  }));
+  handleIpc('save_component', (payload) =>
+    writeComponent(payload.name as string, payload.code as string)
+  );
+  handleIpc('delete_component', (payload) => deleteComponent(payload.name as string));
+  /** 编辑器取岛：返回可直接 import() 的地址（编译失败时带错误列表） */
+  handleIpc('compile_component', (payload) => {
+    const name = payload.name as string;
+    const result = compileComponent(name);
+    if (!result.ok) return { ok: false, errors: result.errors };
+    return { ok: true, url: islandUrl(name, result.hash), hash: result.hash };
+  });
+  handleIpc('open_components_dir', () => {
+    const dir = componentsDir();
+    mkdirSync(dir, { recursive: true });
+    void shell.openPath(dir);
+    return dir;
+  });
 
   // pages
   handleIpc('list_pages', () => listPages());

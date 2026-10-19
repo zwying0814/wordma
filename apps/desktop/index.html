@@ -4,9 +4,23 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self' file: wordma-media:; script-src 'self' 'unsafe-inline' file:; style-src 'self' 'unsafe-inline' file:; img-src 'self' file: data: blob: wordma-media: https: http:; media-src 'self' file: wordma-media:; font-src 'self' file: data:; connect-src 'self' file: wordma-media: ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*"
+      content="default-src 'self' file: wordma-media: wordma-island:; script-src 'self' 'unsafe-inline' file: wordma-island:; style-src 'self' 'unsafe-inline' file:; img-src 'self' file: data: blob: wordma-media: https: http:; media-src 'self' file: wordma-media:; font-src 'self' file: data:; connect-src 'self' file: wordma-media: ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*"
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!--
+      MDX 岛：组件编译产物里的裸 import（react / react-dom/client）由这张表解析到
+      宿主运行时（主进程的 wordma-island 协议）。发布产物里注入的是等价的相对路径版本。
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "wordma-island://runtime/react.js",
+          "react/jsx-runtime": "wordma-island://runtime/react.js",
+          "react-dom": "wordma-island://runtime/react.js",
+          "react-dom/client": "wordma-island://runtime/react.js"
+        }
+      }
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Wordma</title>
   </head>

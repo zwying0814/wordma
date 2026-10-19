@@ -6,13 +6,14 @@
   "main": "electron/main.mjs",
   "scripts": {
     "dev": "vite",
-    "build:main": "esbuild electron/src/main.ts --bundle --platform=node --format=esm --external:electron --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=electron/main.mjs && esbuild electron/src/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=electron/preload.cjs",
-    "dev:electron": "pnpm build:main && VITE_DEV_SERVER_URL=http://localhost:5173 electron electron/main.mjs",
-    "build": "tsc -b && vite build && pnpm build:main",
-    "e2e": "vite build && pnpm build:main && playwright test",
-    "e2e:headed": "vite build && pnpm build:main && playwright test --headed",
+    "build:main": "esbuild electron/src/main.ts --bundle --platform=node --format=esm --external:electron --external:esbuild --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --outfile=electron/main.mjs && esbuild electron/src/preload.ts --bundle --platform=node --format=cjs --external:electron --external:esbuild --outfile=electron/preload.cjs",
+    "dev:electron": "pnpm build:islands && pnpm build:main && VITE_DEV_SERVER_URL=http://localhost:5173 electron electron/main.mjs",
+    "build": "tsc -b && pnpm build:islands && vite build && pnpm build:main",
+    "e2e": "pnpm build:islands && vite build && pnpm build:main && playwright test",
+    "e2e:headed": "pnpm build:islands && vite build && pnpm build:main && playwright test --headed",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:islands": "node scripts/build-island-runtime.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -40,6 +41,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "esbuild": "^0.28.2",
     "katex": "^0.16.47",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.55.0",
@@ -69,7 +71,6 @@
     "@vitejs/plugin-react": "^6.1.1",
     "ejs": "^7.0.1",
     "electron": "^44.7.0",
-    "esbuild": "^0.28.2",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"

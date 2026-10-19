@@ -6,6 +6,7 @@ import { Readable } from 'node:stream';
 
 import { closeDb, getDataDir, openSiteDb } from './db';
 import { MIME_BY_EXT } from './media';
+import { compileComponent, islandRuntimeCode } from './mdx';
 import { registerAllIpc } from './ipc-register';
 import { ensureBuiltinThemes } from './theme';
 import { getActiveSite, setRegistryRoot } from './site';
@@ -15,10 +16,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // 开发模式下由脚本注入，指向 Vite dev server
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 
-// 必须在 app ready 前注册（媒体展示走 wordma-media://{siteId}/{filename}）
+// 必须在 app ready 前注册
+// - wordma-media:// 媒体展示（{siteId}/{filename}）
+// - wordma-island:// MDX 岛模块（runtime/react.js 与 site/{name}.js）
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'wordma-media',
+    privileges: {
+      standard: true,
+      stream: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+  {
+    scheme: 'wordma-island',
     privileges: {
       standard: true,
       stream: true,
@@ -106,6 +118,7 @@ app.whenReady().then(() => {
     ensureActiveSiteDb();
     registerAllIpc();
     registerMediaProtocol();
+    registerIslandProtocol();
   } catch (err) {
     dialog.showErrorBox(
       '初始化失败',
@@ -137,6 +150,50 @@ function watchParentProcess(): void {
   setInterval(() => {
     if (process.ppid !== parentPid) app.quit();
   }, 1000).unref();
+}
+
+/**
+ * 岛协议：wordma-island://runtime/react.js → 宿主 React 运行时；
+ * wordma-island://site/{name}.js → 编译好的组件（编辑器里 import() 取用）。
+ */
+function registerIslandProtocol(): void {
+  protocol.handle('wordma-island', (request) => {
+    try {
+      const url = new URL(request.url);
+      const parts = url.pathname.split('/').filter(Boolean);
+
+      if (url.host === 'runtime' && parts[0] === 'react.js') {
+        return new Response(islandRuntimeCode(), {
+          headers: { 'content-type': 'text/javascript; charset=utf-8' },
+        });
+      }
+
+      if (url.host === 'site' && parts[0]?.endsWith('.js')) {
+        const name = parts[0].replace(/\.js$/, '');
+        const result = compileComponent(name);
+        if (!result.ok) {
+          // 让浏览器侧看到可读的编译错误，而不是一个空模块
+          return new Response(
+            `console.error(${JSON.stringify(`组件「${name}」编译失败：\n${result.errors.join('\n')}`)});\nexport default () => null;`,
+            {
+              headers: { 'content-type': 'text/javascript; charset=utf-8' },
+              status: 200,
+            }
+          );
+        }
+        return new Response(result.code, {
+          headers: { 'content-type': 'text/javascript; charset=utf-8' },
+        });
+      }
+
+      return new Response('Not Found', { status: 404 });
+    } catch (err) {
+      return new Response(
+        `island handler error: ${err instanceof Error ? err.message : String(err)}`,
+        { status: 500 }
+      );
+    }
+  });
 }
 
 /** 媒体协议：wordma-media://{siteId}/{filename} → 数据目录内文件 */

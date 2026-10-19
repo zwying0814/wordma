@@ -10,6 +10,7 @@ import { listPages } from './pages';
 import { listCategories, listTags } from './taxonomy';
 import { getPreviewPort } from './preview';
 import { getActiveThemeName, resolveThemeSettings, themesDir } from './theme';
+import { compileComponent, islandRuntimeCode } from './mdx';
 import {
   ARCHIVE_TEMPLATE,
   BASE_TEMPLATE,
@@ -25,6 +26,8 @@ export type RenderReport = {
   outputDir: string;
   files: number;
   baseUrl: string;
+  /** 非致命问题（如引用了不存在/编译失败的 MDX 组件） */
+  warnings: string[];
 };
 
 type PostRef = { id: number; name: string };
@@ -72,6 +75,55 @@ function copyKatexAssets(outputDir: string): void {
   cpSync(path.join(katexDist, 'fonts'), path.join(targetDir, 'fonts'), {
     recursive: true,
   });
+}
+
+/** 页面里出现岛占位的判定（与 mdx-node-static 的输出一致） */
+function islandNamesIn(html: string): string[] {
+  const names = new Set<string>();
+  const re = /data-wordma-island="([^"]+)"/g;
+  let match = re.exec(html);
+  while (match) {
+    if (match[1]) names.add(match[1]);
+    match = re.exec(html);
+  }
+  return [...names];
+}
+
+/**
+ * 含岛的页面才注入：importmap（把 react 指到产物里的运行时）+ 挂载脚本。
+ * 没有岛的页面一个字都不加 —— 与 KaTeX 的按需引入同一思路。
+ */
+function islandHead(assetRoot: string): string {
+  const runtime = `${assetRoot}assets/mdx/react.js`;
+  return `<script type="importmap">${JSON.stringify({
+    imports: {
+      react: runtime,
+      'react/jsx-runtime': runtime,
+      'react-dom': runtime,
+      'react-dom/client': runtime,
+    },
+  })}</script>
+<script type="module">
+for (const el of document.querySelectorAll('[data-wordma-island]')) {
+  const name = el.dataset.wordmaIsland;
+  const target = document.createElement('div');
+  el.appendChild(target);
+  Promise.all([
+    import('react'),
+    import(new URL('assets/mdx/' + name + '.js', ${JSON.stringify(assetRoot)})),
+  ])
+    .then(([React, mod]) => {
+      let props = {};
+      try { props = JSON.parse(el.dataset.props || '{}'); } catch {}
+      const Component = mod.default;
+      if (typeof Component !== 'function') throw new Error('组件没有默认导出');
+      React.createRoot(target).render(React.createElement(Component, props));
+    })
+    .catch((err) => {
+      el.textContent = '组件「' + name + '」加载失败：' + (err && err.message ? err.message : err);
+    });
+}
+</script>`;
 }
 
 /** 站点地址里的子目录前缀（如 https://user.github.io/repo/ → '/repo/'；域名根目录 → '/'） */
@@ -241,6 +293,7 @@ export async function renderSiteTo(options: {
   themeContext.postsPerPage = perPage;
 
   const files: string[] = [];
+  const warnings: string[] = [];
   const baseContext = {
     site: { name: site.name, description: site.description ?? '', url: baseUrl },
     urls: {
@@ -267,6 +320,9 @@ export async function renderSiteTo(options: {
     ? `<link rel="stylesheet" href="${baseUrl}assets/katex/katex.min.css">`
     : '';
 
+  // 本次渲染里用到的 MDX 岛组件（写文件时统一编译/拷贝）
+  const usedIslands = new Set<string>();
+
   // base 壳：主题 base.ejs 优先
   const baseTpl = themeTemplates['base.ejs'] ?? BASE_TEMPLATE;
   const renderShell = (bodyHtml: string, title: string): string => {
@@ -276,11 +332,16 @@ export async function renderSiteTo(options: {
       title: `${title} - ${site.name}`,
     });
 
+    // 岛只注入到真正含岛的页面（其余页面产物里连 importmap 都没有）
+    const islands = islandNamesIn(bodyHtml);
+    for (const name of islands) usedIslands.add(name);
+    const head = katexLink + (islands.length > 0 ? islandHead(baseUrl) : '');
+    if (!head) return html;
+
     // 主题模板可能没有 </head>，兜底插到最前面
-    if (!katexLink) return html;
     return html.includes('</head>')
-      ? html.replace('</head>', `${katexLink}</head>`)
-      : katexLink + html;
+      ? html.replace('</head>', `${head}</head>`)
+      : head + html;
   };
 
   const writePage = (url: string, bodyHtml: string, title: string): void => {
@@ -427,6 +488,25 @@ export async function renderSiteTo(options: {
   if (usesEquation) {
     copyKatexAssets(outputDir);
   }
+  if (usedIslands.size > 0) {
+    const mdxDir = path.join(assetsDir, 'mdx');
+    mkdirSync(mdxDir, { recursive: true });
+    // 宿主 React 运行时（岛通过 importmap 指向它）
+    writeFileSync(path.join(mdxDir, 'react.js'), islandRuntimeCode());
+
+    for (const name of usedIslands) {
+      const compiled = compileComponent(name);
+      if (compiled.ok) {
+        writeFileSync(path.join(mdxDir, `${name}.js`), compiled.code);
+      } else {
+        // 单个组件坏了不中断整站：占位保留，问题写进报告
+        warnings.push(
+          `MDX 组件「${name}」未产出：${compiled.errors.join('；')}`
+        );
+      }
+    }
+    files.push('assets/mdx/');
+  }
   files.push('assets/');
 
   // 站点目录模型：media/ 直接挂在站点目录下（wordma-media:// URL 里的 siteId 只是兼容形式）
@@ -436,7 +516,7 @@ export async function renderSiteTo(options: {
     files.push('media/');
   }
 
-  return { siteId, outputDir, files: files.length, baseUrl };
+  return { siteId, outputDir, files: files.length, baseUrl, warnings };
 }
 
 /** 渲染站点预览（含草稿，输出到 preview/{siteId}，baseUrl 指向预览服务器） */

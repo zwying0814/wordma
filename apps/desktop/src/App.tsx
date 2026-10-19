@@ -10,6 +10,7 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { PageEditorPage } from '@/pages/PageEditorPage';
 import { PagesPage } from '@/pages/PagesPage';
 import { CategoriesPage } from '@/pages/CategoriesPage';
+import { ComponentsPage } from '@/pages/ComponentsPage';
 import { TagsPage } from '@/pages/TagsPage';
 import { ThemesPage } from '@/pages/ThemesPage';
 import { SettingsPage } from '@/pages/SettingsPage';
@@ -81,6 +82,9 @@ function Routes() {
                 </Route>
                 <Route path="/themes">
                   <ThemesPage />
+                </Route>
+                <Route path="/components">
+                  <ComponentsPage />
                 </Route>
                 <Route path="/media">
                   <MediaPage />

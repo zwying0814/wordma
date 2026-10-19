@@ -5,6 +5,7 @@ import {
   Image as ImageIcon,
   LayoutDashboard,
   Palette,
+  Puzzle,
   Settings,
   Tags,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ export function SidebarNav() {
     { href: '/tags', icon: Tags, label: '标签', count: tagCount },
     { href: '/categories', icon: Folder, label: '分类', count: categoryCount },
     { href: '/themes', icon: Palette, label: '主题' },
+    { href: '/components', icon: Puzzle, label: '组件' },
     { href: '/media', icon: ImageIcon, label: '媒体库' },
     { href: '/settings', icon: Settings, label: '设置' },
   ];

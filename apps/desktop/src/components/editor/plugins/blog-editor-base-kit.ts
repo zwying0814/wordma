@@ -6,6 +6,7 @@ import { BaseColumnKit } from './column-base-kit';
 import { BaseLinkKit } from './link-base-kit';
 import { BaseListKit } from './list-base-kit';
 import { BaseMathKit } from './math-base-kit';
+import { BaseMdxKit } from './mdx-base-kit';
 import { BaseMediaKit } from './media-base-kit';
 import { BaseTableKit } from './table-base-kit';
 import { BaseFontKit } from './font-base-kit';
@@ -25,6 +26,7 @@ export const BlogEditorBaseKit = [
   // 分栏与公式：静态套件缺了它们，保存出来的 HTML 会塌成竖排 / 丢掉公式
   ...BaseColumnKit,
   ...BaseMathKit,
+  ...BaseMdxKit,
   // Marks
   ...BaseBasicMarksKit,
   ...BaseFontKit,

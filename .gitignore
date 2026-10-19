@@ -45,5 +45,7 @@ playwright-report
 # electron 构建产物（源码在 electron/src，electron . 前需先 build:main）
 apps/desktop/electron/main.mjs
 apps/desktop/electron/preload.cjs
+# 岛用的 React 运行时（scripts/build-island-runtime.mjs 产出）
+apps/desktop/electron/assets/
 
 .claude

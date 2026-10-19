@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  BlocksIcon,
   Columns3Icon,
   FileCodeIcon,
   Heading1Icon,
@@ -21,6 +22,7 @@ import { KEYS } from 'platejs';
 import { type PlateEditor, useEditorRef } from 'platejs/react';
 import * as React from 'react';
 
+import { MDX_KEY } from '@/components/editor/plugins/mdx-kit';
 import {
   ACTION_THREE_COLUMNS,
   insertBlock,
@@ -129,6 +131,11 @@ const groups: Group[] = [
   {
     group: 'Advanced blocks',
     items: [
+      {
+        icon: <BlocksIcon />,
+        label: 'MDX component',
+        value: MDX_KEY,
+      },
       {
         icon: <Columns3Icon />,
         label: '3 columns',
