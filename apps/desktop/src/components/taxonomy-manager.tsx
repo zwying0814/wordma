@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { ListRow } from '@/components/ui/list-row';
 import { PageHeader } from '@/components/ui/page-header';
+import { useToast } from '@/lib/use-toast';
 import {
   createCategory,
   createTag,
@@ -67,6 +68,7 @@ const COPY = {
 export function TaxonomyManager({ kind }: { kind: TaxonomyKind }) {
   const copy = COPY[kind];
   const { activeSite, reload: reloadNav } = useSite();
+  const { toast } = useToast();
   const siteId = activeSite?.id ?? null;
 
   const [items, setItems] = React.useState<TaxonomyItem[]>([]);
@@ -112,6 +114,7 @@ export function TaxonomyManager({ kind }: { kind: TaxonomyKind }) {
       else await createCategory({ siteId, name });
       await reload();
       await reloadNav();
+      toast(`${copy.label}「${name}」已创建`);
       setCreating(false);
       setNewName('');
     } catch (err) {
@@ -130,6 +133,7 @@ export function TaxonomyManager({ kind }: { kind: TaxonomyKind }) {
       if (kind === 'tag') await renameTag({ id: renaming.id, name });
       else await renameCategory({ id: renaming.id, name });
       await reload();
+      toast(`${copy.label}已重命名`);
       setRenaming(null);
     } catch (err) {
       setRenameError(errorMessage(err));
@@ -146,6 +150,7 @@ export function TaxonomyManager({ kind }: { kind: TaxonomyKind }) {
       else await deleteCategory(pendingDelete.id);
       await reload();
       await reloadNav();
+      toast(`${copy.label}「${pendingDelete.name}」已删除`);
       setPendingDelete(null);
     } catch (err) {
       setError(errorMessage(err));

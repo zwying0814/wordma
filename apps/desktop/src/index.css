@@ -68,6 +68,12 @@
   /* 反色前景：铺在任意用户色（如调色板色块）上的图标色 */
   --contrast-ink: #ffffff;
 
+  /* 浮层提示（design .toast）：深色小条，成功/失败用图标色区分 */
+  --toast: #23272e;
+  --toast-foreground: #f5f6f8;
+  --toast-success: #5ec08f;
+  --toast-destructive: #f08a8a;
+
   /* 布局与动效（design --dur） */
   --sidebar-width: 236px;
   --duration-fast: 180ms;
@@ -118,6 +124,10 @@
   --highlight: #4a3c1c;
   --brand: #7c9cf5;
   --contrast-ink: #14171c;
+  --toast: #313742;
+  --toast-foreground: #f5f6f8;
+  --toast-success: #5ec08f;
+  --toast-destructive: #f08a8a;
   --syntax-comment: #9aa3b2;
   --syntax-keyword: #c9a6ff;
   --syntax-string: #5ec08f;
@@ -174,6 +184,10 @@
   --color-highlight: var(--highlight);
   --color-brand: var(--brand);
   --color-contrast-ink: var(--contrast-ink);
+  --color-toast: var(--toast);
+  --color-toast-foreground: var(--toast-foreground);
+  --color-toast-success: var(--toast-success);
+  --color-toast-destructive: var(--toast-destructive);
   --color-syntax-comment: var(--syntax-comment);
   --color-syntax-keyword: var(--syntax-keyword);
   --color-syntax-string: var(--syntax-string);
@@ -197,6 +211,20 @@
 
   /* 动效 */
   --ease-out-soft: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* 浮层提示入场（design @keyframes toastIn） */
+  --animate-toast-in: toast-in var(--duration-fast) ease-out;
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
 
   /* 设计里超出 Tailwind 默认字阶的两处（页标题 22px、正文 16.5px） */
   --text-page-title: 22px;

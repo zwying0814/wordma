@@ -1,6 +1,7 @@
 import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/lib/use-toast';
 import { ArrowLeft, Dices } from 'lucide-react';
 import { useLocation, useParams } from 'wouter';
 import type { Value } from 'platejs';
@@ -103,6 +104,7 @@ export function PageEditorPage() {
 }
 
 function PageEditorForm({ page }: { page: SitePage }) {
+  const { toast } = useToast();
   const [, navigate] = useLocation();
   const [initialValue] = React.useState<Value>(() =>
     htmlToValue(page.content)
@@ -145,6 +147,7 @@ function PageEditorForm({ page }: { page: SitePage }) {
       });
       setSlug(saved.slug);
       setSavedAt(new Date().toLocaleTimeString('zh-CN'));
+      toast('页面已保存');
       return saved.slug;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));

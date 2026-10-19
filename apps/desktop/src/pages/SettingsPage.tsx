@@ -27,11 +27,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/ui/page-header';
+import { useToast } from '@/lib/use-toast';
 // 端口范围与默认值与主进程 preview.ts 保持一致
 
 /** 设置页 v1：站点信息 + 新建站点 + 预览端口 + 打开预览 */
 export function SettingsPage() {
   const { activeSite, setActiveSite, reload } = useSite();
+  const { toast } = useToast();
 
   const [name, setName] = React.useState(activeSite?.name ?? '');
   const [description, setDescription] = React.useState(
@@ -70,8 +72,10 @@ export function SettingsPage() {
       });
       await reload();
       setSiteSaved(true);
+      toast('站点信息已保存');
     } catch (err) {
       setSiteError(err instanceof Error ? err.message : String(err));
+      toast(err instanceof Error ? err.message : String(err), 'error');
     }
   };
 
@@ -81,6 +85,7 @@ export function SettingsPage() {
     try {
       await window.api.invoke('set_preview_port', { port: Number(port) });
       setPortSaved(true);
+      toast('预览端口已更新');
     } catch (err) {
       setPortError(err instanceof Error ? err.message : String(err));
     }
@@ -105,10 +110,12 @@ export function SettingsPage() {
       })) as Site;
       await setActiveSite(site.id);
       await reload();
+      toast(`站点「${site.name}」已创建`);
       setNewSiteName('');
       setNewSiteDir('');
     } catch (err) {
       setNewSiteError(err instanceof Error ? err.message : String(err));
+      toast(err instanceof Error ? err.message : String(err), 'error');
     }
   };
 
@@ -118,6 +125,7 @@ export function SettingsPage() {
     setRemoving(true);
     try {
       await deleteSite(activeSite.id);
+      toast(`已移除站点「${activeSite.name}」，数据目录保留在原处`);
       setConfirmRemove(false);
       await reload();
       window.location.hash = '#/welcome';

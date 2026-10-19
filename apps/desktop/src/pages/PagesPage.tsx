@@ -19,6 +19,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { ListRow } from '@/components/ui/list-row';
 import { PageHeader } from '@/components/ui/page-header';
+import { useToast } from '@/lib/use-toast';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString('zh-CN', {
@@ -34,6 +35,7 @@ function formatDateTime(iso: string): string {
 export function PagesPage() {
   const { activeSite } = useSite();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const [pages, setPages] = React.useState<SitePage[]>([]);
   const [pendingDelete, setPendingDelete] = React.useState<SitePage | null>(null);
@@ -63,8 +65,11 @@ export function PagesPage() {
     setDeleting(true);
     try {
       await deletePage(pendingDelete.id);
+      toast(`页面「${pendingDelete.title}」已删除`);
       setPendingDelete(null);
       await reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'error');
     } finally {
       setDeleting(false);
     }

@@ -16,10 +16,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
+import { useToast } from '@/lib/use-toast';
 
 /** 媒体库页：/media（网格 + 上传 + 删除） */
 export function MediaPage() {
   const { activeSite } = useSite();
+  const { toast } = useToast();
   const siteId = activeSite?.id ?? null;
 
   const [items, setItems] = React.useState<MediaItem[]>([]);
@@ -44,7 +46,8 @@ export function MediaPage() {
     setError(null);
     setUploading(true);
     try {
-      for (const file of Array.from(fileList)) {
+      const files = Array.from(fileList);
+      for (const file of files) {
         const filePath = window.api.getPathForFile(file);
         await uploadMediaFromPath({
           siteId,
@@ -53,8 +56,10 @@ export function MediaPage() {
         });
       }
       await reload();
+      toast(files.length > 1 ? `已上传 ${files.length} 个文件` : `已上传「${files[0]?.name ?? ''}」`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      toast(err instanceof Error ? err.message : String(err), 'error');
     } finally {
       setUploading(false);
     }
@@ -65,6 +70,7 @@ export function MediaPage() {
     try {
       await window.api.invoke('delete_media', { id: item.id });
       await reload();
+      toast(`已删除「${item.originalName}」`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -149,7 +155,11 @@ export function MediaPage() {
                 <Button
                   aria-label={`复制 Markdown 引用 ${item.originalName}`}
                   data-testid={`media-copy-${item.filename}`}
-                  onClick={() => void copyMarkdown(item)}
+                  onClick={() => {
+                    void copyMarkdown(item).then(() =>
+                      toast('Markdown 引用已复制')
+                    );
+                  }}
                   size="icon-sm"
                   title="复制 Markdown 引用"
                   variant="ghost"

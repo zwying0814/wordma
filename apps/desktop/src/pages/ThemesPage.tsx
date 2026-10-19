@@ -33,6 +33,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { PageHeader } from '@/components/ui/page-header';
+import { useToast } from '@/lib/use-toast';
 import { Switch } from '@/components/ui/switch';
 import {
   ThemeCard,
@@ -43,6 +44,7 @@ import { cn } from '@/lib/utils';
 /** 主题页：/themes —— 主题卡片网格 + 预览弹窗 + 当前主题的设置表单 */
 export function ThemesPage() {
   const { activeSite, articles } = useSite();
+  const { toast } = useToast();
   const siteId = activeSite?.id ?? null;
 
   const [themes, setThemes] = React.useState<ThemeMeta[]>([]);
@@ -86,6 +88,7 @@ export function ThemesPage() {
       await setActiveTheme({ siteId, name });
       // 切换主题后设置表单跟随新主题的 schema
       await reload();
+      toast(`已启用「${name}」主题`);
       setPreviewing(null);
     } catch (err) {
       setError(errorMessage(err));
@@ -99,6 +102,7 @@ export function ThemesPage() {
     setBusy(true);
     try {
       await deleteTheme(pendingDelete.name);
+      toast(`主题「${pendingDelete.displayName}」已删除`);
       setPendingDelete(null);
       await reload();
     } catch (err) {
@@ -120,6 +124,7 @@ export function ThemesPage() {
         values,
       });
       setSaved(true);
+      toast('主题设置已保存');
     } catch (err) {
       setError(errorMessage(err));
     } finally {

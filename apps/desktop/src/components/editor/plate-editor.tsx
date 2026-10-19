@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/lib/use-toast';
 import { Editor, EditorContainer } from '@/components/ui/editor';
 import { EditorStatic } from '@/components/ui/editor-static';
 import { FixedToolbar } from '@/components/ui/fixed-toolbar';
@@ -64,6 +65,7 @@ export function ArticleEditor({
   onSaved?: () => void;
 }) {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [initialValue] = React.useState<Value>(() =>
     htmlToValue(article.content)
   );
@@ -142,6 +144,7 @@ export function ArticleEditor({
       setSlug(saved.slug);
       setSavedAt(new Date().toLocaleTimeString('zh-CN'));
       onSaved?.();
+      toast(status === 'published' ? '已发布' : '草稿已保存');
       return saved.slug;
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));

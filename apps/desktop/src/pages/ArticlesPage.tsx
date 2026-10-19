@@ -20,6 +20,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { ListRow } from '@/components/ui/list-row';
+import { useToast } from '@/lib/use-toast';
 import { PageHeader } from '@/components/ui/page-header';
 import { Segmented } from '@/components/ui/segmented';
 
@@ -43,6 +44,7 @@ function formatDate(iso: string): string {
 export function ArticlesPage() {
   const { activeSite, articles, reloadArticles } = useSite();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const [filter, setFilter] = React.useState<StatusFilter>('all');
   const [query, setQuery] = React.useState('');
@@ -79,8 +81,11 @@ export function ArticlesPage() {
     setDeleting(true);
     try {
       await deleteArticle(pendingDelete.id);
+      toast(`文章「${pendingDelete.title || '（无标题）'}」已删除`);
       setPendingDelete(null);
       await reloadArticles();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'error');
     } finally {
       setDeleting(false);
     }

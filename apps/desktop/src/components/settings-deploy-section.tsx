@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/lib/use-toast';
 import {
   deploySite,
   getDeployConfig,
@@ -23,6 +24,7 @@ import { cn } from '@/lib/utils';
 
 /** 发布区：发布方式 + 站点地址 + 目标文件夹 + 发布按钮与结果 */
 export function DeploySection({ siteId }: { siteId: number }) {
+  const { toast } = useToast();
   const [config, setConfig] = React.useState<DeployConfig>({
     provider: 'local-folder',
     siteUrl: '',
@@ -55,7 +57,9 @@ export function DeploySection({ siteId }: { siteId: number }) {
       // 先存配置（严格校验在这一步），再发布
       const saved = await setDeployConfig(siteId, config);
       setConfig(saved);
-      setResult(await deploySite(siteId));
+      const deployed = await deploySite(siteId);
+      setResult(deployed);
+      toast(`已发布 ${deployed.files} 个文件`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
