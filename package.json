@@ -1,0 +1,23 @@
+{
+  "name": "wordma",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=12"
+  },
+  "scripts": {
+    "dev": "pnpm -r --if-present run dev",
+    "build": "pnpm -r --if-present run build",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "lint": "pnpm -r --if-present run lint",
+    "format": "pnpm -r --if-present run format",
+    "clean": "pnpm -r --if-present run clean"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "~6.0.3"
+  }
+}

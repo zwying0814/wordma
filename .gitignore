@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+out/
+build/
+.turbo/
+.cache/
+coverage/
+*.tsbuildinfo
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# env
+.env
+.env.*
+!.env.example
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# local scratch and non-repo docs
+tmp/
+docs/
+design/
+test-results/
+playwright-report/
+
+# agent config
+.claude/
