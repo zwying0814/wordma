@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "tauri:dev": "node scripts/fetch-bun.mjs && tauri dev",
+    "tauri:build": "node scripts/fetch-bun.mjs && tauri build",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",

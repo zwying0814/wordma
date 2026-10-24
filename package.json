@@ -9,9 +9,14 @@
     "pnpm": ">=12"
   },
   "scripts": {
-    "dev": "pnpm -r --if-present run dev",
+    "dev": "pnpm --filter desktop tauri:dev",
+    "dev:web": "pnpm --filter desktop dev",
     "build": "pnpm -r --if-present run build",
+    "build:app": "pnpm --filter desktop tauri:build",
     "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "check": "pnpm typecheck && pnpm test",
+    "fetch:bun": "pnpm --filter desktop fetch:bun",
     "lint": "pnpm -r --if-present run lint",
     "format": "pnpm -r --if-present run format",
     "clean": "pnpm -r --if-present run clean"

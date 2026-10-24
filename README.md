@@ -16,9 +16,15 @@
 
 ```bash
 pnpm install
+pnpm dev          # 启动 Tauri 桌面应用
+pnpm dev:web      # 只启动 Vite（浏览器访问，Tauri API 不可用）
 pnpm typecheck
-pnpm build
+pnpm test         # Rust 单元测试
+pnpm build        # 前端产物构建
+pnpm build:app    # 构建当前平台的安装包
 ```
+
+`pnpm dev` 会自动确保 Bun sidecar 已下载；首次运行会从 npmmirror 拉取。
 
 ## 约定
 
