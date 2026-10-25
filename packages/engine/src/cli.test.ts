@@ -42,6 +42,37 @@ function makeOutDir(): string {
   return mkdtempSync(path.join(tmpdir(), 'wordma-cli-'));
 }
 
+function expectBrokenFixture(
+  fixture: string,
+  code: string,
+): string {
+  const outDir = makeOutDir();
+
+  try {
+    const result = runCli([
+      'build',
+      '--root',
+      `fixtures/broken/${fixture}`,
+      `--out=${outDir}`,
+    ]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`[${code}]`);
+    return result.stderr;
+  } finally {
+    rmSync(outDir, { recursive: true, force: true });
+    rmSync(
+      path.join(
+        repoRoot,
+        'fixtures/broken',
+        fixture,
+        '.wordma',
+      ),
+      { recursive: true, force: true },
+    );
+  }
+}
+
 describe('wordma-engine CLI', () => {
   it('--help 输出命令说明', () => {
     const result = runCli(['--help']);
@@ -222,6 +253,75 @@ describe('wordma-engine CLI', () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('需要一个路径');
+  });
+
+  it('MDX 未知组件输出文件与行号', () => {
+    const stderr = expectBrokenFixture(
+      'missing-component',
+      'MISSING_COMPONENT_IMPORT',
+    );
+
+    expect(stderr).toContain('missing.mdx:8:1');
+    expect(stderr).toContain('<Missing>');
+  });
+
+  it('MDX 表达式输出 UNSUPPORTED_EXPRESSION 与行号', () => {
+    const stderr = expectBrokenFixture(
+      'mdx-expression',
+      'UNSUPPORTED_EXPRESSION',
+    );
+
+    expect(stderr).toContain('expression.mdx:8:1');
+  });
+
+  it('非法岛屿 props 输出 INVALID_ISLAND_PROPS 与行号', () => {
+    const stderr = expectBrokenFixture(
+      'mdx-invalid-props',
+      'INVALID_ISLAND_PROPS',
+    );
+
+    expect(stderr).toContain('props.mdx:10:10');
+  });
+
+  it('岛屿嵌套输出 NESTED_ISLAND 与行号', () => {
+    const stderr = expectBrokenFixture(
+      'mdx-nested-island',
+      'NESTED_ISLAND',
+    );
+
+    expect(stderr).toContain('nested.mdx:12:3');
+    expect(stderr).toContain('<Note>');
+  });
+
+  it('逃逸 import 输出 UNSAFE_IMPORT 与行号', () => {
+    const stderr = expectBrokenFixture(
+      'mdx-unsafe-import',
+      'UNSAFE_IMPORT',
+    );
+
+    expect(stderr).toContain('unsafe.mdx:6:1');
+  });
+
+  it('岛屿 Node 内置模块输出 UNSAFE_IMPORT', () => {
+    const stderr = expectBrokenFixture(
+      'island-node-builtin',
+      'UNSAFE_IMPORT',
+    );
+
+    expect(stderr).toContain('bad.tsx');
+    expect(stderr).toContain('node:fs');
+    expect(stderr).toContain('export: default');
+  });
+
+  it('岛屿构建失败输出 ISLAND_BUILD_FAILED', () => {
+    const stderr = expectBrokenFixture(
+      'island-build-failure',
+      'ISLAND_BUILD_FAILED',
+    );
+
+    expect(stderr).toContain('broken.tsx');
+    expect(stderr).toContain('Syntax Error');
+    expect(stderr).toContain('export: default');
   });
 
   it('dev 仍提示尚未实现', () => {

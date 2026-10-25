@@ -71,6 +71,8 @@ export type ContentEntry = {
   relativePath: string;
   /** 去掉 frontmatter 的 MDX/Markdown 正文 */
   body: string;
+  /** 正文第一行在源文件中的 1 基行号 */
+  bodyLine: number;
   isFolderEntry: boolean;
   assets: AssetRef[];
   /** 用于排序的 UTC 毫秒；无日期时为 undefined */

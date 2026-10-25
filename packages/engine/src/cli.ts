@@ -4,6 +4,8 @@ import { ZodError } from 'zod';
 import { buildSite } from './build';
 import {
   BuildError,
+  IslandError,
+  MdxError,
   RouteError,
   ThemeError,
 } from './errors';
@@ -119,7 +121,42 @@ function parseBuildFlags(args: string[]): BuildFlags {
   return flags;
 }
 
+function formatSourceLocation(
+  file: string | undefined,
+  line: number | undefined,
+  column: number | undefined,
+): string {
+  if (!file) return '';
+
+  const position =
+    line === undefined
+      ? file
+      : `${file}:${line}${column === undefined ? '' : `:${column}`}`;
+
+  return `\n  at ${position}`;
+}
+
 function formatError(error: unknown): string {
+  if (error instanceof MdxError) {
+    return `[${error.code}] ${error.message}${formatSourceLocation(
+      error.file,
+      error.line,
+      error.column,
+    )}`;
+  }
+
+  if (error instanceof IslandError) {
+    const exportName = error.exportName
+      ? `\n  export: ${error.exportName}`
+      : '';
+
+    return `[${error.code}] ${error.message}${formatSourceLocation(
+      error.file,
+      undefined,
+      undefined,
+    )}${exportName}`;
+  }
+
   if (
     error instanceof ContentError ||
     error instanceof ThemeError ||

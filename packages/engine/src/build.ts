@@ -92,6 +92,7 @@ export async function buildSite(
       analysis: analyzeMdx(entry.body, {
         filePath: entry.filePath,
         workspaceRoot: root,
+        lineOffset: entry.bodyLine - 1,
       }),
     });
   }

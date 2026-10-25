@@ -122,6 +122,7 @@ function scanUnsafeImports(
   filePath: string,
   workspaceRoot: string,
   visited: Set<string>,
+  exportName?: string,
 ): void {
   if (visited.has(filePath)) return;
   visited.add(filePath);
@@ -137,6 +138,7 @@ function scanUnsafeImports(
       'ISLAND_BUILD_FAILED',
       `无法读取组件：${filePath}`,
       filePath,
+      exportName,
     );
   }
 
@@ -150,6 +152,7 @@ function scanUnsafeImports(
       'ISLAND_BUILD_FAILED',
       `无法解析组件：${filePath}\n${error instanceof Error ? error.message : String(error)}`,
       filePath,
+      exportName,
     );
   }
 
@@ -161,6 +164,7 @@ function scanUnsafeImports(
         'UNSAFE_IMPORT',
         `不允许导入 Node/Bun 内置模块：${specifier}`,
         filePath,
+        exportName,
       );
     }
 
@@ -191,6 +195,7 @@ function scanUnsafeImports(
         'ISLAND_BUILD_FAILED',
         `无法解析 import：${specifier}`,
         filePath,
+        exportName,
       );
     }
 
@@ -202,6 +207,7 @@ function scanUnsafeImports(
         'ISLAND_BUILD_FAILED',
         `import 文件不存在：${specifier}`,
         filePath,
+        exportName,
       );
     }
 
@@ -210,6 +216,7 @@ function scanUnsafeImports(
         'UNSAFE_IMPORT',
         `import 解析结果位于 workspace 外：${specifier}`,
         filePath,
+        exportName,
       );
     }
 
@@ -220,7 +227,12 @@ function scanUnsafeImports(
         path.extname(realPath).toLowerCase(),
       )
     ) {
-      scanUnsafeImports(realPath, workspaceRoot, visited);
+      scanUnsafeImports(
+        realPath,
+        workspaceRoot,
+        visited,
+        exportName,
+      );
     }
   }
 }
@@ -396,7 +408,12 @@ export async function buildIslandBundles(
 
   for (const input of unique) {
     const visited = new Set<string>();
-    scanUnsafeImports(input.source, workspaceRoot, visited);
+    scanUnsafeImports(
+      input.source,
+      workspaceRoot,
+      visited,
+      input.exportName,
+    );
 
     const entryPath = path.join(
       cacheDir,

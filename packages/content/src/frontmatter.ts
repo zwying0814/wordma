@@ -12,11 +12,14 @@ export type SplitFrontmatterResult = {
   data: string;
   /** 去掉 frontmatter 的正文，换行统一为 LF */
   body: string;
+  /** 正文第一行在源文件中的 1 基行号 */
+  bodyLine: number;
 };
 
 export type ParsedContentFile = {
   frontmatter: PageFrontmatter;
   body: string;
+  bodyLine: number;
 };
 
 function formatIssue(error: unknown): string {
@@ -79,6 +82,7 @@ export function splitFrontmatter(
   return {
     data: lines.slice(1, closeIndex).join('\n'),
     body: lines.slice(closeIndex + 1).join('\n'),
+    bodyLine: closeIndex + 2,
   };
 }
 
@@ -86,13 +90,16 @@ export function parseContentFile(
   source: string,
   filePath: string,
 ): ParsedContentFile {
-  const { data, body } = splitFrontmatter(source, filePath);
+  const { data, body, bodyLine } = splitFrontmatter(
+    source,
+    filePath,
+  );
 
   try {
     const parsed = parseYaml(data, { filePath });
     const frontmatter = parsePageFrontmatter(parsed);
 
-    return { frontmatter, body };
+    return { frontmatter, body, bodyLine };
   } catch (error) {
     if (error instanceof ContentError) throw error;
 

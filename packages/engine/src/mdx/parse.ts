@@ -26,6 +26,12 @@ export type ParsedMdx = {
   imports: MdxImport[];
 };
 
+export type ParseMdxOptions = {
+  filePath: string;
+  /** 正文第一行之前的前置行数，用于把正文行号还原为文件行号 */
+  lineOffset?: number;
+};
+
 type MdxEsmNode = {
   type: 'mdxjsEsm';
   position?: Position;
@@ -53,7 +59,6 @@ function startPosition(
   if (start) {
     return {
       line: start.line,
-      // ESTree 使用 0 基列号，统一为 1 基
       column:
         start.column === undefined
           ? undefined
@@ -154,6 +159,7 @@ function collectImports(tree: Root, filePath: string): MdxImport[] {
 function parseErrorMessage(
   error: unknown,
   filePath: string,
+  lineOffset: number,
 ): { message: string; line?: number; column?: number } {
   if (error instanceof Error) {
     const detail = error as Error & {
@@ -165,7 +171,11 @@ function parseErrorMessage(
       };
     };
 
-    const line = detail.line ?? detail.place?.start?.line;
+    const rawLine = detail.line ?? detail.place?.start?.line;
+    const line =
+      rawLine === undefined
+        ? undefined
+        : rawLine + lineOffset;
     const column = detail.column ?? detail.place?.start?.column;
     const reason = detail.reason ?? detail.message;
     const location =
@@ -185,14 +195,85 @@ function parseErrorMessage(
   };
 }
 
+function shiftPositions(
+  node: unknown,
+  offset: number,
+  visited: Set<object>,
+): void {
+  if (offset === 0 || !node || typeof node !== 'object') {
+    return;
+  }
+  if (visited.has(node)) return;
+  visited.add(node);
+
+  const value = node as {
+    position?: {
+      start?: { line?: number };
+      end?: { line?: number };
+    };
+    children?: unknown[];
+    attributes?: unknown[];
+  };
+
+  if (value.position?.start?.line !== undefined) {
+    value.position.start.line += offset;
+  }
+  if (value.position?.end?.line !== undefined) {
+    value.position.end.line += offset;
+  }
+
+  if (Array.isArray(value.children)) {
+    for (const child of value.children) {
+      shiftPositions(child, offset, visited);
+    }
+  }
+
+  if (Array.isArray(value.attributes)) {
+    for (const attribute of value.attributes) {
+      shiftPositions(attribute, offset, visited);
+    }
+  }
+}
+
+function shiftEsmLocations(tree: Root, offset: number): void {
+  if (offset === 0) return;
+
+  for (const child of tree.children) {
+    if (child.type !== 'mdxjsEsm') continue;
+
+    const program = (child as unknown as MdxEsmNode)
+      .data?.estree;
+    if (!program) continue;
+
+    for (const statement of program.body) {
+      const loc = (
+        statement as {
+          loc?: {
+            start?: { line?: number };
+            end?: { line?: number };
+          };
+        }
+      ).loc;
+
+      if (loc?.start?.line !== undefined) {
+        loc.start.line += offset;
+      }
+      if (loc?.end?.line !== undefined) {
+        loc.end.line += offset;
+      }
+    }
+  }
+}
+
 /**
  * 解析 MDX 源码为 mdast，只收集 import 声明，不执行任何内容代码。
  */
 export function parseMdx(
   source: string,
-  options: { filePath: string },
+  options: ParseMdxOptions,
 ): ParsedMdx {
   const { filePath } = options;
+  const lineOffset = Math.max(0, options.lineOffset ?? 0);
   const input =
     source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
 
@@ -201,7 +282,11 @@ export function parseMdx(
   try {
     tree = processor.parse(input.replace(/\r\n?/g, '\n')) as Root;
   } catch (error) {
-    const detail = parseErrorMessage(error, filePath);
+    const detail = parseErrorMessage(
+      error,
+      filePath,
+      lineOffset,
+    );
 
     throw new MdxError('MDX_PARSE_ERROR', detail.message, {
       file: filePath,
@@ -209,6 +294,9 @@ export function parseMdx(
       column: detail.column,
     });
   }
+
+  shiftPositions(tree, lineOffset, new Set());
+  shiftEsmLocations(tree, lineOffset);
 
   return {
     filePath,

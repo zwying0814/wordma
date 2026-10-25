@@ -15,6 +15,8 @@ import { resolveMdxImports } from './resolve';
 export type AnalyzeMdxOptions = {
   filePath: string;
   workspaceRoot: string;
+  /** 正文第一行之前的前置行数 */
+  lineOffset?: number;
 };
 
 export type MdxAnalysis = {
@@ -48,6 +50,7 @@ export function analyzeMdx(
 ): MdxAnalysis {
   const parsed = parseMdx(source, {
     filePath: options.filePath,
+    lineOffset: options.lineOffset,
   });
   const imports = resolveMdxImports(parsed, {
     workspaceRoot: options.workspaceRoot,
@@ -73,6 +76,7 @@ export async function compileMdx(
     analyzeMdx(source, {
       filePath: options.filePath,
       workspaceRoot: options.workspaceRoot,
+      lineOffset: options.lineOffset,
     });
   const rendered = await renderMdx(analysis.parsed.tree, {
     filePath: options.filePath,

@@ -351,8 +351,38 @@ describe('buildIslandBundles', () => {
     }
   });
 
-  it('语法错误报 ISLAND_BUILD_FAILED', async () => {
+  it('产物包含 React 内部标记报 DUPLICATE_REACT', async () => {
     const root = makeRoot();
+
+    try {
+      writeFile(
+        root,
+        'components/fake-react.tsx',
+        [
+          "export const marker = '__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED';",
+          'export default function FakeReact() { return <span>{marker}</span>; }',
+        ].join('\n'),
+      );
+      const refs = references(
+        root,
+        [
+          "import FakeReact from '../../components/fake-react';",
+          '',
+          '<FakeReact />',
+        ].join('\n'),
+      );
+
+      await expectBuildIslandError(
+        root,
+        refs,
+        'DUPLICATE_REACT',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('语法错误报 ISLAND_BUILD_FAILED', async () => {    const root = makeRoot();
 
     try {
       writeFile(

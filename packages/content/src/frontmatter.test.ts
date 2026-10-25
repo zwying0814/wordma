@@ -33,6 +33,7 @@ describe('splitFrontmatter', () => {
 
     expect(result.data).toBe('title: Hello');
     expect(result.body).toBe('Body\n');
+    expect(result.bodyLine).toBe(4);
   });
 
   it('支持 CRLF 并统一为 LF', () => {

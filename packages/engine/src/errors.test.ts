@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   BuildError,
+  IslandError,
+  MdxError,
   RouteError,
   ThemeError,
 } from './index';
@@ -40,6 +42,42 @@ describe('error contracts', () => {
     expect(error.code).toBe('MISSING_LAYOUT');
     expect(error.themeId).toBe('wordma-theme-test');
     expect(error.path).toBe('/themes/wordma-theme-test');
+  });
+
+  it('MdxError 保留 code / file / line / column', () => {
+    const error = new MdxError(
+      'MISSING_COMPONENT_IMPORT',
+      '缺少组件',
+      {
+        file: '/site/content/posts/a.mdx',
+        line: 8,
+        column: 1,
+      },
+    );
+
+    expect(error.name).toBe('MdxError');
+    expect(error.code).toBe('MISSING_COMPONENT_IMPORT');
+    expect(error.file).toBe('/site/content/posts/a.mdx');
+    expect(error.line).toBe(8);
+    expect(error.column).toBe(1);
+  });
+
+  it('IslandError 保留 code / file / exportName', () => {
+    const error = new IslandError(
+      'ISLAND_BUILD_FAILED',
+      '岛屿打包失败',
+      {
+        file: '/site/components/counter.tsx',
+        exportName: 'default',
+      },
+    );
+
+    expect(error.name).toBe('IslandError');
+    expect(error.code).toBe('ISLAND_BUILD_FAILED');
+    expect(error.file).toBe(
+      '/site/components/counter.tsx',
+    );
+    expect(error.exportName).toBe('default');
   });
 
   it('BuildError 保留 code / path', () => {

@@ -122,6 +122,7 @@ function createEntry(params: {
       filePath,
       relativePath,
       body: parsed.body,
+      bodyLine: parsed.bodyLine,
       isFolderEntry,
       assets: assetResult.assets,
       dateMs,
