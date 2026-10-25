@@ -1,5 +1,10 @@
 export { ENGINE_NAME, ENGINE_VERSION } from './constants';
 export { RouteError, ThemeError, MdxError, BuildError } from './errors';
+export { analyzeIslands } from './islands/analyze';
+export type {
+  IslandNode,
+  IslandReference,
+} from './islands/analyze';
 export { parseMdx } from './mdx/parse';
 export type { MdxImport, ParsedMdx } from './mdx/parse';
 export { renderMdx } from './mdx/render';
