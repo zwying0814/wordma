@@ -1,4 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 
 import {
@@ -17,6 +23,27 @@ import {
 import type { ThemeRuntime } from '../index';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../../..');
+const snapshotsDir = path.join(import.meta.dirname, '__snapshots__');
+const updateSnapshots = process.env.UPDATE_SNAPSHOTS === '1';
+
+function expectGolden(name: string, html: string): void {
+  const file = path.join(snapshotsDir, name);
+
+  if (updateSnapshots) {
+    mkdirSync(snapshotsDir, { recursive: true });
+    writeFileSync(file, html);
+    return;
+  }
+
+  if (!existsSync(file)) {
+    throw new Error(`缺少快照：${file}（运行 UPDATE_SNAPSHOTS=1 更新）`);
+  }
+
+  const golden = readFileSync(file, 'utf8');
+  expect(html.replace(/\r\n/g, '\n')).toBe(
+    golden.replace(/\r\n/g, '\n'),
+  );
+}
 
 const workspace = loadWorkspace(
   path.join(repoRoot, 'fixtures/content-layer'),
@@ -114,6 +141,21 @@ describe('renderRoute', () => {
 
     expect(html).toContain('<h1>404</h1>');
     expect(html).toContain('页面不存在');
+  });
+
+  it('首页 golden HTML', async () => {
+    expectGolden('home.html', await render('/'));
+  });
+
+  it('文章页 golden HTML', async () => {
+    expectGolden(
+      'post.html',
+      await render('/posts/standalone-post/'),
+    );
+  });
+
+  it('404 golden HTML', async () => {
+    expectGolden('404.html', await render('/404/'));
   });
 
   it('缺少布局时抛 MISSING_LAYOUT', async () => {
