@@ -9,6 +9,7 @@ import { loadWorkspace } from '@wordma/content';
 
 import { buildSite } from '../build';
 import type { BuildResult } from '../build';
+import { resolveThemeDirectory } from '../theme/resolve';
 import type {
   BuildSuccessEvent,
   DevEventPayload,
@@ -189,6 +190,7 @@ export async function startDev(
     closed: false,
   };
   let watcher: WatchHandle | undefined;
+  const pendingChanged = new Set<string>();
   server.setDiagnostics(initial.result.diagnostics);
 
   let resolveClosed: () => void = () => undefined;
@@ -218,6 +220,9 @@ export async function startDev(
   ): Promise<void> => {
     if (state.closed) return;
     if (state.building) {
+      for (const item of changed) {
+        pendingChanged.add(item);
+      }
       state.pending = true;
       return;
     }
@@ -268,14 +273,37 @@ export async function startDev(
       state.building = false;
       if (state.pending && !state.closed) {
         state.pending = false;
-        void rebuild([]);
+        const next = [...pendingChanged].sort();
+        pendingChanged.clear();
+        void rebuild(next);
       }
     }
   };
 
   if (!options.noWatch) {
+    const themeDirectory = resolveThemeDirectory(
+      root,
+      workspace.site.theme.id,
+    );
+    const relativeTheme = themeDirectory
+      ? path.relative(root, themeDirectory)
+      : '';
+    const externalTheme =
+      themeDirectory &&
+      (relativeTheme.startsWith('..') ||
+        path.isAbsolute(relativeTheme))
+        ? [themeDirectory]
+        : [];
+
     watcher = startWatch({
       root,
+      additionalRoots: externalTheme,
+      ignoredPaths: [
+        outDir,
+        nextDir,
+        `${outDir}.old`,
+        path.join(root, '.wordma'),
+      ],
       onChange: (changed) => {
         if (state.closed) return;
         logger.event?.({ type: 'watch', changed });

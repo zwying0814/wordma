@@ -551,10 +551,11 @@ describe('buildIslandBundles', () => {
 
       const js = readFileSync(bundle.jsPath, 'utf8');
       const css = readFileSync(bundle.cssPath, 'utf8');
-      const className = /box_[a-zA-Z0-9]+/.exec(css)?.[0];
+      const className =
+        /box:"([^"]+)"/.exec(js)?.[1] ??
+        /box:\s*"([^"]+)"/.exec(js)?.[1];
 
       expect(className).toBeDefined();
-      expect(js).toContain(className ?? '');
       expect(css).toContain(`.${className}`);
       expect(css).not.toContain('\n');
     } finally {

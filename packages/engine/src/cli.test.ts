@@ -2,9 +2,11 @@ import { describe, expect, it } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -137,6 +139,30 @@ async function waitForHttp(
   }
 
   throw new Error(`等待 HTTP 服务超时：${url}\n${String(lastError)}`);
+}
+
+async function waitForHtmlMarker(
+  url: string,
+  marker: string,
+  timeoutMs = 8000,
+): Promise<string> {
+  const started = Date.now();
+  let last = '';
+
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const response = await fetch(url);
+      last = await response.text();
+      if (last.includes(marker)) return last;
+    } catch {
+      // server restarting
+    }
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  }
+
+  throw new Error(
+    `等待页面标记超时：${marker}\n${last.slice(0, 500)}`,
+  );
 }
 
 function parseEvents(output: string): Array<
@@ -736,5 +762,102 @@ describe('wordma-engine CLI', () => {
       }
     },
     15000,
+  );
+
+  it(
+    'watch 修改内容后自动重建，并忽略输出目录',
+    async () => {
+      const root = mkdtempSync(
+        path.join(tmpdir(), 'wordma-cli-watch-'),
+      );
+      const outDir = path.join(root, 'dist');
+      const port = freePort();
+      const write = (
+        relative: string,
+        source: string,
+      ): void => {
+        const file = path.join(root, relative);
+        mkdirSync(path.dirname(file), {
+          recursive: true,
+        });
+        writeFileSync(file, source);
+      };
+
+      write(
+        'wordma.site.yaml',
+        [
+          'site:',
+          '  title: Watch Site',
+          'theme:',
+          '  id: wordma-theme-default',
+        ].join('\n'),
+      );
+      write(
+        'content/posts/hello.mdx',
+        '---\ntitle: One\n---\n\n# One',
+      );
+
+      const proc = Bun.spawn(
+        [
+          process.execPath,
+          cliPath,
+          'dev',
+          '--root',
+          root,
+          `--out=${outDir}`,
+          `--port=${port}`,
+        ],
+        {
+          cwd: repoRoot,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
+      const stdout = proc.stdout as ReadableStream<Uint8Array>;
+      const stderr = proc.stderr as ReadableStream<Uint8Array>;
+      const stderrText = new Response(stderr).text();
+      let exited = false;
+
+      try {
+        await readUntil(stdout, 'Dev server:');
+        await waitForHtmlMarker(
+          `http://127.0.0.1:${port}/posts/hello/`,
+          'One',
+        );
+
+        write(
+          'content/posts/hello.mdx',
+          '---\ntitle: Two\n---\n\n# Two',
+        );
+        await new Promise((resolve) =>
+          setTimeout(resolve, 40),
+        );
+        write(
+          'content/posts/hello.mdx',
+          '---\ntitle: Three\n---\n\n# Three',
+        );
+
+        const html = await waitForHtmlMarker(
+          `http://127.0.0.1:${port}/posts/hello/`,
+          'Three',
+        );
+        expect(html).not.toContain('>One<');
+
+        proc.kill('SIGINT');
+        const code = await proc.exited;
+        exited = true;
+        const errors = await stderrText;
+
+        expect(code).toBe(0);
+        expect(errors).not.toContain('watch 启动失败');
+      } finally {
+        if (!exited && proc.exitCode === null) {
+          proc.kill('SIGKILL');
+          await proc.exited;
+        }
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+    20000,
   );
 });
