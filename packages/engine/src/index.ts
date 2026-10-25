@@ -1,15 +1,24 @@
 export { ENGINE_NAME, ENGINE_VERSION } from './constants';
-export { RouteError, ThemeError, MdxError, BuildError } from './errors';
+export { RouteError, ThemeError, MdxError, IslandError, BuildError } from './errors';
+export { buildIslandBundles, collectIslandInputs, copyIslandAssets } from './islands/bundle';
+export type {
+  BuildIslandBundlesOptions,
+  IslandBuildResult,
+  IslandBundle,
+  IslandBundleInput,
+} from './islands/bundle';
+export { analyzeMdx, compileMdx } from './mdx/compile';
+export type {
+  AnalyzeMdxOptions,
+  CompiledContent,
+  CompileMdxOptions,
+  MdxAnalysis,
+} from './mdx/compile';
 export { analyzeIslands } from './islands/analyze';
 export type {
   IslandNode,
   IslandReference,
 } from './islands/analyze';
-export { compileMdx } from './mdx/compile';
-export type {
-  CompiledContent,
-  CompileMdxOptions,
-} from './mdx/compile';
 export { parseMdx } from './mdx/parse';
 export type { MdxImport, ParsedMdx } from './mdx/parse';
 export { renderMdx } from './mdx/render';

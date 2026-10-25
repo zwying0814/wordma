@@ -1,7 +1,10 @@
 import path from 'node:path';
 
 import { loadWorkspace } from '@wordma/content';
-import type { ContentDiagnostic } from '@wordma/content';
+import type {
+  ContentDiagnostic,
+  ContentEntry,
+} from '@wordma/content';
 
 import {
   prepareOutDir,
@@ -10,8 +13,16 @@ import {
   writeHtmlFile,
 } from './output/writer';
 import type { BuildManifest } from './output/writer';
-import { compileMdx } from './mdx/compile';
-import type { CompiledContent } from './mdx/compile';
+import { analyzeMdx, compileMdx } from './mdx/compile';
+import type {
+  CompiledContent,
+  MdxAnalysis,
+} from './mdx/compile';
+import {
+  buildIslandBundles,
+  collectIslandInputs,
+  copyIslandAssets,
+} from './islands/bundle';
 import { createPageContext } from './render/page-context';
 import { renderRoute } from './render/ssr';
 import {
@@ -30,6 +41,7 @@ export type BuildResult = {
   outDir: string;
   routes: number;
   compiledEntries: number;
+  islands: number;
   theme: {
     id: string;
     version: string;
@@ -57,26 +69,57 @@ export async function buildSite(
   const entriesById = new Map(
     workspace.index.entries.map((entry) => [entry.id, entry]),
   );
-  const compiledContent = new Map<string, CompiledContent>();
+  const analyses = new Map<
+    string,
+    { entry: ContentEntry; analysis: MdxAnalysis }
+  >();
 
   for (const route of routeManifest.routes) {
-    if (!route.entryId || compiledContent.has(route.entryId)) {
+    if (!route.entryId || analyses.has(route.entryId)) {
       continue;
     }
 
     const entry = entriesById.get(route.entryId);
     if (!entry) continue;
 
-    compiledContent.set(
-      route.entryId,
-      await compileMdx(entry.body, {
+    analyses.set(route.entryId, {
+      entry,
+      analysis: analyzeMdx(entry.body, {
         filePath: entry.filePath,
         workspaceRoot: root,
       }),
-    );
+    });
   }
 
+  const islandBundles = await buildIslandBundles(
+    collectIslandInputs(
+      [...analyses.values()].flatMap(
+        (item) => item.analysis.references,
+      ),
+    ),
+    {
+      workspaceRoot: root,
+      cacheDir: path.join(root, '.wordma/cache/islands'),
+      basePath: workspace.site.site.basePath,
+    },
+  );
+
   prepareOutDir(outDir);
+  copyIslandAssets(outDir, islandBundles);
+
+  const compiledContent = new Map<string, CompiledContent>();
+
+  for (const [entryId, item] of analyses) {
+    compiledContent.set(
+      entryId,
+      await compileMdx(item.entry.body, {
+        filePath: item.entry.filePath,
+        workspaceRoot: root,
+        analysis: item.analysis,
+        islandAssets: islandBundles.assets,
+      }),
+    );
+  }
 
   for (const route of routeManifest.routes) {
     const context = createPageContext({
@@ -121,6 +164,7 @@ export async function buildSite(
     outDir,
     routes: routeManifest.routes.length,
     compiledEntries: compiledContent.size,
+    islands: islandBundles.bundles.length,
     theme: {
       id: themeRuntime.manifest.id,
       version: themeRuntime.manifest.version,

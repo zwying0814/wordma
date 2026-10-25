@@ -33,6 +33,7 @@ describe('buildSite', () => {
 
       expect(result.routes).toBe(17);
       expect(result.compiledEntries).toBe(4);
+      expect(result.islands).toBe(0);
       expect(result.theme.id).toBe('wordma-theme-default');
       expect(result.diagnostics).toEqual([]);
       expect(existsSync(path.join(outDir, 'stale.txt'))).toBe(false);
@@ -138,6 +139,7 @@ describe('buildSite', () => {
       const result = await buildSite({ root, outDir });
 
       expect(result.compiledEntries).toBe(1);
+      expect(result.islands).toBe(2);
 
       const html = readFileSync(
         path.join(outDir, 'posts/islands/index.html'),
@@ -150,8 +152,25 @@ describe('buildSite', () => {
       expect(html).toContain(
         'This content is rendered inside a Note island.',
       );
+      expect(html).toContain(
+        'data-wordma-src="/assets/islands/island-',
+      );
+
+      const islandFile = /data-wordma-src="\/assets\/islands\/(island-[^"]+\.js)"/.exec(
+        html,
+      )?.[1];
+      expect(islandFile).toBeDefined();
+      expect(
+        existsSync(
+          path.join(outDir, 'assets/islands', islandFile ?? ''),
+        ),
+      ).toBe(true);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
+      rmSync(path.join(root, '.wordma'), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 

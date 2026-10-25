@@ -21,6 +21,7 @@ import { visit } from 'unist-util-visit';
 
 import { MdxError } from '../errors';
 import type { IslandReference } from '../islands/analyze';
+import { islandExportName } from '../islands/identity';
 import {
   evaluateJsxAttributes,
   serializeIslandProps,
@@ -276,14 +277,6 @@ async function renderSlot(
   }).trim();
 
   return html || undefined;
-}
-
-function islandExportName(reference: IslandReference): string {
-  const importedName = reference.import.importedName;
-
-  return reference.propertyPath.length > 0
-    ? `${importedName}.${reference.propertyPath.join('.')}`
-    : importedName;
 }
 
 async function prepareIslands(

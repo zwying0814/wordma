@@ -135,8 +135,10 @@ function resolveImport(
   }
 
   const workspaceRoot = realpathSync(options.workspaceRoot);
-  const filePath = realpathOrResolve(options.filePath);
-  const baseDirectory = path.dirname(filePath);
+  const filePath = path.resolve(options.filePath);
+  const baseDirectory = realpathOrResolve(
+    path.dirname(filePath),
+  );
   const isRelative =
     imported.source.startsWith('./') ||
     imported.source.startsWith('../');

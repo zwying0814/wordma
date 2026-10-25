@@ -64,6 +64,27 @@ export class MdxError extends Error {
   }
 }
 
+export class IslandError extends Error {
+  readonly code: string;
+  readonly file?: string;
+  readonly exportName?: string;
+
+  constructor(
+    code: string,
+    message: string,
+    options: {
+      file?: string;
+      exportName?: string;
+    } = {},
+  ) {
+    super(message);
+    this.name = 'IslandError';
+    this.code = code;
+    this.file = options.file;
+    this.exportName = options.exportName;
+  }
+}
+
 export class BuildError extends Error {
   readonly code: string;
   readonly path?: string;
