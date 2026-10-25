@@ -18,6 +18,7 @@
     "@wordma/theme": "workspace:*",
     "hast-util-to-html": "^9.0.5",
     "katex": "^0.19.1",
+    "lightningcss": "^1.33.0",
     "mdast-util-to-string": "^4.0.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

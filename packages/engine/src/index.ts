@@ -42,6 +42,15 @@ export type {
   ResolvedMdxImport,
   ResolveMdxImportsOptions,
 } from './mdx/resolve';
+export {
+  buildThemeStyles,
+  copyThemeStyles,
+} from './styles/theme-styles';
+export type {
+  BuildThemeStylesOptions,
+  ThemeStylesAsset,
+  ThemeStylesResult,
+} from './styles/theme-styles';
 export { buildSite } from './build';
 export type { BuildOptions, BuildResult } from './build';
 export { inspectWorkspace } from './inspect';

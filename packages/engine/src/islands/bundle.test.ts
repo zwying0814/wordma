@@ -518,6 +518,50 @@ describe('buildIslandBundles', () => {
     }
   });
 
+  it('支持 CSS Modules 并保留类名映射', async () => {
+    const root = makeRoot();
+
+    try {
+      writeFile(
+        root,
+        'components/style.module.css',
+        '.box { color: blue; }\n',
+      );
+      writeFile(
+        root,
+        'components/module-styled.tsx',
+        [
+          "import styles from './style.module.css';",
+          "export default function ModuleStyled() { return <span className={styles.box}>m</span>; }",
+        ].join('\n'),
+      );
+      const refs = references(
+        root,
+        [
+          "import ModuleStyled from '../../components/module-styled';",
+          '',
+          '<ModuleStyled />',
+        ].join('\n'),
+      );
+      const result = await build(root, refs);
+      const bundle = result.bundles[0];
+      if (!bundle?.cssPath) {
+        throw new Error('缺少 CSS Modules 产物');
+      }
+
+      const js = readFileSync(bundle.jsPath, 'utf8');
+      const css = readFileSync(bundle.cssPath, 'utf8');
+      const className = /box_[a-zA-Z0-9]+/.exec(css)?.[0];
+
+      expect(className).toBeDefined();
+      expect(js).toContain(className ?? '');
+      expect(css).toContain(`.${className}`);
+      expect(css).not.toContain('\n');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('无岛屿时不创建缓存目录', async () => {
     const root = makeRoot();
 

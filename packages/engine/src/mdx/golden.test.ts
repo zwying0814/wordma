@@ -160,6 +160,10 @@ describe('M3 golden HTML', () => {
       expectGolden('content-post.html', html);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
+      rmSync(path.join(root, '.wordma'), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 });

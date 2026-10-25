@@ -71,9 +71,18 @@ describe('buildSite', () => {
       expect(home).toContain('Content Layer Fixture');
       expect(home).toContain('href="/posts/standalone-post/"');
       expect(home).toContain('href="/page/2/"');
+      expect(home).toContain(
+        '/assets/css/theme-',
+      );
       expect(
         existsSync(path.join(outDir, 'assets/islands')),
       ).toBe(false);
+
+      const themeCss = readdirSync(
+        path.join(outDir, 'assets/css'),
+      );
+      expect(themeCss).toHaveLength(1);
+      expect(themeCss[0]).toStartWith('theme-');
 
       const notFound = readFileSync(
         path.join(outDir, '404.html'),
@@ -122,6 +131,10 @@ describe('buildSite', () => {
       expect(home).not.toContain('data-wordma-src');
     } finally {
       rmSync(outDir, { recursive: true, force: true });
+      rmSync(path.join(fixture, '.wordma'), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
@@ -142,6 +155,10 @@ describe('buildSite', () => {
       ).toBe(true);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
+      rmSync(path.join(fixture, '.wordma'), {
+        recursive: true,
+        force: true,
+      });
     }
   });
 
@@ -174,6 +191,12 @@ describe('buildSite', () => {
         'href="/assets/islands/island-',
       );
       expect(html).toContain('.css"');
+      expect(html).toContain(
+        '/assets/css/theme-',
+      );
+      expect(html.indexOf('/assets/css/theme-')).toBeLessThan(
+        html.indexOf('/assets/islands/island-'),
+      );
       expect(html).toContain('<script type="importmap">');
       expect(html).toContain(
         '"react":"/assets/islands/react-',

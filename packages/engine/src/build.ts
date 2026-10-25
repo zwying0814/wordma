@@ -31,6 +31,10 @@ import {
 import { createPageContext } from './render/page-context';
 import { renderRoute } from './render/ssr';
 import {
+  buildThemeStyles,
+  copyThemeStyles,
+} from './styles/theme-styles';
+import {
   buildRouteManifest,
 } from './routing/manifest';
 import type { RouteManifest } from './routing/manifest';
@@ -71,6 +75,11 @@ export async function buildSite(
     themeRuntime.manifest,
   );
   const outDir = resolveOutDir(root, options.outDir);
+  const themeStyles = buildThemeStyles({
+    themeRuntime,
+    cacheDir: path.join(root, '.wordma/cache/css'),
+    basePath: workspace.site.site.basePath,
+  });
   const entriesById = new Map(
     workspace.index.entries.map((entry) => [entry.id, entry]),
   );
@@ -121,6 +130,7 @@ export async function buildSite(
       : undefined;
 
   prepareOutDir(outDir);
+  copyThemeStyles(outDir, themeStyles);
   copyIslandAssets(outDir, islandBundles);
   if (islandRuntime) {
     copyIslandRuntime(outDir, islandRuntime);
@@ -150,23 +160,29 @@ export async function buildSite(
         ? compiledContent.get(route.entryId)
         : undefined,
     });
-    const assets: PageAssets =
+    const islandStyles =
       islandRuntime && context.content.islands.length > 0
+        ? context.content.islands
+            .map((island) => island.css)
+            .filter(
+              (css): css is string =>
+                typeof css === 'string',
+            )
+        : [];
+    const assets: PageAssets = {
+      styles: [
+        ...(themeStyles.css
+          ? [themeStyles.css.url]
+          : []),
+        ...new Set(islandStyles),
+      ],
+      ...(islandRuntime && context.content.islands.length > 0
         ? {
-            styles: [
-              ...new Set(
-                context.content.islands
-                  .map((island) => island.css)
-                  .filter(
-                    (css): css is string =>
-                      typeof css === 'string',
-                  ),
-              ),
-            ],
             importMap: islandRuntime.importMap,
             bodyScripts: [islandRuntime.mount.url],
           }
-        : { styles: [], bodyScripts: [] };
+        : { bodyScripts: [] }),
+    };
     const html = renderRoute({
       route,
       context,

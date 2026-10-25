@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { assetUrl } from '../assets';
 import { IslandError } from '../errors';
+import { minifyCss } from '../styles/css';
 import type { IslandReference } from './analyze';
 import {
   islandExportName,
@@ -486,12 +487,20 @@ export async function buildIslandBundles(
     let cssFile: string | undefined;
 
     if (cssOutput) {
-      const cssText = await cssOutput.text();
+      const rawCss = await cssOutput.text();
+      let cssText: string;
+      try {
+        cssText = minifyCss(rawCss, cssOutput.path);
+      } catch (error) {
+        throw buildError(input, error);
+      }
+
       cssBytes = new TextEncoder().encode(cssText).length;
       cssFile = `island-${hash}-${contentHash(cssText)}.css`;
       cssPath = path.join(cacheDir, cssFile);
+      writeFileSync(cssPath, cssText);
       if (cssOutput.path !== cssPath) {
-        renameSync(cssOutput.path, cssPath);
+        rmSync(cssOutput.path, { force: true });
       }
     }
 

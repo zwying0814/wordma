@@ -137,6 +137,13 @@ describe('wordma-engine CLI', () => {
       expect(manifest.routes).toHaveLength(17);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
+      rmSync(
+        path.join(
+          repoRoot,
+          'fixtures/content-layer/.wordma',
+        ),
+        { recursive: true, force: true },
+      );
     }
   });
 
@@ -160,6 +167,13 @@ describe('wordma-engine CLI', () => {
       ).toBe(true);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
+      rmSync(
+        path.join(
+          repoRoot,
+          'fixtures/content-layer/.wordma',
+        ),
+        { recursive: true, force: true },
+      );
     }
   });
 
