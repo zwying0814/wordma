@@ -30,6 +30,8 @@ export type CompileMdxOptions = AnalyzeMdxOptions & {
   analysis?: MdxAnalysis;
   /** 按 referenceIslandKey 查找已打包的岛屿资产 */
   islandAssets?: ReadonlyMap<string, IslandAsset>;
+  /** 正文资源路径 → hash URL */
+  resolveAsset?: (source: string) => string | undefined;
 };
 
 export type CompiledContent = {
@@ -81,6 +83,7 @@ export async function compileMdx(
   const rendered = await renderMdx(analysis.parsed.tree, {
     filePath: options.filePath,
     codeTheme: options.codeTheme,
+    resolveAsset: options.resolveAsset,
     islands: analysis.references.map((reference) => {
       const asset = options.islandAssets?.get(
         referenceIslandKey(reference),

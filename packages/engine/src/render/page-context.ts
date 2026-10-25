@@ -1,5 +1,6 @@
 import type {
   ContentEntry,
+  AssetRef,
   PageMeta,
   PageSummary,
   PostSummary,
@@ -27,6 +28,8 @@ export type CreatePageContextOptions = {
   routeManifest: RouteManifest;
   themeManifest: ThemeManifest;
   compiledContent?: CompiledContent;
+  contentAssets?: AssetRef[];
+  contentCover?: AssetRef;
 };
 
 type UrlMaps = {
@@ -210,6 +213,8 @@ export function createPageContext(
     routeManifest,
     themeManifest,
     compiledContent,
+    contentAssets,
+    contentCover,
   } = options;
   const maps = buildUrlMaps(routeManifest.routes);
   const url = (path: string): string =>
@@ -319,7 +324,9 @@ export function createPageContext(
           css: island.css,
         }),
       ),
-      assets: entry?.assets ?? [],
+      assets:
+        contentAssets ?? entry?.assets ?? [],
+      ...(contentCover ? { cover: contentCover } : {}),
       excerpt:
         compiledContent?.excerpt ?? entry?.meta.description,
     },

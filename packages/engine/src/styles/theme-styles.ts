@@ -14,7 +14,7 @@ import type { ThemeStyles } from '@wordma/theme';
 import { assetUrl } from '../assets';
 import { ThemeError } from '../errors';
 import type { ThemeRuntime } from '../theme/runtime';
-import { compileCssFile } from './css';
+import { compileCssFile, applyBasePathToCssUrls } from './css';
 
 export type ThemeStylesAsset = {
   url: string;
@@ -262,7 +262,10 @@ export function buildThemeStyles(
     }
   }
 
-  const css = chunks.join('\n');
+  const css = applyBasePathToCssUrls(
+    chunks.join('\n'),
+    options.basePath,
+  );
   const hash = contentHash(css);
   const cacheDir = path.resolve(options.cacheDir);
   const file = `theme-${hash}.css`;

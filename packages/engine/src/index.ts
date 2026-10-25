@@ -52,6 +52,22 @@ export type {
   ThemeStylesAsset,
   ThemeStylesResult,
 } from './styles/theme-styles';
+export {
+  copyContentAssets,
+  createContentAssetResolver,
+  resolveContentAssetPath,
+} from './output/content-assets';
+export type {
+  ContentAssetResolverOptions,
+  ContentAssetsResult,
+  CopyContentAssetsOptions,
+} from './output/content-assets';
+export { copyStaticAssets } from './output/static';
+export type {
+  CopyStaticOptions,
+  StaticCopyResult,
+  StaticFile,
+} from './output/static';
 export { buildSite } from './build';
 export type { BuildOptions, BuildResult } from './build';
 export { inspectWorkspace } from './inspect';

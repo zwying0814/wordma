@@ -100,6 +100,25 @@ describe('buildSite', () => {
       expect(post).toContain('Content layer fixture.');
       expect(post).toContain('id="standalone-post"');
 
+      const folderPost = readFileSync(
+        path.join(outDir, 'posts/folder/index.html'),
+        'utf8',
+      );
+      const imageSrc =
+        /src="\/assets\/content\/([a-f0-9]{8}-photo\.svg)"/.exec(
+          folderPost,
+        )?.[1];
+      expect(imageSrc).toBeDefined();
+      expect(
+        existsSync(
+          path.join(
+            outDir,
+            'assets/content',
+            imageSrc ?? '',
+          ),
+        ),
+      ).toBe(true);
+
       const manifest = JSON.parse(
         readFileSync(
           path.join(outDir, '.wordma-manifest.json'),

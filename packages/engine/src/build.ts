@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import { loadWorkspace } from '@wordma/content';
 import type {
+  AssetRef,
   ContentDiagnostic,
   ContentEntry,
 } from '@wordma/content';
@@ -14,6 +15,12 @@ import {
   writeHtmlFile,
 } from './output/writer';
 import type { BuildManifest } from './output/writer';
+import {
+  copyContentAssets,
+  createContentAssetResolver,
+  resolveContentAssetPath,
+} from './output/content-assets';
+import { copyStaticAssets } from './output/static';
 import { analyzeMdx, compileMdx } from './mdx/compile';
 import type {
   CompiledContent,
@@ -130,6 +137,20 @@ export async function buildSite(
       : undefined;
 
   prepareOutDir(outDir);
+  const staticAssets = copyStaticAssets({
+    root,
+    themeDirectory: themeRuntime.directory,
+    outDir,
+    basePath: workspace.site.site.basePath,
+  });
+  const contentAssets = copyContentAssets({
+    workspaceRoot: root,
+    outDir,
+    basePath: workspace.site.site.basePath,
+    entries: [...analyses.values()].map(
+      (item) => item.entry,
+    ),
+  });
   copyThemeStyles(outDir, themeStyles);
   copyIslandAssets(outDir, islandBundles);
   if (islandRuntime) {
@@ -137,8 +158,35 @@ export async function buildSite(
   }
 
   const compiledContent = new Map<string, CompiledContent>();
+  const entryAssets = new Map<string, AssetRef[]>();
+  const entryCovers = new Map<string, AssetRef>();
 
   for (const [entryId, item] of analyses) {
+    entryAssets.set(
+      entryId,
+      item.entry.assets
+        .map((asset) =>
+          contentAssets.bySource.get(asset.source),
+        )
+        .filter(
+          (asset): asset is AssetRef =>
+            asset !== undefined,
+        ),
+    );
+
+    if (item.entry.meta.cover) {
+      const realPath = resolveContentAssetPath(
+        item.entry.meta.cover,
+        item.entry.filePath,
+        root,
+      );
+      const cover = realPath
+        ? contentAssets.byRealPath.get(realPath)
+        : undefined;
+
+      if (cover) entryCovers.set(entryId, cover);
+    }
+
     compiledContent.set(
       entryId,
       await compileMdx(item.entry.body, {
@@ -146,6 +194,11 @@ export async function buildSite(
         workspaceRoot: root,
         analysis: item.analysis,
         islandAssets: islandBundles.assets,
+        resolveAsset: createContentAssetResolver({
+          entryFilePath: item.entry.filePath,
+          workspaceRoot: root,
+          byRealPath: contentAssets.byRealPath,
+        }),
       }),
     );
   }
@@ -158,6 +211,12 @@ export async function buildSite(
       themeManifest: themeRuntime.manifest,
       compiledContent: route.entryId
         ? compiledContent.get(route.entryId)
+        : undefined,
+      contentAssets: route.entryId
+        ? entryAssets.get(route.entryId)
+        : undefined,
+      contentCover: route.entryId
+        ? entryCovers.get(route.entryId)
         : undefined,
     });
     const islandStyles =
@@ -196,6 +255,8 @@ export async function buildSite(
   const diagnostics = [
     ...routeManifest.diagnostics,
     ...themeRuntime.diagnostics,
+    ...staticAssets.diagnostics,
+    ...contentAssets.diagnostics,
   ];
   const buildManifest: BuildManifest = {
     version: 1,

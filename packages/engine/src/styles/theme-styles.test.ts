@@ -328,6 +328,39 @@ describe('buildThemeStyles', () => {
     }
   });
 
+  it('basePath 会补到 CSS 的根相对 url()', () => {
+    const theme = makeTheme();
+    const cacheDir = mkdtempSync(
+      path.join(tmpdir(), 'wordma-theme-css-cache-'),
+    );
+
+    try {
+      writeCss(
+        theme.dir,
+        'src/styles/font.css',
+        '@font-face { src: url(/fonts/a.woff2); }\n.icon { background: url("/img/x.svg"); }\n',
+      );
+
+      const result = buildThemeStyles({
+        themeRuntime: theme.runtime([
+          './styles/font.css',
+        ]),
+        cacheDir,
+        basePath: '/docs/',
+      });
+      const css = readFileSync(
+        result.css?.filePath ?? '',
+        'utf8',
+      );
+
+      expect(css).toContain('/docs/fonts/a.woff2');
+      expect(css).toContain('/docs/img/x.svg');
+    } finally {
+      rmSync(theme.dir, { recursive: true, force: true });
+      rmSync(cacheDir, { recursive: true, force: true });
+    }
+  });
+
   it('无 styles 时不产出 CSS', () => {
     const theme = makeTheme();
 

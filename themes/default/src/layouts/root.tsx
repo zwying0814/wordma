@@ -12,6 +12,7 @@ export function RootLayout({
   site,
   page,
   theme,
+  helpers,
   children,
 }: RootLayoutProps) {
   const accent = theme.accent ?? '#3563d9';
@@ -31,7 +32,7 @@ export function RootLayout({
       </head>
       <body style={{ '--wordma-accent': accent } as CSSProperties}>
         <header className="site-header">
-          <a className="site-title" href="/">
+          <a className="site-title" href={helpers.url('/')}>
             {site.title}
           </a>
         </header>

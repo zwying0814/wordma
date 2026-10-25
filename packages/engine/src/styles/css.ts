@@ -31,3 +31,28 @@ export function minifyCss(
 
   return new TextDecoder().decode(result.code);
 }
+
+export function applyBasePathToCssUrls(
+  css: string,
+  basePath: string | undefined,
+): string {
+  const prefix =
+    basePath && basePath !== '/'
+      ? basePath.replace(/^\/+|\/+$/g, '')
+      : '';
+  if (!prefix) return css;
+
+  return css.replace(
+    /url\(\s*(["']?)\/(?!\/)([^)"']*)\1\s*\)/g,
+    (match, quote: string, path: string) => {
+      if (
+        path === prefix ||
+        path.startsWith(`${prefix}/`)
+      ) {
+        return match;
+      }
+
+      return `url(${quote}/${prefix}/${path}${quote})`;
+    },
+  );
+}

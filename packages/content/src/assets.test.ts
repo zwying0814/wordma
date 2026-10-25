@@ -109,6 +109,35 @@ describe('asset discovery', () => {
     }
   });
 
+  it('发现 Markdown 与 HTML 链接资源', () => {
+    const root = makeRoot();
+    writeEntry(
+      path.join(root, 'content/posts/links.mdx'),
+      'title: Links',
+      [
+        '[doc](./doc.pdf)',
+        '<a href="./guide.pdf">guide</a>',
+        '[external](https://example.com/x)',
+      ].join('\n'),
+    );
+    writeFile(path.join(root, 'content/posts/doc.pdf'));
+    writeFile(path.join(root, 'content/posts/guide.pdf'));
+
+    try {
+      const index = loadContentIndex(path.join(root, 'content'), {
+        workspaceRoot: root,
+      });
+      const entry = index.collections.posts?.entries[0];
+
+      expect(entry?.assets.map((asset) => asset.source)).toEqual([
+        'content/posts/doc.pdf',
+        'content/posts/guide.pdf',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('standalone entry 的正文图片相对 collection 目录解析', () => {
     const root = makeRoot();
     writeEntry(

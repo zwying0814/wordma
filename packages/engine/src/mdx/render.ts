@@ -59,6 +59,8 @@ export type RenderMdxOptions = {
   codeTheme?: string;
   /** 由 analyzeIslands 得到的岛屿，附带已打包资产 */
   islands?: IslandRenderInput[];
+  /** 把正文中的相对资源路径解析为 hash URL */
+  resolveAsset?: (source: string) => string | undefined;
 };
 
 export type RenderedMdx = {
@@ -197,6 +199,36 @@ function findKatexError(tree: HastRoot): Element | undefined {
   });
 
   return error;
+}
+
+function rewriteAssetUrls(
+  tree: HastRoot,
+  resolveAsset: ((source: string) => string | undefined) | undefined,
+): void {
+  if (!resolveAsset) return;
+
+  visit(tree, 'element', (node: Element) => {
+    const attribute =
+      node.tagName === 'a'
+        ? 'href'
+        : node.tagName === 'img' ||
+            node.tagName === 'source' ||
+            node.tagName === 'video' ||
+            node.tagName === 'audio' ||
+            node.tagName === 'track'
+          ? 'src'
+          : undefined;
+
+    if (!attribute) return;
+
+    const value = node.properties[attribute];
+    if (typeof value !== 'string') return;
+
+    const resolved = resolveAsset(value);
+    if (resolved) {
+      node.properties[attribute] = resolved;
+    }
+  });
 }
 
 async function runProcessor(
@@ -535,7 +567,12 @@ export async function renderMdx(
     options,
   );
   const processor = createProcessor(options, prepared);
-  const hast = await runProcessor(processor, tree, options);
+  const hast = await runProcessor(
+    processor,
+    tree,
+    options,
+  );
+  rewriteAssetUrls(hast, options.resolveAsset);
 
   return {
     html: toHtml(hast, { allowDangerousHtml: true }),

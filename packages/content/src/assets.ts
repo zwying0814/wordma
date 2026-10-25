@@ -106,10 +106,24 @@ function extractBodyAssetPaths(body: string): string[] {
     if (match[1]) paths.push(match[1]);
   }
 
+  // Markdown 链接：[text](path "title")
+  const markdownLink =
+    /(?<!!)\[[^\]]*]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g;
+  for (const match of body.matchAll(markdownLink)) {
+    if (match[1]) paths.push(match[1]);
+  }
+
   // HTML 图片：<img src="path">
   const htmlImage =
     /<img\b[^>]*\ssrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
   for (const match of body.matchAll(htmlImage)) {
+    if (match[1]) paths.push(match[1]);
+  }
+
+  // HTML 链接：<a href="path">
+  const htmlLink =
+    /<a\b[^>]*\shref\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  for (const match of body.matchAll(htmlLink)) {
     if (match[1]) paths.push(match[1]);
   }
 

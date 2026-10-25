@@ -15,6 +15,7 @@ export type PageContent = {
   headings: Heading[];
   islands: IslandRef[];
   assets: AssetRef[];
+  cover?: AssetRef;
   excerpt?: string;
 };
 
