@@ -58,6 +58,7 @@ export {
   resolveContentAssetPath,
 } from './output/content-assets';
 export type {
+  ContentAssetFile,
   ContentAssetResolverOptions,
   ContentAssetsResult,
   CopyContentAssetsOptions,
@@ -76,6 +77,11 @@ export type {
 } from './output/static';
 export { buildSite } from './build';
 export type { BuildOptions, BuildResult } from './build';
+export type {
+  BuildManifest,
+  BuildManifestOutput,
+  BuildManifestPage,
+} from './output/writer';
 export { inspectWorkspace } from './inspect';
 export type {
   InspectPageType,

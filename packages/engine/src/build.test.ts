@@ -135,22 +135,109 @@ describe('buildSite', () => {
         ),
       ) as {
         version: number;
-        site: { title: string; basePath: string };
+        site: {
+          title: string;
+          basePath: string;
+          url?: string;
+        };
         theme: { id: string; version: string };
         routes: unknown[];
+        pages: Array<{
+          path: string;
+          output: string;
+          kind: string;
+          assets: {
+            styles: string[];
+            scripts: string[];
+          };
+        }>;
         diagnostics: Array<{ code: string }>;
         assets: {
+          themeStyles?: { url: string; bytes: number };
           islands: unknown[];
           reactRuntime?: unknown;
           mountScript?: unknown;
+          content: Array<{
+            source: string;
+            url: string;
+            hash: string;
+            bytes: number;
+          }>;
+          static: Array<{ path: string; url: string }>;
         };
+        outputs: Array<{
+          path: string;
+          kind: 'html' | 'asset' | 'feed';
+        }>;
       };
 
-      expect(manifest.version).toBe(1);
+      expect(manifest.version).toBe(2);
       expect(manifest.site.title).toBe('Content Layer Fixture');
       expect(manifest.site.basePath).toBe('');
+      expect(manifest.site.url).toBeUndefined();
       expect(manifest.theme.id).toBe('wordma-theme-default');
       expect(manifest.routes).toHaveLength(17);
+      expect(manifest.pages).toHaveLength(17);
+
+      const postPage = manifest.pages.find(
+        (page) =>
+          page.path === '/posts/standalone-post/',
+      );
+      expect(postPage?.output).toBe(
+        'posts/standalone-post/index.html',
+      );
+      expect(postPage?.kind).toBe('post');
+      expect(postPage?.assets.styles).toEqual([
+        manifest.assets.themeStyles?.url as string,
+      ]);
+      expect(postPage?.assets.scripts).toEqual([]);
+
+      expect(
+        manifest.assets.themeStyles?.url,
+      ).toContain('/assets/css/theme-');
+      expect(
+        manifest.assets.themeStyles?.bytes,
+      ).toBeGreaterThan(0);
+      expect(manifest.assets.islands).toEqual([]);
+      expect(manifest.assets.reactRuntime).toBeUndefined();
+      expect(manifest.assets.mountScript).toBeUndefined();
+      expect(manifest.assets.content).toHaveLength(2);
+      expect(
+        manifest.assets.content.some((asset) =>
+          asset.source.endsWith('photo.svg'),
+        ),
+      ).toBe(true);
+      expect(
+        manifest.assets.content.every(
+          (asset) =>
+            asset.hash.length === 8 &&
+            asset.url.includes(asset.hash),
+        ),
+      ).toBe(true);
+      expect(manifest.assets.static).toEqual([]);
+
+      expect(
+        manifest.outputs.map((output) => output.path),
+      ).toEqual(
+        [...manifest.outputs]
+          .map((output) => output.path)
+          .sort(),
+      );
+      expect(
+        manifest.outputs.filter(
+          (output) => output.kind === 'html',
+        ),
+      ).toHaveLength(17);
+      expect(
+        manifest.outputs.find(
+          (output) => output.path === 'robots.txt',
+        )?.kind,
+      ).toBe('feed');
+      for (const output of manifest.outputs) {
+        expect(
+          existsSync(path.join(outDir, output.path)),
+        ).toBe(true);
+      }
       expect(
         manifest.diagnostics.filter(
           (diagnostic) =>
@@ -290,7 +377,15 @@ describe('buildSite', () => {
           'utf8',
         ),
       ) as {
+        pages: Array<{
+          path: string;
+          assets: {
+            styles: string[];
+            scripts: string[];
+          };
+        }>;
         assets: {
+          themeStyles?: { url: string; bytes: number };
           islands: Array<{
             source: string;
             exportName: string;
@@ -301,6 +396,10 @@ describe('buildSite', () => {
           reactRuntime?: { url: string; bytes: number };
           mountScript?: { url: string; bytes: number };
         };
+        outputs: Array<{
+          path: string;
+          kind: string;
+        }>;
       };
 
       expect(manifest.assets.islands).toHaveLength(2);
@@ -330,6 +429,39 @@ describe('buildSite', () => {
       expect(manifest.assets.mountScript?.url).toContain(
         '/assets/islands/mount-',
       );
+
+      const postPage = manifest.pages.find(
+        (page) => page.path === '/posts/islands/',
+      );
+      expect(postPage?.assets.styles).toHaveLength(2);
+      expect(postPage?.assets.styles[0]).toBe(
+        manifest.assets.themeStyles?.url,
+      );
+      expect(postPage?.assets.styles[1]).toContain(
+        '/assets/islands/island-',
+      );
+      expect(postPage?.assets.scripts).toEqual([
+        manifest.assets.mountScript?.url as string,
+      ]);
+
+      const homePage = manifest.pages.find(
+        (page) => page.path === '/',
+      );
+      expect(homePage?.assets.styles).toEqual([
+        manifest.assets.themeStyles?.url as string,
+      ]);
+      expect(homePage?.assets.scripts).toEqual([]);
+
+      for (const output of manifest.outputs) {
+        expect(
+          existsSync(path.join(outDir, output.path)),
+        ).toBe(true);
+      }
+      expect(
+        manifest.outputs.filter(
+          (output) => output.kind === 'html',
+        ).length,
+      ).toBeGreaterThan(0);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
       rmSync(path.join(root, '.wordma'), {
@@ -419,6 +551,14 @@ describe('buildSite', () => {
         ),
       ) as {
         diagnostics: Array<{ code: string }>;
+        assets: {
+          themeStyles?: unknown;
+          islands: unknown[];
+        };
+        outputs: Array<{
+          path: string;
+          kind: string;
+        }>;
       };
 
       expect(
@@ -426,6 +566,16 @@ describe('buildSite', () => {
           (diagnostic) => diagnostic.code === 'MISSING_LAYOUT',
         ),
       ).toHaveLength(2);
+      expect(manifest.assets.themeStyles).toBeUndefined();
+      expect(manifest.assets.islands).toEqual([]);
+      expect(manifest.outputs.length).toBeGreaterThan(0);
+      expect(
+        manifest.outputs.every(
+          (output) =>
+            output.kind === 'html' ||
+            output.kind === 'feed',
+        ),
+      ).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
       rmSync(outDir, { recursive: true, force: true });

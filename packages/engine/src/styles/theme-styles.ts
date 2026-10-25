@@ -18,6 +18,8 @@ import { compileCssFile, applyBasePathToCssUrls } from './css';
 
 export type ThemeStylesAsset = {
   url: string;
+  /** dist 内相对路径（POSIX） */
+  path: string;
   filePath: string;
   bytes: number;
   sources: string[];
@@ -281,6 +283,7 @@ export function buildThemeStyles(
         options.basePath,
         `assets/css/${file}`,
       ),
+      path: `assets/css/${file}`,
       filePath,
       bytes: new TextEncoder().encode(css).length,
       sources: files.map((item) =>

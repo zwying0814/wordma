@@ -15,6 +15,10 @@ import {
   writeHtmlFile,
 } from './output/writer';
 import type { BuildManifest } from './output/writer';
+import type {
+  BuildManifestOutput,
+  BuildManifestPage,
+} from './output/writer';
 import {
   copyContentAssets,
   createContentAssetResolver,
@@ -204,6 +208,8 @@ export async function buildSite(
     );
   }
 
+  const pages: BuildManifestPage[] = [];
+
   for (const route of routeManifest.routes) {
     const context = createPageContext({
       route,
@@ -251,6 +257,15 @@ export async function buildSite(
     });
 
     writeHtmlFile(outDir, route, html);
+    pages.push({
+      path: route.path,
+      output: route.output,
+      kind: route.kind,
+      assets: {
+        styles: [...assets.styles],
+        scripts: [...assets.bodyScripts],
+      },
+    });
   }
 
   const feedResult = writeFeeds({
@@ -280,19 +295,77 @@ export async function buildSite(
     ...contentAssets.diagnostics,
     ...feedResult.diagnostics,
   ];
+  const outputs = new Map<string, BuildManifestOutput>();
+  const addOutput = (
+    outputPath: string,
+    kind: BuildManifestOutput['kind'],
+  ): void => {
+    outputs.set(outputPath, { path: outputPath, kind });
+  };
+
+  for (const file of staticAssets.files) {
+    addOutput(file.path, 'asset');
+  }
+  for (const file of contentAssets.files) {
+    addOutput(file.path, 'asset');
+  }
+  if (themeStyles.css) {
+    addOutput(themeStyles.css.path, 'asset');
+  }
+  for (const bundle of islandBundles.bundles) {
+    addOutput(
+      `assets/islands/${path.basename(bundle.jsPath)}`,
+      'asset',
+    );
+    if (bundle.cssPath) {
+      addOutput(
+        `assets/islands/${path.basename(bundle.cssPath)}`,
+        'asset',
+      );
+    }
+  }
+  if (islandRuntime) {
+    addOutput(
+      `assets/islands/${path.basename(islandRuntime.react.filePath)}`,
+      'asset',
+    );
+    addOutput(
+      `assets/islands/${path.basename(islandRuntime.mount.filePath)}`,
+      'asset',
+    );
+  }
+  for (const file of feedResult.files) {
+    addOutput(file.path, 'feed');
+  }
+  for (const route of routeManifest.routes) {
+    addOutput(route.output, 'html');
+  }
+
   const buildManifest: BuildManifest = {
-    version: 1,
+    version: 2,
     site: {
       title: workspace.site.site.title,
       basePath: workspace.site.site.basePath,
+      ...(workspace.site.site.url
+        ? { url: workspace.site.site.url }
+        : {}),
     },
     theme: {
       id: themeRuntime.manifest.id,
       version: themeRuntime.manifest.version,
     },
     routes: routeManifest.routes,
+    pages,
     diagnostics,
     assets: {
+      ...(themeStyles.css
+        ? {
+            themeStyles: {
+              url: themeStyles.css.url,
+              bytes: themeStyles.css.bytes,
+            },
+          }
+        : {}),
       islands: islandBundles.bundles.map((bundle) => ({
         source: bundle.relativeSource,
         exportName: bundle.exportName,
@@ -312,7 +385,20 @@ export async function buildSite(
             },
           }
         : {}),
+      content: contentAssets.files.map((file) => ({
+        source: file.source,
+        url: file.url,
+        hash: file.hash,
+        bytes: file.bytes,
+      })),
+      static: staticAssets.files.map((file) => ({
+        path: file.path,
+        url: file.url,
+      })),
     },
+    outputs: [...outputs.values()].sort((a, b) =>
+      a.path.localeCompare(b.path),
+    ),
   };
 
   writeBuildManifest(outDir, buildManifest);

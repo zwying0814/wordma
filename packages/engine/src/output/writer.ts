@@ -4,21 +4,42 @@ import path from 'node:path';
 import type { ContentDiagnostic } from '@wordma/content';
 
 import { BuildError } from '../errors';
-import type { Route } from '../routing/manifest';
+import type { Route, RouteKind } from '../routing/manifest';
+
+export type BuildManifestPage = {
+  path: string;
+  output: string;
+  kind: RouteKind;
+  assets: {
+    styles: string[];
+    scripts: string[];
+  };
+};
+
+export type BuildManifestOutput = {
+  path: string;
+  kind: 'html' | 'asset' | 'feed';
+};
 
 export type BuildManifest = {
-  version: 1;
+  version: 2;
   site: {
     title: string;
     basePath: string;
+    url?: string;
   };
   theme: {
     id: string;
     version: string;
   };
   routes: Route[];
+  pages: BuildManifestPage[];
   diagnostics: ContentDiagnostic[];
   assets: {
+    themeStyles?: {
+      url: string;
+      bytes: number;
+    };
     islands: Array<{
       source: string;
       exportName: string;
@@ -34,7 +55,18 @@ export type BuildManifest = {
       url: string;
       bytes: number;
     };
+    content: Array<{
+      source: string;
+      url: string;
+      hash: string;
+      bytes: number;
+    }>;
+    static: Array<{
+      path: string;
+      url: string;
+    }>;
   };
+  outputs: BuildManifestOutput[];
 };
 
 export const BUILD_MANIFEST_FILE = '.wordma-manifest.json';

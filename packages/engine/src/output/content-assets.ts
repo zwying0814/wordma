@@ -23,8 +23,17 @@ export type CopyContentAssetsOptions = {
   entries: ContentEntry[];
 };
 
+export type ContentAssetFile = {
+  source: string;
+  url: string;
+  path: string;
+  hash: string;
+  bytes: number;
+};
+
 export type ContentAssetsResult = {
   assets: AssetRef[];
+  files: ContentAssetFile[];
   bySource: Map<string, AssetRef>;
   byRealPath: Map<string, AssetRef>;
   diagnostics: ContentDiagnostic[];
@@ -153,6 +162,7 @@ export function copyContentAssets(
   const workspaceRoot = realpathSync(options.workspaceRoot);
   const bySource = new Map<string, AssetRef>();
   const byRealPath = new Map<string, AssetRef>();
+  const files: ContentAssetFile[] = [];
   const diagnostics: ContentDiagnostic[] = [];
   const seen = new Set<string>();
   const copied = new Set<string>();
@@ -228,6 +238,13 @@ export function copyContentAssets(
 
       bySource.set(asset.source, resolved);
       byRealPath.set(realPath, resolved);
+      files.push({
+        source: asset.source,
+        url: resolved.url,
+        path: relativePath,
+        hash,
+        bytes: stat.size,
+      });
     }
   }
 
@@ -235,6 +252,7 @@ export function copyContentAssets(
     assets: [...bySource.values()].sort((a, b) =>
       a.source.localeCompare(b.source),
     ),
+    files,
     bySource,
     byRealPath,
     diagnostics,
