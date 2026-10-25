@@ -17,7 +17,10 @@ import type { ContentIndex } from './types/content';
 import type { SiteConfig } from './types/site';
 import { parseYamlFile } from './yaml/parse';
 
-export type LoadWorkspaceOptions = LoadContentIndexOptions;
+export type LoadWorkspaceOptions = Pick<
+  LoadContentIndexOptions,
+  'includeDrafts'
+>;
 
 export type Workspace = {
   root: string;
@@ -123,7 +126,10 @@ export function loadWorkspace(
     }
   }
 
-  const index = loadContentIndex(contentDir, options);
+  const index = loadContentIndex(contentDir, {
+    ...options,
+    workspaceRoot: root,
+  });
   diagnostics.push(...index.diagnostics);
 
   return {

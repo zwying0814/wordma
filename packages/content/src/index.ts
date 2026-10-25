@@ -4,8 +4,10 @@
  * 内容模型、schema 与主题字段命名空间工具。
  */
 export * from './collections';
+export * from './date';
 export * from './diagnostics';
 export * from './frontmatter';
+export * from './slug';
 export * from './types';
 export * from './schema';
 export * from './theme-fields';
