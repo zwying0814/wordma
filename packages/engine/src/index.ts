@@ -8,7 +8,12 @@ export type {
 export { parseMdx } from './mdx/parse';
 export type { MdxImport, ParsedMdx } from './mdx/parse';
 export { renderMdx } from './mdx/render';
-export type { RenderedMdx, RenderMdxOptions } from './mdx/render';
+export type {
+  CompiledIsland,
+  IslandRenderInput,
+  RenderedMdx,
+  RenderMdxOptions,
+} from './mdx/render';
 export { resolveMdxImports } from './mdx/resolve';
 export type {
   ResolvedMdxImport,
