@@ -105,9 +105,19 @@ for (const filePath of files.filter((file) => file.endsWith('theme.yaml'))) {
 }
 
 for (const filePath of files.filter((file) => file.endsWith('.mdx'))) {
-  expectOk(`frontmatter: ${relative(filePath)}`, () =>
-    parsePageFrontmatter(readFrontmatter(filePath)),
-  );
+  const label = `frontmatter: ${relative(filePath)}`;
+
+  if (relative(filePath).includes('broken/invalid-frontmatter/')) {
+    expectFailWith(
+      label,
+      () => parsePageFrontmatter(readFrontmatter(filePath)),
+      (error) => error instanceof Error && error.name === 'ZodError',
+    );
+  } else {
+    expectOk(label, () =>
+      parsePageFrontmatter(readFrontmatter(filePath)),
+    );
+  }
 }
 
 // 主题切换 fixture 必须同时保留两个命名空间。

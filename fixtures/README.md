@@ -7,6 +7,7 @@
 | Fixture | 用途 | 首次使用 |
 |---|---|---|
 | `minimal/` | 最小站点、文章、独立页 | M1 内容索引 |
+| `content-layer/` | 独立文件、folder entry、草稿、资源、自定义 collection | M1 |
 | `islands/` | MDX 客户端组件、带 children 的组件 | M3 |
 | `custom-fields/` | 主题扩展文章字段、命名空间存储 | M6 |
 | `custom-pages/` | theme pageTypes、动态路由、主题页面 | M2 / M6 |
@@ -15,6 +16,7 @@
 | `broken/bad-theme/` | 主题缺 displayName | M0.4 |
 | `broken/duplicate-slug/` | 两个文章同 slug | M1 |
 | `broken/invalid-date/` | 日期不存在，内容索引失败 | M1 |
+| `broken/invalid-frontmatter/` | frontmatter 缺 title | M1 |
 | `broken/route-conflict/` | 主题页面与内容页面同路径 | M2 |
 | `broken/missing-component/` | MDX 引用不存在的组件 | M3 |
 

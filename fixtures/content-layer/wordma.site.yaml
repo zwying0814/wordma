@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../../packages/content/schema/site.schema.json
+site:
+  title: Content Layer Fixture
+  description: M1 content index coverage
+  language: zh-CN
+  basePath: ""
+
+theme:
+  id: wordma-theme-default
+  settings: {}
+
+navigation:
+  - label: 首页
+    path: /
