@@ -2,6 +2,7 @@ import { ContentError, YamlParseError } from '@wordma/content';
 import { ZodError } from 'zod';
 
 import { buildSite } from './build';
+import { startDev } from './dev';
 import {
   BuildError,
   IslandError,
@@ -30,6 +31,18 @@ build 选项:
   --root <path>     工作区目录，默认当前目录
   --out <path>      输出目录，默认 <root>/.wordma/dist
   --include-drafts  包含草稿
+  --json            输出 NDJSON 事件
+  --no-cache        禁用构建缓存
+
+dev 选项:
+  --root <path>     工作区目录，默认当前目录
+  --out <path>      输出目录，默认 <root>/.wordma/dev
+  --port <number>   监听端口，默认 4321
+  --host <host>     监听地址，默认 127.0.0.1
+  --include-drafts  包含草稿
+  --json            输出 NDJSON 事件
+  --no-watch        不监听文件变化
+  --no-cache        禁用构建缓存
 
 全局选项:
   -h, --help      显示帮助
@@ -45,6 +58,19 @@ type BuildFlags = {
   root?: string;
   out?: string;
   includeDrafts?: boolean;
+  json?: boolean;
+  noCache?: boolean;
+};
+
+type DevFlags = {
+  root?: string;
+  out?: string;
+  port?: number;
+  host?: string;
+  includeDrafts?: boolean;
+  json?: boolean;
+  noWatch?: boolean;
+  noCache?: boolean;
 };
 
 function parseInspectFlags(args: string[]): InspectFlags {
@@ -92,6 +118,16 @@ function parseBuildFlags(args: string[]): BuildFlags {
       continue;
     }
 
+    if (arg === '--json') {
+      flags.json = true;
+      continue;
+    }
+
+    if (arg === '--no-cache') {
+      flags.noCache = true;
+      continue;
+    }
+
     if (arg === '--root' || arg === '--out') {
       const value = args[index + 1];
       if (!value || value.startsWith('-')) {
@@ -134,6 +170,100 @@ function formatSourceLocation(
       : `${file}:${line}${column === undefined ? '' : `:${column}`}`;
 
   return `\n  at ${position}`;
+}
+
+function parseDevFlags(args: string[]): DevFlags {
+  const flags: DevFlags = {};
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === undefined) continue;
+
+    if (arg === '--include-drafts') {
+      flags.includeDrafts = true;
+      continue;
+    }
+
+    if (arg === '--json') {
+      flags.json = true;
+      continue;
+    }
+
+    if (arg === '--no-watch') {
+      flags.noWatch = true;
+      continue;
+    }
+
+    if (arg === '--no-cache') {
+      flags.noCache = true;
+      continue;
+    }
+
+    if (arg === '--root' || arg === '--out' || arg === '--host') {
+      const value = args[index + 1];
+      if (!value || value.startsWith('-')) {
+        throw new Error(`${arg} 需要一个值`);
+      }
+
+      if (arg === '--root') flags.root = value;
+      else if (arg === '--out') flags.out = value;
+      else flags.host = value;
+
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--port') {
+      const value = args[index + 1];
+      if (!value || value.startsWith('-')) {
+        throw new Error('--port 需要一个端口号');
+      }
+      const port = Number(value);
+      if (
+        !Number.isInteger(port) ||
+        port < 1 ||
+        port > 65535
+      ) {
+        throw new Error(`无效端口：${value}`);
+      }
+      flags.port = port;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--root=')) {
+      flags.root = arg.slice('--root='.length);
+      continue;
+    }
+
+    if (arg.startsWith('--out=')) {
+      flags.out = arg.slice('--out='.length);
+      continue;
+    }
+
+    if (arg.startsWith('--host=')) {
+      flags.host = arg.slice('--host='.length);
+      continue;
+    }
+
+    if (arg.startsWith('--port=')) {
+      const value = arg.slice('--port='.length);
+      const port = Number(value);
+      if (
+        !Number.isInteger(port) ||
+        port < 1 ||
+        port > 65535
+      ) {
+        throw new Error(`无效端口：${value}`);
+      }
+      flags.port = port;
+      continue;
+    }
+
+    throw new Error(`未知参数：${arg}`);
+  }
+
+  return flags;
 }
 
 function formatError(error: unknown): string {
@@ -221,6 +351,130 @@ function runInspect(args: string[]): void {
   console.log(`Diagnostics: ${result.diagnostics.length}`);
 }
 
+function errorPayload(
+  error: unknown,
+): Record<string, unknown> {
+  if (error instanceof Error) {
+    const detail = error as Error & {
+      code?: string;
+      file?: string;
+      line?: number;
+      column?: number;
+      path?: string;
+      exportName?: string;
+    };
+
+    return {
+      code: detail.code ?? 'ERROR',
+      message: detail.message,
+      ...(detail.file ? { file: detail.file } : {}),
+      ...(detail.line !== undefined
+        ? { line: detail.line }
+        : {}),
+      ...(detail.column !== undefined
+        ? { column: detail.column }
+        : {}),
+      ...(detail.path ? { path: detail.path } : {}),
+      ...(detail.exportName
+        ? { exportName: detail.exportName }
+        : {}),
+    };
+  }
+
+  return {
+    code: 'ERROR',
+    message: String(error),
+  };
+}
+
+let eventSeq = 0;
+
+function emitEvent(
+  event: Record<string, unknown>,
+): void {
+  console.log(
+    JSON.stringify({
+      v: 1,
+      seq: (eventSeq += 1),
+      time: new Date().toISOString(),
+      ...event,
+    }),
+  );
+}
+
+async function runBuild(args: string[]): Promise<void> {
+  const flags = parseBuildFlags(args);
+  const started = Date.now();
+  const result = await buildSite({
+    root: flags.root ?? process.cwd(),
+    outDir: flags.out,
+    includeDrafts: flags.includeDrafts,
+  });
+  const durationMs = Date.now() - started;
+
+  if (flags.json) {
+    emitEvent({
+      type: 'build-success',
+      durationMs,
+      routes: result.routes,
+      compiledEntries: result.compiledEntries,
+      islands: result.islands,
+      diagnostics: result.diagnostics,
+      outDir: result.outDir,
+    });
+    return;
+  }
+
+  console.log(
+    `Built ${result.routes} routes to ${result.outDir}`,
+  );
+  console.log(
+    `Theme: ${result.theme.id}@${result.theme.version}`,
+  );
+  if (result.diagnostics.length > 0) {
+    console.log(
+      `Diagnostics: ${result.diagnostics.length}`,
+    );
+  }
+}
+
+async function runDev(args: string[]): Promise<void> {
+  const flags = parseDevFlags(args);
+  const json = flags.json === true;
+
+  const dev = await startDev(
+    {
+      root: flags.root ?? process.cwd(),
+      outDir: flags.out,
+      port: flags.port,
+      host: flags.host,
+      includeDrafts: flags.includeDrafts,
+      noWatch: flags.noWatch,
+      noCache: flags.noCache,
+    },
+    json
+      ? {
+          info: (message) => {
+            console.error(message);
+          },
+          error: (message) => {
+            console.error(message);
+          },
+          event: emitEvent,
+        }
+      : {
+          info: (message) => {
+            console.log(message);
+          },
+          error: (message) => {
+            console.error(message);
+          },
+        },
+  );
+
+  await dev.closed;
+}
+
 const args = process.argv.slice(2);
 const command = args[0];
 
@@ -239,35 +493,20 @@ if (args.includes('--help') || args.includes('-h')) {
   process.exit(0);
 }
 
+const jsonMode = args.includes('--json');
+
 try {
   switch (command) {
     case 'inspect':
       runInspect(args.slice(1));
       break;
 
-    case 'build': {
-      const flags = parseBuildFlags(args.slice(1));
-      const result = await buildSite({
-        root: flags.root ?? process.cwd(),
-        outDir: flags.out,
-        includeDrafts: flags.includeDrafts,
-      });
-
-      console.log(
-        `Built ${result.routes} routes to ${result.outDir}`,
-      );
-      console.log(
-        `Theme: ${result.theme.id}@${result.theme.version}`,
-      );
-      if (result.diagnostics.length > 0) {
-        console.log(`Diagnostics: ${result.diagnostics.length}`);
-      }
+    case 'build':
+      await runBuild(args.slice(1));
       break;
-    }
 
     case 'dev':
-      console.error('wordma-engine dev 尚未实现（M5 之后提供）');
-      process.exit(1);
+      await runDev(args.slice(1));
       break;
 
     default:
@@ -276,6 +515,13 @@ try {
       process.exit(1);
   }
 } catch (error) {
-  console.error(formatError(error));
+  if (jsonMode) {
+    emitEvent({
+      type: 'build-error',
+      diagnostics: [errorPayload(error)],
+    });
+  } else {
+    console.error(formatError(error));
+  }
   process.exit(1);
 }

@@ -75,6 +75,22 @@ export type {
   StaticCopyResult,
   StaticFile,
 } from './output/static';
+export { startDev } from './dev';
+export type {
+  DevHandle,
+  DevLogger,
+  StartDevOptions,
+} from './dev';
+export { startDevServer } from './dev/server';
+export type {
+  DevServer,
+  DevServerOptions,
+} from './dev/server';
+export { startWatch } from './dev/watch';
+export type {
+  WatchHandle,
+  WatchOptions,
+} from './dev/watch';
 export { buildSite } from './build';
 export type { BuildOptions, BuildResult } from './build';
 export type {

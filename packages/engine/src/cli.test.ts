@@ -8,7 +8,6 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const cliPath = path.resolve(import.meta.dirname, 'cli.ts');
 
@@ -40,6 +39,83 @@ function runCli(
 
 function makeOutDir(): string {
   return mkdtempSync(path.join(tmpdir(), 'wordma-cli-'));
+}
+
+async function readUntil(
+  stream: ReadableStream<Uint8Array>,
+  marker: string,
+  timeoutMs = 8000,
+): Promise<string> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let output = '';
+
+  return await new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          `等待 "${marker}" 超时\n--- output ---\n${output}`,
+        ),
+      );
+    }, timeoutMs);
+
+    const pump = async (): Promise<void> => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            clearTimeout(timer);
+            reject(
+              new Error(
+                `进程在 "${marker}" 前退出\n--- output ---\n${output}`,
+              ),
+            );
+            return;
+          }
+
+          output += decoder.decode(value, {
+            stream: true,
+          });
+
+          if (output.includes(marker)) {
+            clearTimeout(timer);
+            resolve(output);
+            void (async () => {
+              try {
+                while (!(await reader.read()).done) {
+                  // drain
+                }
+              } catch {
+                // ignore
+              }
+            })();
+            return;
+          }
+        }
+      } catch (error) {
+        clearTimeout(timer);
+        reject(error);
+      }
+    };
+
+    void pump();
+  });
+}
+
+function freePort(): number {
+  const server = Bun.serve({
+    hostname: '127.0.0.1',
+    port: 0,
+    fetch: () => new Response(''),
+  });
+  const port = server.port;
+  server.stop(true);
+
+  if (typeof port !== 'number') {
+    throw new Error('无法分配测试端口');
+  }
+
+  return port;
 }
 
 function expectBrokenFixture(
@@ -80,7 +156,10 @@ describe('wordma-engine CLI', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('inspect');
     expect(result.stdout).toContain('build');
+    expect(result.stdout).toContain('dev');
     expect(result.stdout).toContain('--include-drafts');
+    expect(result.stdout).toContain('--port');
+    expect(result.stdout).toContain('--no-watch');
   });
 
   it('--version 输出版本', () => {
@@ -109,6 +188,84 @@ describe('wordma-engine CLI', () => {
       'pages',
       'posts',
     ]);
+  });
+
+  it('build --json 输出单条 NDJSON', () => {
+    const outDir = makeOutDir();
+
+    try {
+      const result = runCli([
+        'build',
+        '--root',
+        'fixtures/content-layer',
+        `--out=${outDir}`,
+        '--json',
+        '--no-cache',
+      ]);
+      const lines = result.stdout
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+
+      expect(result.status).toBe(0);
+      expect(lines).toHaveLength(1);
+
+      const event = JSON.parse(lines[0] ?? '') as {
+        v: number;
+        seq: number;
+        type: string;
+        routes: number;
+      };
+
+      expect(event.v).toBe(1);
+      expect(event.seq).toBe(1);
+      expect(event.type).toBe('build-success');
+      expect(event.routes).toBe(17);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+      rmSync(
+        path.join(
+          repoRoot,
+          'fixtures/content-layer/.wordma',
+        ),
+        { recursive: true, force: true },
+      );
+    }
+  });
+
+  it('build --json 失败输出 build-error', () => {
+    const outDir = makeOutDir();
+
+    try {
+      const result = runCli([
+        'build',
+        '--root',
+        'fixtures/broken/missing-component',
+        `--out=${outDir}`,
+        '--json',
+      ]);
+      const event = JSON.parse(
+        result.stdout.trim(),
+      ) as {
+        type: string;
+        diagnostics: Array<{ code: string }>;
+      };
+
+      expect(result.status).toBe(1);
+      expect(event.type).toBe('build-error');
+      expect(event.diagnostics[0]?.code).toBe(
+        'MISSING_COMPONENT_IMPORT',
+      );
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+      rmSync(
+        path.join(
+          repoRoot,
+          'fixtures/broken/missing-component/.wordma',
+        ),
+        { recursive: true, force: true },
+      );
+    }
   });
 
   it('build 成功并输出页面', () => {
@@ -338,10 +495,76 @@ describe('wordma-engine CLI', () => {
     expect(stderr).toContain('export: default');
   });
 
-  it('dev 仍提示尚未实现', () => {
-    const result = runCli(['dev']);
+  it('dev 拒绝无效端口', () => {
+    const result = runCli(['dev', '--port', 'abc']);
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('尚未实现');
+    expect(result.stderr).toContain('无效端口');
   });
+
+  it(
+    'dev 启动、响应请求并优雅退出',
+    async () => {
+      const outDir = makeOutDir();
+      const port = freePort();
+      const proc = Bun.spawn(
+        [
+          process.execPath,
+          cliPath,
+          'dev',
+          '--root',
+          'fixtures/minimal',
+          `--out=${outDir}`,
+          `--port=${port}`,
+          '--no-watch',
+        ],
+        {
+          cwd: repoRoot,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
+      const stdout = proc.stdout as ReadableStream<Uint8Array>;
+      const stderr = proc.stderr as ReadableStream<Uint8Array>;
+      const stderrText = new Response(stderr).text();
+      let exited = false;
+
+      try {
+        const output = await readUntil(stdout, 'Dev server:');
+        expect(output).toContain(
+          'Dev server: http://127.0.0.1:',
+        );
+
+        const response = await fetch(
+          `http://127.0.0.1:${port}/`,
+        );
+        const html = await response.text();
+
+        expect(response.status).toBe(200);
+        expect(html).toContain('Minimal Wordma Site');
+
+        proc.kill('SIGINT');
+        const code = await proc.exited;
+        exited = true;
+        const errors = await stderrText;
+
+        expect(code).toBe(0);
+        expect(errors).not.toContain('Error');
+      } finally {
+        if (!exited && proc.exitCode === null) {
+          proc.kill('SIGKILL');
+          await proc.exited;
+        }
+        rmSync(outDir, { recursive: true, force: true });
+        rmSync(
+          path.join(
+            repoRoot,
+            'fixtures/minimal/.wordma',
+          ),
+          { recursive: true, force: true },
+        );
+      }
+    },
+    15000,
+  );
 });
