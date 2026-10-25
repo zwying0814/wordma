@@ -38,6 +38,7 @@ describe('basePath 构建', () => {
         [
           'site:',
           '  title: Base Path',
+          '  url: https://example.com',
           '  basePath: /docs',
           'theme:',
           '  id: wordma-theme-default',
@@ -73,6 +74,12 @@ describe('basePath 构建', () => {
         /src="\/docs\/assets\/content\/[a-f0-9]{8}-pic\.png"/,
       );
       expect(post).toContain('href="/docs/"');
+      expect(post).toContain(
+        '<link rel="canonical" href="https://example.com/docs/posts/hello/"/>',
+      );
+      expect(post).toContain(
+        '<meta property="og:url" content="https://example.com/docs/posts/hello/"/>',
+      );
 
       const notFound = readFileSync(
         path.join(outDir, '404.html'),

@@ -1,6 +1,10 @@
 import type { CSSProperties, ReactNode } from 'react';
 
-import { WordmaBodyEnd, WordmaHead } from '@wordma/theme';
+import {
+  WordmaBodyEnd,
+  WordmaHead,
+  WordmaSeo,
+} from '@wordma/theme';
 
 import type { DefaultPageContext } from '../types';
 
@@ -10,9 +14,9 @@ type RootLayoutProps = DefaultPageContext & {
 
 export function RootLayout({
   site,
-  page,
   theme,
   helpers,
+  seo,
   children,
 }: RootLayoutProps) {
   const accent = theme.accent ?? '#3563d9';
@@ -22,12 +26,7 @@ export function RootLayout({
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>
-          {page.title ? `${page.title} · ${site.title}` : site.title}
-        </title>
-        {page.description && (
-          <meta name="description" content={page.description} />
-        )}
+        <WordmaSeo seo={seo} />
         <WordmaHead />
       </head>
       <body style={{ '--wordma-accent': accent } as CSSProperties}>

@@ -10,6 +10,8 @@ import type {
   TaxonomyTerm,
 } from '@wordma/content';
 
+import type { SeoMeta } from './seo';
+
 export type PageContent = {
   html: string;
   headings: Heading[];
@@ -70,6 +72,7 @@ export type PageContext<
   navigation: NavigationItem[];
   theme: TTheme;
   helpers: ThemeHelpers;
+  seo: SeoMeta;
   pagination?: PaginationInfo;
   archive?: ArchiveGroup[];
 };

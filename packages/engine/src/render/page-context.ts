@@ -21,6 +21,7 @@ import type {
   RouteManifest,
 } from '../routing/manifest';
 import type { CompiledContent } from '../mdx/compile';
+import { buildSeo } from './seo';
 
 export type CreatePageContextOptions = {
   route: Route;
@@ -308,9 +309,18 @@ export function createPageContext(
         )
       : undefined;
 
+  const seo = buildSeo({
+    site: workspace.site.site,
+    route,
+    page,
+    excerpt: compiledContent?.excerpt,
+    cover: contentCover,
+  });
+
   return {
     site: workspace.site.site,
     page,
+    seo,
     content: {
       html: compiledContent?.html ?? '',
       headings: compiledContent?.headings ?? [],

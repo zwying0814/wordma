@@ -12,6 +12,8 @@ export type {
   PageAssets,
   PageAssetsProviderProps,
 } from './components/assets';
+export { WordmaSeo } from './components/seo';
+export type { WordmaSeoProps } from './components/seo';
 export { defineTheme } from './define-theme';
 export type {
   ThemeDefinition,
@@ -37,3 +39,8 @@ export type {
   ThemeHelpers,
   ThemeLayoutKey,
 } from './types/page-context';
+export type {
+  SeoMeta,
+  SeoOpenGraph,
+  SeoTwitter,
+} from './types/seo';

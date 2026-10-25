@@ -83,6 +83,8 @@ export type {
   RouteManifest,
   RouteTaxonomy,
 } from './routing/manifest';
+export { buildSeo } from './render/seo';
+export type { BuildSeoOptions } from './render/seo';
 export { createPageContext } from './render/page-context';
 export type { CreatePageContextOptions } from './render/page-context';
 export { renderRoute } from './render/ssr';
