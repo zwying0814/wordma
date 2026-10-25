@@ -1,0 +1,8 @@
+{
+  "name": "wordma-fixture-minimal",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "wordma-theme-default": "file:../../themes/default"
+  }
+}

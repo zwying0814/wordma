@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../../../../packages/theme/schema/theme.schema.json
+id: wordma-theme-custom-pages
+displayName: Custom Pages Fixture
+version: 0.0.0
+engines:
+  wordma: ">=0.0.0"
+
+settings: []
+
+content:
+  version: 1
+  post:
+    fields: []
+  page:
+    fields:
+      - key: subtitle
+        type: text
+        label: 副标题
+  pageTypes:
+    about:
+      label: 关于页
+      route: /about
+      layout: about
+      fields:
+        - key: subtitle
+          type: text
+          label: 副标题
+    project:
+      label: 项目
+      route: /projects/[slug]
+      layout: project
+      collection: projects
+      fields:
+        - key: repo
+          type: text
+          label: 仓库地址
+        - key: status
+          type: select
+          label: 状态
+          default: active
+          options:
+            - label: 进行中
+              value: active
+            - label: 已归档
+              value: archived
+
+pages:
+  - id: search
+    path: /search
+    layout: search

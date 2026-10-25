@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../../packages/content/schema/site.schema.json
+site:
+  title: Islands Fixture
+  description: MDX client islands
+  language: zh-CN
+  basePath: ""
+
+theme:
+  id: wordma-theme-default
+  settings: {}
+
+navigation:
+  - label: 首页
+    path: /

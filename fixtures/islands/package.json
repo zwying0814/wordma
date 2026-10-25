@@ -1,0 +1,13 @@
+{
+  "name": "wordma-fixture-islands",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "wordma-theme-default": "file:../../themes/default"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8"
+  }
+}

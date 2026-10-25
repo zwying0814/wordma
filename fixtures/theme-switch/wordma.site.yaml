@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=../../packages/content/schema/site.schema.json
+site:
+  title: Theme Switch Fixture
+  language: zh-CN
+  basePath: ""
+
+theme:
+  id: wordma-theme-journal
+  settings: {}
+
+navigation: []

@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../packages/content/schema/site.schema.json
+site:
+  title: Route Conflict Fixture
+  language: zh-CN
+theme:
+  id: wordma-theme-route-conflict
+  settings: {}
+navigation: []

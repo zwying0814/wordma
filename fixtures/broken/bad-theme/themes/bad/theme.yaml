@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../../packages/theme/schema/theme.schema.json
+id: wordma-theme-bad
+version: 0.0.0
+engines:
+  wordma: ">=0.0.0"
+
+settings: []
+pages: []

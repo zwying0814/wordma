@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=../../../../packages/theme/schema/theme.schema.json
+id: wordma-theme-custom-fields
+displayName: Custom Fields Fixture
+version: 0.0.0
+engines:
+  wordma: ">=0.0.0"
+
+settings: []
+
+content:
+  version: 1
+  post:
+    fields:
+      - key: heroStyle
+        type: select
+        label: 封面样式
+        default: wide
+        options:
+          - label: 宽图
+            value: wide
+          - label: 卡片
+            value: card
+      - key: featured
+        type: switch
+        label: 推荐到首页
+        default: false
+  page:
+    fields: []
+  pageTypes: {}
+
+pages: []

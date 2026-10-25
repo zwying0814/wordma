@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=../../../packages/content/schema/site.schema.json
+site:
+  title: Bad Theme Fixture
+theme:
+  id: wordma-theme-bad
+  settings: {}

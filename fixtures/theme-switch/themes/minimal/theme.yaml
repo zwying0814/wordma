@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../../../packages/theme/schema/theme.schema.json
+id: wordma-theme-minimal
+displayName: Minimal Fixture
+version: 0.0.0
+engines:
+  wordma: ">=0.0.0"
+
+settings: []
+
+content:
+  version: 1
+  post:
+    fields:
+      - key: compact
+        type: switch
+        label: 紧凑模式
+        default: false
+  page:
+    fields: []
+  pageTypes: {}
+
+pages: []

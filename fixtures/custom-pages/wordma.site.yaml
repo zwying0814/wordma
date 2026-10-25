@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../../packages/content/schema/site.schema.json
+site:
+  title: Custom Pages Fixture
+  language: zh-CN
+  basePath: ""
+
+theme:
+  id: wordma-theme-custom-pages
+  settings: {}
+
+navigation:
+  - label: 关于
+    path: /about

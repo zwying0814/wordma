@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=../../../../../packages/theme/schema/theme.schema.json
+id: wordma-theme-route-conflict
+displayName: Route Conflict Fixture
+version: 0.0.0
+engines:
+  wordma: ">=0.0.0"
+
+settings: []
+content:
+  version: 1
+  post:
+    fields: []
+  page:
+    fields: []
+  pageTypes: {}
+
+pages:
+  - id: about
+    path: /about
+    layout: about

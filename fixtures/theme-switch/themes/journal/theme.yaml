@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../../../packages/theme/schema/theme.schema.json
+id: wordma-theme-journal
+displayName: Journal Fixture
+version: 0.0.0
+engines:
+  wordma: ">=0.0.0"
+
+settings: []
+
+content:
+  version: 1
+  post:
+    fields:
+      - key: heroStyle
+        type: text
+        label: 封面样式
+        default: wide
+  page:
+    fields: []
+  pageTypes: {}
+
+pages: []

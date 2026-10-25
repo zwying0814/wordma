@@ -1,5 +1,21 @@
 export type PageKind = 'post' | 'page';
 
+export type PageFrontmatter = {
+  title: string;
+  slug?: string;
+  date?: string;
+  updated?: string;
+  description?: string;
+  tags: string[];
+  categories: string[];
+  draft: boolean;
+  cover?: string;
+  /** 主题 pageTypes 的 id，例如 about / project */
+  type?: string;
+  /** 主题扩展字段：theme.<packageName>.<field> */
+  theme?: Record<string, Record<string, unknown>>;
+};
+
 export type PageMeta = {
   id: string;
   kind: PageKind;
