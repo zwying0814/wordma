@@ -5,6 +5,7 @@
  */
 export * from './collections';
 export * from './diagnostics';
+export * from './frontmatter';
 export * from './types';
 export * from './schema';
 export * from './theme-fields';
