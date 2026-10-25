@@ -1,4 +1,4 @@
-import { YamlParseError } from '@wordma/content';
+import { ContentError, YamlParseError } from '@wordma/content';
 import { ZodError } from 'zod';
 
 import { ENGINE_VERSION } from './index';
@@ -62,6 +62,10 @@ function parseInspectFlags(args: string[]): InspectFlags {
 }
 
 function formatError(error: unknown): string {
+  if (error instanceof ContentError) {
+    return `[${error.code}] ${error.message}`;
+  }
+
   if (error instanceof YamlParseError) {
     return error.diagnostics
       .map(
@@ -105,6 +109,16 @@ function runInspect(args: string[]): void {
   console.log(`Page fields: ${result.pageFields.length}`);
   console.log(`Page types: ${result.pageTypes.length}`);
   console.log(`Pages: ${result.pages.length}`);
+  console.log(
+    result.collections.length > 0
+      ? `Collections: ${result.collections
+          .map((collection) => `${collection.name}(${collection.count})`)
+          .join(', ')}`
+      : 'Collections: (none)',
+  );
+  console.log(`Tags: ${result.tags.length}`);
+  console.log(`Categories: ${result.categories.length}`);
+  console.log(`Diagnostics: ${result.diagnostics.length}`);
 }
 
 const args = process.argv.slice(2);

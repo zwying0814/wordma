@@ -131,6 +131,20 @@ describe('content fixtures', () => {
     ]);
   });
 
+  it('两次加载结果稳定', () => {
+    const fixture = path.join(repoRoot, 'fixtures/content-layer');
+    const first = loadWorkspace(fixture);
+    const second = loadWorkspace(fixture);
+
+    expect(first.index.entries.map((entry) => entry.id)).toEqual(
+      second.index.entries.map((entry) => entry.id),
+    );
+    expect(first.index.tags).toEqual(second.index.tags);
+    expect(first.index.categories).toEqual(
+      second.index.categories,
+    );
+  });
+
   it('custom-pages 识别 projects collection', () => {
     const workspace = loadWorkspace(
       path.join(repoRoot, 'fixtures/custom-pages'),
