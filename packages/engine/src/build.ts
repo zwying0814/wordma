@@ -21,6 +21,7 @@ import {
   resolveContentAssetPath,
 } from './output/content-assets';
 import { copyStaticAssets } from './output/static';
+import { writeFeeds } from './output/feeds';
 import { analyzeMdx, compileMdx } from './mdx/compile';
 import type {
   CompiledContent,
@@ -252,11 +253,32 @@ export async function buildSite(
     writeHtmlFile(outDir, route, html);
   }
 
+  const feedResult = writeFeeds({
+    site: workspace.site.site,
+    routes: routeManifest.routes,
+    posts:
+      workspace.index.collections.posts?.entries ?? [],
+    entriesById,
+    excerpts: new Map(
+      [...compiledContent.entries()]
+        .filter(([, content]) => content.excerpt)
+        .map(([id, content]) => [
+          id,
+          content.excerpt as string,
+        ]),
+    ),
+    outDir,
+    staticPaths: new Set(
+      staticAssets.files.map((file) => file.path),
+    ),
+  });
+
   const diagnostics = [
     ...routeManifest.diagnostics,
     ...themeRuntime.diagnostics,
     ...staticAssets.diagnostics,
     ...contentAssets.diagnostics,
+    ...feedResult.diagnostics,
   ];
   const buildManifest: BuildManifest = {
     version: 1,

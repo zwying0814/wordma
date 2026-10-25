@@ -90,6 +90,29 @@ describe('basePath 构建', () => {
       expect(
         existsSync(path.join(outDir, 'favicon.svg')),
       ).toBe(true);
+      expect(existsSync(path.join(outDir, 'rss.xml'))).toBe(
+        true,
+      );
+      expect(
+        existsSync(path.join(outDir, 'sitemap.xml')),
+      ).toBe(true);
+
+      const sitemap = readFileSync(
+        path.join(outDir, 'sitemap.xml'),
+        'utf8',
+      );
+      expect(sitemap).toContain(
+        '<loc>https://example.com/docs/posts/hello/</loc>',
+      );
+      expect(sitemap).not.toContain('/404/');
+
+      const robots = readFileSync(
+        path.join(outDir, 'robots.txt'),
+        'utf8',
+      );
+      expect(robots).toContain(
+        'Sitemap: https://example.com/docs/sitemap.xml',
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
       rmSync(outDir, { recursive: true, force: true });

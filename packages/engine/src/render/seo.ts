@@ -6,6 +6,10 @@ import type {
 import type { SeoMeta } from '@wordma/theme';
 
 import type { Route } from '../routing/manifest';
+import {
+  absoluteAssetUrl,
+  absoluteSiteUrl,
+} from '../site-url';
 
 export type BuildSeoOptions = {
   site: SiteMeta;
@@ -22,39 +26,6 @@ function trimText(
   return text ? text : undefined;
 }
 
-function basePrefix(basePath: string): string {
-  return basePath && basePath !== '/'
-    ? `/${basePath.replace(/^\/+|\/+$/g, '')}`
-    : '';
-}
-
-function absolutePageUrl(
-  siteUrl: string | undefined,
-  basePath: string,
-  routePath: string,
-): string | undefined {
-  if (!siteUrl) return undefined;
-
-  const origin = siteUrl.replace(/\/+$/g, '');
-  const path = routePath.startsWith('/')
-    ? routePath
-    : `/${routePath}`;
-
-  return `${origin}${basePrefix(basePath)}${path}`;
-}
-
-function absoluteAssetUrl(
-  siteUrl: string | undefined,
-  url: string,
-): string | undefined {
-  if (!siteUrl) return undefined;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return url;
-
-  return `${siteUrl.replace(/\/+$/g, '')}${
-    url.startsWith('/') ? url : `/${url}`
-  }`;
-}
-
 export function buildSeo(options: BuildSeoOptions): SeoMeta {
   const { site, route, page, excerpt, cover } = options;
   const title =
@@ -65,7 +36,7 @@ export function buildSeo(options: BuildSeoOptions): SeoMeta {
     trimText(page.description) ??
     trimText(excerpt) ??
     trimText(site.description);
-  const canonical = absolutePageUrl(
+  const canonical = absoluteSiteUrl(
     site.url,
     site.basePath,
     route.path,

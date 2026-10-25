@@ -36,7 +36,16 @@ describe('buildSite', () => {
       expect(result.compiledEntries).toBe(4);
       expect(result.islands).toBe(0);
       expect(result.theme.id).toBe('wordma-theme-default');
-      expect(result.diagnostics).toEqual([]);
+      expect(
+        result.diagnostics.filter(
+          (item) => item.code !== 'MISSING_SITE_URL',
+        ),
+      ).toEqual([]);
+      expect(
+        result.diagnostics.some(
+          (item) => item.code === 'MISSING_SITE_URL',
+        ),
+      ).toBe(true);
       expect(existsSync(path.join(outDir, 'stale.txt'))).toBe(false);
 
       const files = [
@@ -129,7 +138,7 @@ describe('buildSite', () => {
         site: { title: string; basePath: string };
         theme: { id: string; version: string };
         routes: unknown[];
-        diagnostics: unknown[];
+        diagnostics: Array<{ code: string }>;
         assets: {
           islands: unknown[];
           reactRuntime?: unknown;
@@ -142,7 +151,18 @@ describe('buildSite', () => {
       expect(manifest.site.basePath).toBe('');
       expect(manifest.theme.id).toBe('wordma-theme-default');
       expect(manifest.routes).toHaveLength(17);
-      expect(manifest.diagnostics).toEqual([]);
+      expect(
+        manifest.diagnostics.filter(
+          (diagnostic) =>
+            diagnostic.code !== 'MISSING_SITE_URL',
+        ),
+      ).toEqual([]);
+      expect(
+        manifest.diagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === 'MISSING_SITE_URL',
+        ),
+      ).toBe(true);
       expect(manifest.assets.islands).toEqual([]);
       expect(manifest.assets.reactRuntime).toBeUndefined();
       expect(manifest.assets.mountScript).toBeUndefined();

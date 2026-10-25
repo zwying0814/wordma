@@ -62,6 +62,12 @@ export type {
   ContentAssetsResult,
   CopyContentAssetsOptions,
 } from './output/content-assets';
+export { writeFeeds } from './output/feeds';
+export type {
+  BuildFeedsOptions,
+  FeedFile,
+  FeedResult,
+} from './output/feeds';
 export { copyStaticAssets } from './output/static';
 export type {
   CopyStaticOptions,

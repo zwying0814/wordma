@@ -14,6 +14,8 @@ import { assetUrl } from '../assets';
 
 export type StaticFile = {
   source: string;
+  /** dist 内相对路径（POSIX） */
+  path: string;
   url: string;
 };
 
@@ -142,6 +144,7 @@ function copyTree(
       paths.add(relativePath);
       files.push({
         source: fullPath,
+        path: relativePath,
         url: assetUrl(basePath, relativePath),
       });
     }
