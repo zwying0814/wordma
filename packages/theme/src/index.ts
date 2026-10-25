@@ -17,10 +17,13 @@ export type {
   ThemePackageJson,
 } from './load-theme';
 export type {
+  ArchiveGroup,
   PageCollections,
   PageContent,
   PageContext,
   PageTaxonomy,
+  PaginationInfo,
+  TaxonomyView,
   ThemeHelpers,
   ThemeLayoutKey,
 } from './types/page-context';

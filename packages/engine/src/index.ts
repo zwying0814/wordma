@@ -13,5 +13,7 @@ export type {
   RouteManifest,
   RouteTaxonomy,
 } from './routing/manifest';
+export { createPageContext } from './render/page-context';
+export type { CreatePageContextOptions } from './render/page-context';
 export { loadThemeRuntime } from './theme/runtime';
 export type { ThemeRuntime } from './theme/runtime';

@@ -23,15 +23,39 @@ export type PageCollections = {
   pages: PageSummary[];
 };
 
-export type PageTaxonomy = {
-  tags: TaxonomyTerm[];
-  categories: TaxonomyTerm[];
-};
-
 export type ThemeHelpers = {
   url: (path: string) => string;
   asset: (path: string) => string;
   t: (key: string) => string;
+};
+
+export type PaginationInfo = {
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+  prevUrl?: string;
+  nextUrl?: string;
+};
+
+export type TaxonomyView =
+  | {
+      kind: 'categories' | 'tags';
+    }
+  | {
+      kind: 'category' | 'tag';
+      term: TaxonomyTerm;
+      posts: PostSummary[];
+    };
+
+export type ArchiveGroup = {
+  year: string;
+  posts: PostSummary[];
+};
+
+export type PageTaxonomy = {
+  tags: TaxonomyTerm[];
+  categories: TaxonomyTerm[];
+  view?: TaxonomyView;
 };
 
 export type PageContext<
@@ -45,6 +69,8 @@ export type PageContext<
   navigation: NavigationItem[];
   theme: TTheme;
   helpers: ThemeHelpers;
+  pagination?: PaginationInfo;
+  archive?: ArchiveGroup[];
 };
 
 export type ThemeLayoutKey =
