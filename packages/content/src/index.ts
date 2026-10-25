@@ -8,6 +8,7 @@ export * from './date';
 export * from './diagnostics';
 export * from './frontmatter';
 export * from './slug';
+export * from './taxonomy';
 export * from './types';
 export * from './schema';
 export * from './theme-fields';

@@ -245,6 +245,18 @@ describe('loadContentIndex', () => {
     }
   });
 
+  it('fixtures/broken/invalid-date 报 INVALID_DATE', () => {
+    const fixture = path.join(repoRoot, 'fixtures/broken/invalid-date');
+
+    expectContentError(
+      () =>
+        loadContentIndex(path.join(fixture, 'content'), {
+          workspaceRoot: fixture,
+        }),
+      'INVALID_DATE',
+    );
+  });
+
   it('忽略非内容文件', () => {
     const root = makeTempRoot();
     mkdirSync(path.join(root, 'content/posts'), { recursive: true });

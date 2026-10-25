@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../packages/content/schema/site.schema.json
+site:
+  title: Invalid Date Fixture
+  language: zh-CN
+theme:
+  id: wordma-theme-default
+  settings: {}
+navigation: []

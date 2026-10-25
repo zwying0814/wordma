@@ -14,6 +14,7 @@
 | `broken/bad-yaml/` | 重复 key，YAML 解析失败 | M0.4 |
 | `broken/bad-theme/` | 主题缺 displayName | M0.4 |
 | `broken/duplicate-slug/` | 两个文章同 slug | M1 |
+| `broken/invalid-date/` | 日期不存在，内容索引失败 | M1 |
 | `broken/route-conflict/` | 主题页面与内容页面同路径 | M2 |
 | `broken/missing-component/` | MDX 引用不存在的组件 | M3 |
 

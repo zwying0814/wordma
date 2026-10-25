@@ -5,6 +5,7 @@ import { parseDateMs } from './date';
 import { ContentError } from './diagnostics';
 import { frontmatterToPageData, readContentFile } from './frontmatter';
 import { normalizeSlug, slugFromEntry } from './slug';
+import { buildTaxonomy } from './taxonomy';
 import type {
   ContentCollection,
   ContentCollectionKind,
@@ -218,13 +219,17 @@ export function loadContentIndex(
 
   for (const name of names) {
     const kind = collectionKind(name);
-    const collectionEntries = loadCollectionEntries({
+    const loadedEntries = loadCollectionEntries({
       collection: name,
       kind,
       collectionDir: path.join(contentDir, name),
       contentDir,
       workspaceRoot,
     });
+
+    const collectionEntries = options.includeDrafts
+      ? loadedEntries
+      : loadedEntries.filter((entry) => !entry.meta.draft);
 
     collectionEntries.sort(
       kind === 'page' ? comparePages : compareByDate,
@@ -239,6 +244,8 @@ export function loadContentIndex(
   }
 
   entries.sort(compareByDate);
+
+  const taxonomy = buildTaxonomy(entries);
 
   const diagnostics =
     names.length === 0
@@ -255,8 +262,8 @@ export function loadContentIndex(
   return {
     collections,
     entries,
-    tags: [],
-    categories: [],
+    tags: taxonomy.tags,
+    categories: taxonomy.categories,
     diagnostics,
   };
 }
