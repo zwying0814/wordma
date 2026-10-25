@@ -15,5 +15,7 @@ export type {
 } from './routing/manifest';
 export { createPageContext } from './render/page-context';
 export type { CreatePageContextOptions } from './render/page-context';
+export { renderRoute } from './render/ssr';
+export type { RenderRouteOptions } from './render/ssr';
 export { loadThemeRuntime } from './theme/runtime';
 export type { ThemeRuntime } from './theme/runtime';
