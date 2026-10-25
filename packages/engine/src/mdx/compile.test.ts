@@ -38,17 +38,28 @@ describe('compileMdx', () => {
 
     expect(result.headings).toEqual([
       { id: 'islands', text: 'Islands', depth: 1 },
+      {
+        id: 'counter-demo',
+        text: 'Counter Demo',
+        depth: 2,
+      },
     ]);
     expect(result.html).toContain('<h1 id="islands">');
-    expect(result.islands).toHaveLength(2);
+    expect(result.html).toContain('<table>');
+    expect(result.html).toContain('class="shiki');
+    expect(result.html).toContain('class="katex"');
+    expect(result.islands).toHaveLength(3);
     expect(result.islands.map((item) => item.name)).toEqual([
+      'Counter',
       'Counter',
       'Note',
     ]);
     expect(result.islands[0]?.relativeSource).toBe(
       'components/counter.tsx',
     );
-    expect(result.islands[1]?.slotHtml).toContain(
+    expect(result.islands[0]?.props).toEqual({ start: 2 });
+    expect(result.islands[1]?.props).toEqual({});
+    expect(result.islands[2]?.slotHtml).toContain(
       'This content is rendered inside a Note island.',
     );
     expect(result.html).toContain('data-wordma-island="Counter"');
@@ -141,8 +152,13 @@ describe('compileMdx', () => {
     );
     expect(context.content.headings).toEqual([
       { id: 'islands', text: 'Islands', depth: 1 },
+      {
+        id: 'counter-demo',
+        text: 'Counter Demo',
+        depth: 2,
+      },
     ]);
-    expect(context.content.islands).toHaveLength(2);
+    expect(context.content.islands).toHaveLength(3);
     expect(context.content.islands[0]).toMatchObject({
       name: 'Counter',
       source: 'components/counter.tsx',

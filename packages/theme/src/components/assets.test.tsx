@@ -41,6 +41,7 @@ describe('WordmaHead / WordmaBodyEnd', () => {
       '<link rel="stylesheet" href="/island.css"/>',
     );
     expect(html).toContain('<script type="importmap">');
+    expect(html).toContain('{"imports":{');
     expect(html).toContain(
       '"react":"/assets/react.js"',
     );

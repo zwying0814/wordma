@@ -44,10 +44,9 @@ function importMapJson(
     return undefined;
   }
 
-  return JSON.stringify(importMap).replace(
-    /</g,
-    '\\u003c',
-  );
+  return JSON.stringify({
+    imports: importMap,
+  }).replace(/</g, '\\u003c');
 }
 
 /**
