@@ -46,6 +46,14 @@ describe('buildSite', () => {
           (item) => item.code === 'MISSING_SITE_URL',
         ),
       ).toBe(true);
+      expect(
+        result.diagnostics.find(
+          (item) => item.code === 'MISSING_SITE_URL',
+        ),
+      ).toMatchObject({
+        severity: 'warning',
+        source: 'build',
+      });
       expect(existsSync(path.join(outDir, 'stale.txt'))).toBe(false);
 
       const files = [
@@ -151,7 +159,11 @@ describe('buildSite', () => {
             scripts: string[];
           };
         }>;
-        diagnostics: Array<{ code: string }>;
+        diagnostics: Array<{
+          code: string;
+          severity?: string;
+          source?: string;
+        }>;
         assets: {
           themeStyles?: { url: string; bytes: number };
           islands: unknown[];
@@ -250,6 +262,15 @@ describe('buildSite', () => {
             diagnostic.code === 'MISSING_SITE_URL',
         ),
       ).toBe(true);
+      expect(
+        manifest.diagnostics.find(
+          (diagnostic) =>
+            diagnostic.code === 'MISSING_SITE_URL',
+        ),
+      ).toMatchObject({
+        severity: 'warning',
+        source: 'build',
+      });
       expect(manifest.assets.islands).toEqual([]);
       expect(manifest.assets.reactRuntime).toBeUndefined();
       expect(manifest.assets.mountScript).toBeUndefined();
@@ -552,7 +573,11 @@ describe('buildSite', () => {
           'utf8',
         ),
       ) as {
-        diagnostics: Array<{ code: string }>;
+        diagnostics: Array<{
+          code: string;
+          severity?: string;
+          source?: string;
+        }>;
         assets: {
           themeStyles?: unknown;
           islands: unknown[];

@@ -1,17 +1,10 @@
-import { ContentError, YamlParseError } from '@wordma/content';
-import { ZodError } from 'zod';
-
 import { buildSite } from './build';
 import { startDev } from './dev';
 import { EventWriter } from './dev/events';
-import type { JsonDiagnostic } from './dev/events';
 import {
-  BuildError,
-  IslandError,
-  MdxError,
-  RouteError,
-  ThemeError,
-} from './errors';
+  diagnosticsFromError,
+  formatDiagnostic,
+} from './diagnostics';
 import { ENGINE_VERSION } from './index';
 import { inspectWorkspace } from './inspect';
 
@@ -159,21 +152,6 @@ function parseBuildFlags(args: string[]): BuildFlags {
   return flags;
 }
 
-function formatSourceLocation(
-  file: string | undefined,
-  line: number | undefined,
-  column: number | undefined,
-): string {
-  if (!file) return '';
-
-  const position =
-    line === undefined
-      ? file
-      : `${file}:${line}${column === undefined ? '' : `:${column}`}`;
-
-  return `\n  at ${position}`;
-}
-
 function parseDevFlags(args: string[]): DevFlags {
   const flags: DevFlags = {};
 
@@ -269,54 +247,9 @@ function parseDevFlags(args: string[]): DevFlags {
 }
 
 function formatError(error: unknown): string {
-  if (error instanceof MdxError) {
-    return `[${error.code}] ${error.message}${formatSourceLocation(
-      error.file,
-      error.line,
-      error.column,
-    )}`;
-  }
-
-  if (error instanceof IslandError) {
-    const exportName = error.exportName
-      ? `\n  export: ${error.exportName}`
-      : '';
-
-    return `[${error.code}] ${error.message}${formatSourceLocation(
-      error.file,
-      undefined,
-      undefined,
-    )}${exportName}`;
-  }
-
-  if (
-    error instanceof ContentError ||
-    error instanceof ThemeError ||
-    error instanceof RouteError ||
-    error instanceof BuildError
-  ) {
-    return `[${error.code}] ${error.message}`;
-  }
-
-  if (error instanceof YamlParseError) {
-    return error.diagnostics
-      .map(
-        (diagnostic) =>
-          `${diagnostic.file}:${diagnostic.line}:${diagnostic.column} [${diagnostic.code}] ${diagnostic.message}`,
-      )
-      .join('\n');
-  }
-
-  if (error instanceof ZodError) {
-    return error.issues
-      .map(
-        (issue) =>
-          `- ${issue.path.join('.') || '(root)'}: ${issue.message}`,
-      )
-      .join('\n');
-  }
-
-  return error instanceof Error ? error.message : String(error);
+  return diagnosticsFromError(error)
+    .map(formatDiagnostic)
+    .join('\n');
 }
 
 function runInspect(args: string[]): void {
@@ -351,42 +284,6 @@ function runInspect(args: string[]): void {
   console.log(`Tags: ${result.tags.length}`);
   console.log(`Categories: ${result.categories.length}`);
   console.log(`Diagnostics: ${result.diagnostics.length}`);
-}
-
-function errorPayload(
-  error: unknown,
-): JsonDiagnostic {
-  if (error instanceof Error) {
-    const detail = error as Error & {
-      code?: string;
-      file?: string;
-      line?: number;
-      column?: number;
-      path?: string;
-      exportName?: string;
-    };
-
-    return {
-      code: detail.code ?? 'ERROR',
-      message: detail.message,
-      ...(detail.file ? { file: detail.file } : {}),
-      ...(detail.line !== undefined
-        ? { line: detail.line }
-        : {}),
-      ...(detail.column !== undefined
-        ? { column: detail.column }
-        : {}),
-      ...(detail.path ? { path: detail.path } : {}),
-      ...(detail.exportName
-        ? { exportName: detail.exportName }
-        : {}),
-    };
-  }
-
-  return {
-    code: 'ERROR',
-    message: String(error),
-  };
 }
 
 const jsonWriter = new EventWriter();
@@ -511,7 +408,7 @@ try {
     jsonWriter.emit({
       type: 'build-error',
       durationMs: 0,
-      diagnostics: [errorPayload(error)],
+      diagnostics: diagnosticsFromError(error),
     });
     if (command === 'dev') {
       jsonWriter.emit({ type: 'exit', code: 1 });

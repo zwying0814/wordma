@@ -76,6 +76,15 @@ export type {
   StaticFile,
 } from './output/static';
 export {
+  diagnosticFromContent,
+  diagnosticsFromError,
+  formatDiagnostic,
+} from './diagnostics';
+export type {
+  Diagnostic,
+  DiagnosticSource,
+} from './diagnostics';
+export {
   BuildCache,
   CACHE_FORMAT_VERSION,
   createBuildCache,

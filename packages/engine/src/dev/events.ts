@@ -1,15 +1,8 @@
+import type { Diagnostic } from '../diagnostics';
+
 export const EVENTS_VERSION = 1;
 
-export type JsonDiagnostic = {
-  code: string;
-  message: string;
-  file?: string;
-  line?: number;
-  column?: number;
-  path?: string;
-  exportName?: string;
-  [key: string]: unknown;
-};
+export type JsonDiagnostic = Diagnostic;
 
 export type ReadyEvent = {
   type: 'ready';
@@ -32,7 +25,7 @@ export type BuildSuccessEvent = {
   routes: number;
   compiledEntries: number;
   islands: number;
-  diagnostics: JsonDiagnostic[];
+  diagnostics: Diagnostic[];
   cache?: {
     hits: number;
     misses: number;

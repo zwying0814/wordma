@@ -3,7 +3,6 @@ import path from 'node:path';
 import { loadWorkspace } from '@wordma/content';
 import type {
   AssetRef,
-  ContentDiagnostic,
   ContentEntry,
 } from '@wordma/content';
 import type { PageAssets } from '@wordma/theme';
@@ -28,6 +27,10 @@ import { copyStaticAssets } from './output/static';
 import { writeFeeds } from './output/feeds';
 import { createBuildCache } from './cache/build-cache';
 import type { CacheStats } from './cache/build-cache';
+import {
+  diagnosticFromContent,
+} from './diagnostics';
+import type { Diagnostic } from './diagnostics';
 import { analyzeMdx, compileMdx } from './mdx/compile';
 import type {
   CompiledContent,
@@ -72,7 +75,7 @@ export type BuildResult = {
     id: string;
     version: string;
   };
-  diagnostics: ContentDiagnostic[];
+  diagnostics: Diagnostic[];
   manifest: RouteManifest;
 };
 
@@ -325,12 +328,22 @@ export async function buildSite(
     ),
   });
 
-  const diagnostics = [
-    ...routeManifest.diagnostics,
-    ...themeRuntime.diagnostics,
-    ...staticAssets.diagnostics,
-    ...contentAssets.diagnostics,
-    ...feedResult.diagnostics,
+  const diagnostics: Diagnostic[] = [
+    ...routeManifest.diagnostics.map((item) =>
+      diagnosticFromContent(item, 'content'),
+    ),
+    ...themeRuntime.diagnostics.map((item) =>
+      diagnosticFromContent(item, 'theme'),
+    ),
+    ...staticAssets.diagnostics.map((item) =>
+      diagnosticFromContent(item, 'build'),
+    ),
+    ...contentAssets.diagnostics.map((item) =>
+      diagnosticFromContent(item, 'content'),
+    ),
+    ...feedResult.diagnostics.map((item) =>
+      diagnosticFromContent(item, 'build'),
+    ),
   ];
   const outputs = new Map<string, BuildManifestOutput>();
   const addOutput = (

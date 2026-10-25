@@ -10,10 +10,14 @@ import { loadWorkspace } from '@wordma/content';
 import { buildSite } from '../build';
 import type { BuildResult } from '../build';
 import { resolveThemeDirectory } from '../theme/resolve';
+import {
+  diagnosticsFromError,
+  formatDiagnostic,
+} from '../diagnostics';
+import type { Diagnostic } from '../diagnostics';
 import type {
   BuildSuccessEvent,
   DevEventPayload,
-  JsonDiagnostic,
 } from './events';
 import { startDevServer } from './server';
 import type { DevServer } from './server';
@@ -71,38 +75,8 @@ function promote(nextDir: string, outDir: string): void {
   rmSync(oldDir, { recursive: true, force: true });
 }
 
-function errorEvent(error: unknown): JsonDiagnostic {
-  if (error instanceof Error) {
-    const detail = error as Error & {
-      code?: string;
-      file?: string;
-      line?: number;
-      column?: number;
-      path?: string;
-      exportName?: string;
-    };
-
-    return {
-      code: detail.code ?? 'DEV_BUILD_FAILED',
-      message: detail.message,
-      ...(detail.file ? { file: detail.file } : {}),
-      ...(detail.line !== undefined
-        ? { line: detail.line }
-        : {}),
-      ...(detail.column !== undefined
-        ? { column: detail.column }
-        : {}),
-      ...(detail.path ? { path: detail.path } : {}),
-      ...(detail.exportName
-        ? { exportName: detail.exportName }
-        : {}),
-    };
-  }
-
-  return {
-    code: 'DEV_BUILD_FAILED',
-    message: String(error),
-  };
+function errorEvent(error: unknown): Diagnostic[] {
+  return diagnosticsFromError(error);
 }
 
 function buildSuccessEvent(
@@ -121,12 +95,9 @@ function buildSuccessEvent(
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    const detail = error as Error & { code?: string };
-    return `${detail.code ? `[${detail.code}] ` : ''}${detail.message}`;
-  }
-
-  return String(error);
+  return diagnosticsFromError(error)
+    .map(formatDiagnostic)
+    .join('\n');
 }
 
 /**
@@ -182,7 +153,7 @@ export async function startDev(
   const basePath = workspace?.site.site.basePath ?? '';
   const initialDiagnostics = initial
     ? initial.result.diagnostics
-    : [errorEvent(initialError)];
+    : errorEvent(initialError);
 
   let server: DevServer;
   try {
@@ -293,11 +264,11 @@ export async function startDev(
       });
     } catch (error) {
       logger.error(errorMessage(error));
-      server.setDiagnostics([errorEvent(error)]);
+      server.setDiagnostics(errorEvent(error));
       logger.event?.({
         type: 'build-error',
         durationMs: 0,
-        diagnostics: [errorEvent(error)],
+        diagnostics: errorEvent(error),
       });
     } finally {
       state.building = false;

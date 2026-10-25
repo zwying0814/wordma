@@ -1,8 +1,7 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type { ContentDiagnostic } from '@wordma/content';
-
+import type { Diagnostic } from '../diagnostics';
 import { BuildError } from '../errors';
 import type { Route, RouteKind } from '../routing/manifest';
 
@@ -34,7 +33,7 @@ export type BuildManifest = {
   };
   routes: Route[];
   pages: BuildManifestPage[];
-  diagnostics: ContentDiagnostic[];
+  diagnostics: Diagnostic[];
   assets: {
     themeStyles?: {
       url: string;

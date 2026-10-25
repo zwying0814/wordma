@@ -211,6 +211,8 @@ describe('dev server', () => {
       server.setDiagnostics([
         {
           code: 'MDX_PARSE_ERROR',
+          severity: 'error',
+          source: 'mdx',
           message: 'bad content',
           file: '/site/a.mdx',
           line: 3,
@@ -250,6 +252,7 @@ describe('dev server', () => {
         {
           code: 'MDX_PARSE_ERROR',
           severity: 'error',
+          source: 'mdx',
           message: '<script>alert(1)</script>',
           file: '/site/a.mdx',
           line: 2,
@@ -258,6 +261,7 @@ describe('dev server', () => {
         {
           code: 'MISSING_ASSET',
           severity: 'warning',
+          source: 'content',
           message: 'missing image',
         },
       ],

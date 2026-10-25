@@ -68,6 +68,8 @@ describe('EventWriter', () => {
       diagnostics: [
         {
           code: 'MDX_PARSE_ERROR',
+          severity: 'error',
+          source: 'mdx',
           message: 'line 1\nline 2',
         },
       ],
