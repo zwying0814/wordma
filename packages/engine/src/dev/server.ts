@@ -18,6 +18,13 @@ export type DevServerOptions = {
   host: string;
   port: number;
   basePath?: string;
+  hasBuild?: boolean;
+  initialDiagnostics?: JsonDiagnostic[];
+};
+
+export type BuildState = {
+  hasBuild: boolean;
+  diagnostics: JsonDiagnostic[];
 };
 
 export type DevServer = {
@@ -25,6 +32,7 @@ export type DevServer = {
   port: number;
   publish: (event: DevServerEvent) => void;
   setDiagnostics: (diagnostics: JsonDiagnostic[]) => void;
+  setBuildState: (state: BuildState) => void;
   close: () => void;
 };
 
@@ -60,6 +68,35 @@ const CLIENT_SCRIPT = `(() => {
     if (existing) existing.remove();
   }
 
+  function renderGroup(overlay, titleText, color, items) {
+    if (items.length === 0) return;
+
+    const groupTitle = document.createElement('h3');
+    groupTitle.textContent = titleText;
+    groupTitle.setAttribute(
+      'style',
+      'margin:20px 0 10px;font-size:15px;color:' + color + ';'
+    );
+    overlay.appendChild(groupTitle);
+
+    for (const diagnostic of items) {
+      const block = document.createElement('pre');
+      block.setAttribute(
+        'style',
+        'margin:0 0 12px;padding:12px;white-space:pre-wrap;background:#1b1e25;border:1px solid #333843;border-radius:6px;'
+      );
+      const location = diagnostic.file
+        ? diagnostic.file +
+          (diagnostic.line == null ? '' : ':' + diagnostic.line) +
+          (diagnostic.column == null ? '' : ':' + diagnostic.column)
+        : '';
+      block.textContent =
+        '[' + diagnostic.code + '] ' + diagnostic.message +
+        (location ? '\\n' + location : '');
+      overlay.appendChild(block);
+    }
+  }
+
   function showOverlay(diagnostics) {
     let overlay = document.getElementById(overlayId);
     if (!overlay) {
@@ -78,22 +115,15 @@ const CLIENT_SCRIPT = `(() => {
     title.setAttribute('style', 'margin:0 0 16px;font-size:18px;color:#ff8a8a;');
     overlay.appendChild(title);
 
-    for (const diagnostic of diagnostics) {
-      const block = document.createElement('pre');
-      block.setAttribute(
-        'style',
-        'margin:0 0 12px;padding:12px;white-space:pre-wrap;background:#1b1e25;border:1px solid #333843;border-radius:6px;'
-      );
-      const location = diagnostic.file
-        ? diagnostic.file +
-          (diagnostic.line == null ? '' : ':' + diagnostic.line) +
-          (diagnostic.column == null ? '' : ':' + diagnostic.column)
-        : '';
-      block.textContent =
-        '[' + diagnostic.code + '] ' + diagnostic.message +
-        (location ? '\\n' + location : '');
-      overlay.appendChild(block);
-    }
+    const errors = diagnostics.filter(
+      (item) => !item.severity || item.severity === 'error'
+    );
+    const warnings = diagnostics.filter(
+      (item) => item.severity === 'warning'
+    );
+
+    renderGroup(overlay, 'Errors', '#ff8a8a', errors);
+    renderGroup(overlay, 'Warnings', '#f0c674', warnings);
   }
 
   const source = new EventSource('${EVENTS_PATH}');
@@ -111,7 +141,7 @@ const CLIENT_SCRIPT = `(() => {
       const errors = diagnostics.filter(
         (item) => !item.severity || item.severity === 'error'
       );
-      if (errors.length > 0) showOverlay(errors);
+      if (errors.length > 0) showOverlay(diagnostics);
       else hideOverlay();
     } catch {
       // ignore malformed events
@@ -148,6 +178,75 @@ function sseMessage(
   return `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function diagnosticText(diagnostic: JsonDiagnostic): string {
+  const location = diagnostic.file
+    ? `${diagnostic.file}${
+        diagnostic.line === undefined
+          ? ''
+          : `:${diagnostic.line}${
+              diagnostic.column === undefined
+                ? ''
+                : `:${diagnostic.column}`
+            }`
+      }`
+    : '';
+
+  return `[${diagnostic.code}] ${diagnostic.message}${
+    location ? `\n${location}` : ''
+  }`;
+}
+
+function errorPageHtml(
+  diagnostics: JsonDiagnostic[],
+): string {
+  const errors = diagnostics.filter(
+    (item) =>
+      !item.severity || item.severity === 'error',
+  );
+  const warnings = diagnostics.filter(
+    (item) => item.severity === 'warning',
+  );
+  const group = (
+    title: string,
+    color: string,
+    items: JsonDiagnostic[],
+  ): string =>
+    items.length === 0
+      ? ''
+      : `<h2 style="color:${color};font-size:16px;margin:20px 0 10px">${title}</h2>${items
+          .map(
+            (item) =>
+              `<pre style="margin:0 0 12px;padding:12px;white-space:pre-wrap;background:#1b1e25;border:1px solid #333843;border-radius:6px">${escapeHtml(
+                diagnosticText(item),
+              )}</pre>`,
+          )
+          .join('')}`;
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wordma build failed</title>
+</head>
+<body style="margin:0;background:#111318;color:#f5f5f5;padding:24px;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace">
+<h1 style="margin:0 0 16px;font-size:18px;color:#ff8a8a">Wordma build failed</h1>
+${group('Errors', '#ff8a8a', errors)}
+${group('Warnings', '#f0c674', warnings)}
+<script type="module" src="/_wordma/client.js"></script>
+</body>
+</html>`;
+}
+
 export function startDevServer(
   options: DevServerOptions,
 ): DevServer {
@@ -160,7 +259,11 @@ export function startDevServer(
   const clients = new Set<
     ReadableStreamDefaultController<Uint8Array>
   >();
-  let diagnostics: JsonDiagnostic[] = [];
+  let hasBuild =
+    options.hasBuild ??
+    existsSync(path.join(outDir, 'index.html'));
+  let diagnostics: JsonDiagnostic[] =
+    options.initialDiagnostics ?? [];
   let heartbeat: ReturnType<typeof setInterval> | undefined;
 
   const closeClient = (
@@ -195,6 +298,14 @@ export function startDevServer(
     next: JsonDiagnostic[],
   ): void => {
     publish({ type: 'diagnostics', diagnostics: next });
+  };
+
+  const setBuildState = (next: BuildState): void => {
+    hasBuild = next.hasBuild;
+    publish({
+      type: 'diagnostics',
+      diagnostics: next.diagnostics,
+    });
   };
 
   const responseForFile = (
@@ -364,6 +475,37 @@ export function startDevServer(
           return new Response('Bad Request', { status: 400 });
         }
 
+        if (!hasBuild) {
+          const wantsHtml =
+            request.headers
+              .get('accept')
+              ?.includes('text/html') ||
+            pathname.endsWith('/') ||
+            !path.extname(pathname);
+
+          if (wantsHtml) {
+            const headers = {
+              'content-type': MIME_TYPES['.html'] as string,
+              'cache-control': 'no-store',
+            };
+
+            return method === 'HEAD'
+              ? new Response(null, {
+                  status: 500,
+                  headers,
+                })
+              : new Response(
+                  errorPageHtml(diagnostics),
+                  {
+                    status: 500,
+                    headers,
+                  },
+                );
+          }
+
+          return new Response('Not Found', { status: 404 });
+        }
+
         const target = path.resolve(
           outDir,
           `.${pathname}`,
@@ -410,6 +552,7 @@ export function startDevServer(
     port: actualPort,
     publish,
     setDiagnostics,
+    setBuildState,
     close: () => {
       if (heartbeat) {
         clearInterval(heartbeat);

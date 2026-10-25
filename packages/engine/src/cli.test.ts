@@ -703,7 +703,7 @@ describe('wordma-engine CLI', () => {
   );
 
   it(
-    'dev --json 启动失败时 build-error 后输出 exit',
+    'dev --json 初次失败启动覆盖层并可退出',
     async () => {
       const outDir = makeOutDir();
       const port = freePort();
@@ -725,17 +725,32 @@ describe('wordma-engine CLI', () => {
           stderr: 'pipe',
         },
       );
+      const stdout = proc.stdout as ReadableStream<Uint8Array>;
+      const stderr = proc.stderr as ReadableStream<Uint8Array>;
+      const stderrText = new Response(stderr).text();
+      let exited = false;
 
       try {
-        const code = await proc.exited;
-        const output = await new Response(
-          proc.stdout as ReadableStream<Uint8Array>,
-        ).text();
-        const events = parseEvents(output);
+        const response = await waitForHttp(
+          `http://127.0.0.1:${port}/`,
+        );
+        expect(response.status).toBe(500);
+        expect(await response.text()).toContain(
+          'MISSING_COMPONENT_IMPORT',
+        );
 
-        expect(code).toBe(1);
+        proc.kill('SIGINT');
+        const code = await proc.exited;
+        exited = true;
+
+        const output = await new Response(stdout).text();
+        const events = parseEvents(output);
+        await stderrText;
+
+        expect(code).toBe(0);
         expect(events.map((event) => event.type)).toEqual([
           'build-error',
+          'ready',
           'exit',
         ]);
         expect(
@@ -745,9 +760,9 @@ describe('wordma-engine CLI', () => {
             }>
           )[0]?.code,
         ).toBe('MISSING_COMPONENT_IMPORT');
-        expect(events[1]?.code).toBe(1);
+        expect(events[2]?.code).toBe(0);
       } finally {
-        if (proc.exitCode === null) {
+        if (!exited && proc.exitCode === null) {
           proc.kill('SIGKILL');
           await proc.exited;
         }
@@ -850,6 +865,108 @@ describe('wordma-engine CLI', () => {
 
         expect(code).toBe(0);
         expect(errors).not.toContain('watch 启动失败');
+      } finally {
+        if (!exited && proc.exitCode === null) {
+          proc.kill('SIGKILL');
+          await proc.exited;
+        }
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+    20000,
+  );
+
+  it(
+    'dev 初次失败显示覆盖层，修复后自动恢复',
+    async () => {
+      const root = mkdtempSync(
+        path.join(tmpdir(), 'wordma-cli-recover-'),
+      );
+      const outDir = path.join(root, 'dist');
+      const port = freePort();
+      const write = (
+        relative: string,
+        source: string,
+      ): void => {
+        const file = path.join(root, relative);
+        mkdirSync(path.dirname(file), {
+          recursive: true,
+        });
+        writeFileSync(file, source);
+      };
+
+      write(
+        'wordma.site.yaml',
+        [
+          'site:',
+          '  title: Recovery Site',
+          'theme:',
+          '  id: wordma-theme-default',
+        ].join('\n'),
+      );
+      write(
+        'content/posts/hello.mdx',
+        '---\ntitle: Hello\n---\n\n# Hello\n\n<Missing />',
+      );
+
+      const proc = Bun.spawn(
+        [
+          process.execPath,
+          cliPath,
+          'dev',
+          '--root',
+          root,
+          `--out=${outDir}`,
+          `--port=${port}`,
+        ],
+        {
+          cwd: repoRoot,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
+      const stdout = proc.stdout as ReadableStream<Uint8Array>;
+      const stderr = proc.stderr as ReadableStream<Uint8Array>;
+      const stderrText = new Response(stderr).text();
+      let exited = false;
+
+      try {
+        await readUntil(stdout, 'Dev server:');
+
+        const broken = await fetch(
+          `http://127.0.0.1:${port}/`,
+        );
+        const brokenHtml = await broken.text();
+        expect(broken.status).toBe(500);
+        expect(brokenHtml).toContain(
+          'MISSING_COMPONENT_IMPORT',
+        );
+        expect(brokenHtml).toContain(
+          '/_wordma/client.js',
+        );
+
+        write(
+          'content/posts/hello.mdx',
+          '---\ntitle: Fixed\n---\n\n# Fixed\n\nRecovered.',
+        );
+
+        await waitForHtmlMarker(
+          `http://127.0.0.1:${port}/posts/hello/`,
+          'Recovered.',
+        );
+
+        const fixed = await fetch(
+          `http://127.0.0.1:${port}/posts/hello/`,
+        );
+        expect(fixed.status).toBe(200);
+        expect(await fixed.text()).toContain('Recovered.');
+
+        proc.kill('SIGINT');
+        const code = await proc.exited;
+        exited = true;
+        await stderrText;
+
+        expect(code).toBe(0);
       } finally {
         if (!exited && proc.exitCode === null) {
           proc.kill('SIGKILL');

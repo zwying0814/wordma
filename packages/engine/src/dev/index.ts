@@ -143,11 +143,6 @@ export async function startDev(
   const host = options.host ?? '127.0.0.1';
   const port = options.port ?? 4321;
 
-  // 提前读取 basePath，也用于校验工作区。
-  const workspace = loadWorkspace(root, {
-    includeDrafts: options.includeDrafts,
-  });
-
   const runBuild = async (): Promise<{
     result: BuildResult;
     durationMs: number;
@@ -165,11 +160,27 @@ export async function startDev(
     };
   };
 
-  const initial = await runBuild();
-  promote(nextDir, outDir);
-  logger.event?.(
-    buildSuccessEvent(initial.result, initial.durationMs),
-  );
+  let workspace: ReturnType<typeof loadWorkspace> | undefined;
+  let initial:
+    | { result: BuildResult; durationMs: number }
+    | undefined;
+  let initialError: unknown;
+
+  try {
+    workspace = loadWorkspace(root, {
+      includeDrafts: options.includeDrafts,
+    });
+    initial = await runBuild();
+    promote(nextDir, outDir);
+  } catch (error) {
+    initialError = error;
+    rmSync(nextDir, { recursive: true, force: true });
+  }
+
+  const basePath = workspace?.site.site.basePath ?? '';
+  const initialDiagnostics = initial
+    ? initial.result.diagnostics
+    : [errorEvent(initialError)];
 
   let server: DevServer;
   try {
@@ -177,11 +188,26 @@ export async function startDev(
       outDir,
       host,
       port,
-      basePath: workspace.site.site.basePath,
+      basePath,
+      hasBuild: initial !== undefined,
+      initialDiagnostics,
     });
   } catch (error) {
     rmSync(nextDir, { recursive: true, force: true });
     throw error;
+  }
+
+  if (initial) {
+    logger.event?.(
+      buildSuccessEvent(initial.result, initial.durationMs),
+    );
+  } else {
+    logger.error(errorMessage(initialError));
+    logger.event?.({
+      type: 'build-error',
+      durationMs: 0,
+      diagnostics: initialDiagnostics,
+    });
   }
 
   const state: LoopState = {
@@ -191,7 +217,6 @@ export async function startDev(
   };
   let watcher: WatchHandle | undefined;
   const pendingChanged = new Set<string>();
-  server.setDiagnostics(initial.result.diagnostics);
 
   let resolveClosed: () => void = () => undefined;
   const closed = new Promise<void>((resolve) => {
@@ -248,7 +273,10 @@ export async function startDev(
       logger.info(
         `Built ${built.result.routes} routes in ${built.durationMs}ms`,
       );
-      server.setDiagnostics(built.result.diagnostics);
+      server.setBuildState({
+        hasBuild: true,
+        diagnostics: built.result.diagnostics,
+      });
       logger.event?.(
         buildSuccessEvent(built.result, built.durationMs),
       );
@@ -281,10 +309,12 @@ export async function startDev(
   };
 
   if (!options.noWatch) {
-    const themeDirectory = resolveThemeDirectory(
-      root,
-      workspace.site.theme.id,
-    );
+    const themeDirectory = workspace
+      ? resolveThemeDirectory(
+          root,
+          workspace.site.theme.id,
+        )
+      : null;
     const relativeTheme = themeDirectory
       ? path.relative(root, themeDirectory)
       : '';
@@ -328,7 +358,7 @@ export async function startDev(
     url: server.url,
     root,
     outDir,
-    basePath: workspace.site.site.basePath,
+    basePath,
     watch: !options.noWatch,
   });
 

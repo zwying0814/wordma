@@ -239,6 +239,62 @@ describe('dev server', () => {
     }
   });
 
+  it('初次失败返回覆盖层，ready 后恢复站点', async () => {
+    const outDir = makeDist();
+    const server = startDevServer({
+      outDir,
+      host: '127.0.0.1',
+      port: 0,
+      hasBuild: false,
+      initialDiagnostics: [
+        {
+          code: 'MDX_PARSE_ERROR',
+          severity: 'error',
+          message: '<script>alert(1)</script>',
+          file: '/site/a.mdx',
+          line: 2,
+          column: 3,
+        },
+        {
+          code: 'MISSING_ASSET',
+          severity: 'warning',
+          message: 'missing image',
+        },
+      ],
+    });
+
+    try {
+      const response = await fetch(`${server.url}`);
+      const html = await response.text();
+
+      expect(response.status).toBe(500);
+      expect(html).toContain('MDX_PARSE_ERROR');
+      expect(html).toContain('/site/a.mdx:2:3');
+      expect(html).toContain('Warnings');
+      expect(html).toContain('missing image');
+      expect(html).toContain(
+        '&lt;script&gt;alert(1)&lt;/script&gt;',
+      );
+      expect(html).not.toContain('<script>alert(1)</script>');
+      expect(html).toContain('/_wordma/client.js');
+
+      const asset = await fetch(`${server.url}app.js`);
+      expect(asset.status).toBe(404);
+
+      server.setBuildState({
+        hasBuild: true,
+        diagnostics: [],
+      });
+
+      const ready = await fetch(`${server.url}`);
+      expect(ready.status).toBe(200);
+      expect(await ready.text()).toContain('<h1>Home</h1>');
+    } finally {
+      server.close();
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
   it('提供 dev client 脚本', async () => {
     const outDir = makeDist();
     const server = start(outDir);
@@ -255,6 +311,9 @@ describe('dev server', () => {
       );
       expect(script).toContain('EventSource');
       expect(script).toContain('wordma-dev-overlay');
+      expect(script).toContain('Warnings');
+      expect(script).toContain('#f0c674');
+      expect(script).not.toContain('innerHTML');
       expect(script).toContain(
         'source.addEventListener(\'reload\'',
       );
