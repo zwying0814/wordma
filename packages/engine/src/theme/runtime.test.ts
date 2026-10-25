@@ -163,11 +163,20 @@ describe('loadThemeRuntime', () => {
       expect(runtime.definition.layouts.taxonomy).toBe(
         runtime.definition.layouts.index,
       );
+      const warnings = runtime.diagnostics.filter(
+        (diagnostic) => diagnostic.code === 'MISSING_LAYOUT',
+      );
+      expect(warnings).toHaveLength(2);
       expect(
-        runtime.diagnostics.filter(
-          (diagnostic) => diagnostic.code === 'MISSING_LAYOUT',
+        warnings.every(
+          (warning) => warning.severity === 'warning',
         ),
-      ).toHaveLength(2);
+      ).toBe(true);
+      expect(
+        warnings.every((warning) =>
+          warning.file?.endsWith('theme.yaml'),
+        ),
+      ).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

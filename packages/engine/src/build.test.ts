@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -113,6 +114,99 @@ describe('buildSite', () => {
         existsSync(path.join(outDir, 'posts/draft/index.html')),
       ).toBe(true);
     } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
+  it('主题缺失 archive/taxonomy 的诊断进入 build manifest', async () => {
+    const root = mkdtempSync(
+      path.join(tmpdir(), 'wordma-fallback-ws-'),
+    );
+    const outDir = makeOutDir();
+    const themeId = 'wordma-theme-fallback-build';
+    const themeDir = path.join(root, 'themes', themeId);
+
+    try {
+      mkdirSync(path.join(root, 'content/posts'), {
+        recursive: true,
+      });
+      mkdirSync(path.join(themeDir, 'src'), { recursive: true });
+
+      writeFileSync(
+        path.join(root, 'wordma.site.yaml'),
+        [
+          'site:',
+          '  title: Fallback Build',
+          'theme:',
+          `  id: ${themeId}`,
+        ].join('\n'),
+      );
+      writeFileSync(
+        path.join(root, 'content/posts/hello.mdx'),
+        '---\ntitle: Hello\ndate: 2026-01-01\n---\nBody\n',
+      );
+      writeFileSync(
+        path.join(themeDir, 'theme.yaml'),
+        [
+          `id: ${themeId}`,
+          'displayName: Fallback',
+          'version: 0.0.0',
+          'engines:',
+          '  wordma: ">=0.0.0"',
+          'settings: []',
+          'pages: []',
+        ].join('\n'),
+      );
+      writeFileSync(
+        path.join(themeDir, 'package.json'),
+        JSON.stringify({
+          name: themeId,
+          version: '0.0.0',
+          type: 'module',
+          exports: {
+            '.': './src/index.tsx',
+          },
+        }),
+      );
+      writeFileSync(
+        path.join(themeDir, 'src/index.tsx'),
+        [
+          'const Layout = () => null;',
+          'export default {',
+          '  layouts: {',
+          '    root: Layout,',
+          '    index: Layout,',
+          '    post: Layout,',
+          '    page: Layout,',
+          '    notFound: Layout,',
+          '  },',
+          '};',
+        ].join('\n'),
+      );
+
+      const result = await buildSite({ root, outDir });
+      const warnings = result.diagnostics.filter(
+        (diagnostic) => diagnostic.code === 'MISSING_LAYOUT',
+      );
+
+      expect(warnings).toHaveLength(2);
+
+      const manifest = JSON.parse(
+        readFileSync(
+          path.join(outDir, '.wordma-manifest.json'),
+          'utf8',
+        ),
+      ) as {
+        diagnostics: Array<{ code: string }>;
+      };
+
+      expect(
+        manifest.diagnostics.filter(
+          (diagnostic) => diagnostic.code === 'MISSING_LAYOUT',
+        ),
+      ).toHaveLength(2);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
       rmSync(outDir, { recursive: true, force: true });
     }
   });

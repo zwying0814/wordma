@@ -170,6 +170,38 @@ describe('buildRouteManifest', () => {
     );
   });
 
+  it('路由冲突包含路径与来源', () => {
+    const workspace = loadWorkspace(
+      path.join(repoRoot, 'fixtures/broken/route-conflict'),
+    );
+    const theme = loadTheme(
+      'fixtures/broken/route-conflict/themes/wordma-theme-route-conflict/theme.yaml',
+    );
+
+    try {
+      buildRouteManifest(workspace, theme);
+    } catch (error) {
+      expect(error).toBeInstanceOf(RouteError);
+      const routeError = error as RouteError;
+
+      expect(routeError.path).toBe('/about/');
+      expect(routeError.sources).toHaveLength(2);
+      expect(
+        routeError.sources?.some((source) =>
+          source.startsWith('page:'),
+        ),
+      ).toBe(true);
+      expect(
+        routeError.sources?.some((source) =>
+          source.startsWith('theme-page:'),
+        ),
+      ).toBe(true);
+      return;
+    }
+
+    throw new Error('预期抛出 RouteError(ROUTE_CONFLICT)');
+  });
+
   it('支持覆盖文章路由模式', () => {
     const workspace = loadWorkspace(
       path.join(repoRoot, 'fixtures/content-layer'),
