@@ -404,6 +404,7 @@ function renderIslandPlaceholder(
       properties: {
         className: ['wordma-island-slot'],
         style: 'display:contents',
+        'data-wordma-slot': '',
       },
       children: [
         {

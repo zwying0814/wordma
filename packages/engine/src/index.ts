@@ -7,6 +7,15 @@ export type {
   IslandBundle,
   IslandBundleInput,
 } from './islands/bundle';
+export {
+  buildIslandRuntime,
+  copyIslandRuntime,
+} from './islands/runtime';
+export type {
+  BuildIslandRuntimeOptions,
+  IslandRuntime,
+  IslandRuntimeAsset,
+} from './islands/runtime';
 export { analyzeMdx, compileMdx } from './mdx/compile';
 export type {
   AnalyzeMdxOptions,

@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -70,6 +71,9 @@ describe('buildSite', () => {
       expect(home).toContain('Content Layer Fixture');
       expect(home).toContain('href="/posts/standalone-post/"');
       expect(home).toContain('href="/page/2/"');
+      expect(
+        existsSync(path.join(outDir, 'assets/islands')),
+      ).toBe(false);
 
       const notFound = readFileSync(
         path.join(outDir, '404.html'),
@@ -165,6 +169,19 @@ describe('buildSite', () => {
           path.join(outDir, 'assets/islands', islandFile ?? ''),
         ),
       ).toBe(true);
+
+      const assets = readdirSync(
+        path.join(outDir, 'assets/islands'),
+      );
+      expect(
+        assets.filter((file) => file.startsWith('react-')),
+      ).toHaveLength(1);
+      expect(
+        assets.filter((file) => file.startsWith('mount-')),
+      ).toHaveLength(1);
+      expect(
+        assets.filter((file) => file.startsWith('island-')),
+      ).toHaveLength(2);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
       rmSync(path.join(root, '.wordma'), {

@@ -23,6 +23,10 @@ import {
   collectIslandInputs,
   copyIslandAssets,
 } from './islands/bundle';
+import {
+  buildIslandRuntime,
+  copyIslandRuntime,
+} from './islands/runtime';
 import { createPageContext } from './render/page-context';
 import { renderRoute } from './render/ssr';
 import {
@@ -103,9 +107,22 @@ export async function buildSite(
       basePath: workspace.site.site.basePath,
     },
   );
+  const islandRuntime =
+    islandBundles.bundles.length > 0
+      ? await buildIslandRuntime({
+          cacheDir: path.join(
+            root,
+            '.wordma/cache/islands',
+          ),
+          basePath: workspace.site.site.basePath,
+        })
+      : undefined;
 
   prepareOutDir(outDir);
   copyIslandAssets(outDir, islandBundles);
+  if (islandRuntime) {
+    copyIslandRuntime(outDir, islandRuntime);
+  }
 
   const compiledContent = new Map<string, CompiledContent>();
 
