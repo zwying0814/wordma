@@ -5,11 +5,21 @@ version: 0.0.0
 engines:
   wordma: ">=0.0.0"
 
-settings: []
+settings:
+  - key: accent
+    type: color
+    label: 强调色
+    default: "#3563d9"
+  - key: showDescription
+    type: switch
+    label: 显示文章摘要
+    default: true
 
 content:
   version: 1
   post:
+    fields: []
+  page:
     fields: []
   pageTypes: {}
 

@@ -1,9 +1,121 @@
 :root {
   color-scheme: light dark;
+  --wordma-accent: #3563d9;
+  --wordma-bg: #ffffff;
+  --wordma-ink: #1f2328;
+  --wordma-muted: #6b7280;
+  --wordma-border: #e5e7eb;
+  --wordma-width: 42rem;
+  --wordma-font: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei',
+    sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --wordma-bg: #0f1115;
+    --wordma-ink: #f5f5f5;
+    --wordma-muted: #9ca3af;
+    --wordma-border: #262a31;
+  }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'PingFang SC', sans-serif;
-  line-height: 1.7;
+  background: var(--wordma-bg);
+  color: var(--wordma-ink);
+  font-family: var(--wordma-font);
+  line-height: 1.75;
+}
+
+a {
+  color: var(--wordma-accent);
+}
+
+.site-header,
+.site-main,
+.site-footer {
+  max-width: var(--wordma-width);
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  min-height: 3.5rem;
+  border-bottom: 1px solid var(--wordma-border);
+}
+
+.site-title {
+  color: var(--wordma-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-main {
+  padding-top: 2rem;
+  padding-bottom: 4rem;
+}
+
+.site-footer {
+  padding-top: 1rem;
+  padding-bottom: 2rem;
+  border-top: 1px solid var(--wordma-border);
+  color: var(--wordma-muted);
+  font-size: 0.875rem;
+}
+
+.post-list {
+  padding: 0;
+  list-style: none;
+}
+
+.post-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--wordma-border);
+}
+
+.post-list a {
+  text-decoration: none;
+}
+
+.post-list time,
+.prose time {
+  color: var(--wordma-muted);
+  font-size: 0.875rem;
+}
+
+.lead {
+  color: var(--wordma-muted);
+  font-size: 1.05rem;
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
+}
+
+.prose pre {
+  overflow-x: auto;
+  padding: 1rem;
+  border: 1px solid var(--wordma-border);
+  border-radius: 0.5rem;
+}
+
+.not-found {
+  padding: 4rem 0;
+  text-align: center;
+}
+
+.not-found h1 {
+  margin: 0;
+  color: var(--wordma-accent);
+  font-size: 4rem;
 }

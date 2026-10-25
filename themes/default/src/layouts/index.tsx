@@ -1,8 +1,23 @@
-export function IndexLayout() {
+import type { DefaultPageContext } from '../types';
+
+export function IndexLayout({
+  site,
+  page,
+  collections,
+}: DefaultPageContext) {
   return (
-    <main>
-      <h1>Wordma</h1>
-      <p>默认主题首页占位。</p>
-    </main>
+    <section>
+      <h1>{page.title || site.title}</h1>
+      {page.description && <p className="lead">{page.description}</p>}
+
+      <ul className="post-list">
+        {collections.posts.map((post) => (
+          <li key={post.id}>
+            <a href={post.url ?? `/posts/${post.slug}/`}>{post.title}</a>
+            {post.date && <time dateTime={post.date}>{post.date}</time>}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

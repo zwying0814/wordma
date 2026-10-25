@@ -1,8 +1,11 @@
-export function NotFoundLayout() {
+import type { DefaultPageContext } from '../types';
+
+export function NotFoundLayout({ site }: DefaultPageContext) {
   return (
-    <main>
+    <section className="not-found">
       <h1>404</h1>
       <p>页面不存在。</p>
-    </main>
+      <a href="/">返回 {site.title}</a>
+    </section>
   );
 }
