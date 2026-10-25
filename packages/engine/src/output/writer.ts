@@ -27,7 +27,10 @@ export function resolveOutDir(
   outInput?: string,
 ): string {
   const root = path.resolve(rootInput);
-  const outDir = path.resolve(root, outInput ?? '.wordma/dist');
+  // 显式 --out 相对当前工作目录；缺省输出放到 workspace 的 .wordma/dist。
+  const outDir = outInput
+    ? path.resolve(outInput)
+    : path.join(root, '.wordma/dist');
   const relativeFromOut = path.relative(outDir, root);
 
   if (
