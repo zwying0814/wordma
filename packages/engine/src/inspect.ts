@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 import {
@@ -16,6 +15,8 @@ import type {
   ThemePageDeclaration,
   ThemeSettingDescriptor,
 } from '@wordma/content';
+
+import { resolveThemeDirectory } from './theme/resolve';
 
 export type InspectTheme = {
   id: string;
@@ -63,28 +64,14 @@ function resolveThemeManifest(
   root: string,
   themeId: string,
 ): ResolvedTheme | null {
-  const candidates = [
-    path.join(root, 'themes', themeId, 'theme.yaml'),
-    path.join(root, 'node_modules', themeId, 'theme.yaml'),
-  ];
+  const directory = resolveThemeDirectory(root, themeId);
+  if (!directory) return null;
 
-  if (themeId === 'wordma-theme-default') {
-    // 开发仓库里的内置主题；发布后由引擎依赖提供。
-    candidates.push(
-      path.resolve(import.meta.dirname, '../../../themes/default/theme.yaml'),
-    );
-  }
-
-  for (const candidate of candidates) {
-    if (!existsSync(candidate)) continue;
-
-    return {
-      manifest: parseThemeManifest(parseYamlFile(candidate)),
-      path: candidate,
-    };
-  }
-
-  return null;
+  const manifestPath = path.join(directory, 'theme.yaml');
+  return {
+    manifest: parseThemeManifest(parseYamlFile(manifestPath)),
+    path: manifestPath,
+  };
 }
 
 export function inspectWorkspace(rootInput: string): InspectResult {

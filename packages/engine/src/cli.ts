@@ -1,6 +1,8 @@
 import { ContentError, YamlParseError } from '@wordma/content';
 import { ZodError } from 'zod';
 
+import { ThemeError } from './errors';
+
 import { ENGINE_VERSION } from './index';
 import { inspectWorkspace } from './inspect';
 
@@ -63,6 +65,10 @@ function parseInspectFlags(args: string[]): InspectFlags {
 
 function formatError(error: unknown): string {
   if (error instanceof ContentError) {
+    return `[${error.code}] ${error.message}`;
+  }
+
+  if (error instanceof ThemeError) {
     return `[${error.code}] ${error.message}`;
   }
 

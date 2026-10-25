@@ -1,5 +1,5 @@
 export { ENGINE_NAME, ENGINE_VERSION } from './constants';
-export { RouteError } from './errors';
+export { RouteError, ThemeError } from './errors';
 export { inspectWorkspace } from './inspect';
 export type {
   InspectPageType,
@@ -13,3 +13,5 @@ export type {
   RouteManifest,
   RouteTaxonomy,
 } from './routing/manifest';
+export { loadThemeRuntime } from './theme/runtime';
+export type { ThemeRuntime } from './theme/runtime';

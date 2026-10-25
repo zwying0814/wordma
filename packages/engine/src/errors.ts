@@ -18,3 +18,25 @@ export class RouteError extends Error {
     this.sources = options.sources;
   }
 }
+
+export class ThemeError extends Error {
+  readonly code: string;
+  readonly themeId?: string;
+  readonly path?: string;
+
+  constructor(
+    code: string,
+    message: string,
+    options: {
+      themeId?: string;
+      path?: string;
+    } = {},
+  ) {
+    super(message);
+    this.name = 'ThemeError';
+    this.code = code;
+    this.themeId = options.themeId;
+    this.path = options.path;
+  }
+}
+
