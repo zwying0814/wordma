@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   copyFileSync,
   mkdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -122,6 +123,79 @@ function resolveStyleFile(
   return realPath;
 }
 
+const TAILWIND_DIRECTIVE =
+  /@tailwind\s+(?:base|components|utilities)\b/;
+const TAILWIND_IMPORT =
+  /@import\s+(?:url\(\s*)?["']tailwindcss(?:\/[^"']*)?["']/;
+const CSS_IMPORT =
+  /@import\s+(?:url\(\s*)?["']([^"']+)["']/g;
+
+function isRemoteImport(value: string): boolean {
+  return (
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('//') ||
+    value.startsWith('data:')
+  );
+}
+
+function assertNoTailwindDirectives(
+  filePath: string,
+  themeDir: string,
+  themeId: string,
+  visited: Set<string>,
+): void {
+  if (visited.has(filePath)) return;
+  visited.add(filePath);
+
+  let source: string;
+  try {
+    source = readFileSync(filePath, 'utf8');
+  } catch {
+    return;
+  }
+
+  if (
+    TAILWIND_DIRECTIVE.test(source) ||
+    TAILWIND_IMPORT.test(source)
+  ) {
+    throw new ThemeError(
+      'TAILWIND_PRECOMPILE_REQUIRED',
+      [
+        `主题使用了未预生成的 Tailwind 指令：${filePath}`,
+        '请先运行：',
+        '  bunx @tailwindcss/cli -i ./src/styles/app.css -o ./src/styles/generated.css --minify',
+        '然后在 styles 中引用 generated.css。',
+      ].join('\n'),
+      { themeId, path: filePath },
+    );
+  }
+
+  for (const match of source.matchAll(CSS_IMPORT)) {
+    const specifier = match[1];
+    if (
+      !specifier ||
+      isRemoteImport(specifier) ||
+      specifier.startsWith('tailwindcss')
+    ) {
+      continue;
+    }
+    if (!specifier.startsWith('.')) continue;
+
+    const imported = path.resolve(
+      path.dirname(filePath),
+      specifier,
+    );
+    if (!isInside(themeDir, imported)) continue;
+    assertNoTailwindDirectives(
+      imported,
+      themeDir,
+      themeId,
+      visited,
+    );
+  }
+}
+
 export function themeStylePaths(
   styles: ThemeStyles | undefined,
 ): string[] {
@@ -162,8 +236,18 @@ export function buildThemeStyles(
   }
 
   const chunks: string[] = [];
+  const themeDir = realpathSync(
+    options.themeRuntime.directory,
+  );
 
   for (const file of files) {
+    assertNoTailwindDirectives(
+      file,
+      themeDir,
+      options.themeRuntime.manifest.id,
+      new Set(),
+    );
+
     try {
       chunks.push(compileCssFile(file));
     } catch (error) {

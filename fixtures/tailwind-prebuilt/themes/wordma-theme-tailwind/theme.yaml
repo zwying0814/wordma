@@ -1,0 +1,7 @@
+id: wordma-theme-tailwind
+displayName: Tailwind Prebuilt
+version: 0.0.0
+engines:
+  wordma: ">=0.0.0"
+settings: []
+pages: []

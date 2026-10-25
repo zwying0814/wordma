@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=../../../packages/content/schema/site.schema.json
+site:
+  title: Tailwind Prebuilt Fixture
+  language: zh-CN
+theme:
+  id: wordma-theme-tailwind
+  settings: {}
+navigation: []
