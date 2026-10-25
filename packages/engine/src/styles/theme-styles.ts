@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   realpathSync,
-  rmSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -12,9 +12,14 @@ import path from 'node:path';
 import type { ThemeStyles } from '@wordma/theme';
 
 import { assetUrl } from '../assets';
+import type { BuildCache } from '../cache/build-cache';
 import { ThemeError } from '../errors';
 import type { ThemeRuntime } from '../theme/runtime';
-import { compileCssFile, applyBasePathToCssUrls } from './css';
+import {
+  CSS_TARGETS,
+  applyBasePathToCssUrls,
+  compileCssFile,
+} from './css';
 
 export type ThemeStylesAsset = {
   url: string;
@@ -33,6 +38,7 @@ export type BuildThemeStylesOptions = {
   themeRuntime: ThemeRuntime;
   cacheDir: string;
   basePath?: string;
+  cache?: BuildCache;
 };
 
 function isInside(root: string, candidate: string): boolean {
@@ -215,6 +221,61 @@ export function themeStylePaths(
 /**
  * 编译主题 styles：解析相对路径、打包 @import、压缩并生成内容 hash。
  */
+function collectStyleGraph(
+  files: string[],
+  themeDir: string,
+  visited: Set<string>,
+  output: Array<{ path: string; hash: string }>,
+): void {
+  for (const file of files) {
+    if (visited.has(file)) continue;
+    visited.add(file);
+
+    let source: string;
+    try {
+      source = readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+
+    output.push({
+      path: path
+        .relative(themeDir, file)
+        .split(path.sep)
+        .join('/'),
+      hash: contentHash(source),
+    });
+
+    const imports: string[] = [];
+    for (const match of source.matchAll(CSS_IMPORT)) {
+      const specifier = match[1];
+      if (
+        !specifier ||
+        isRemoteImport(specifier) ||
+        specifier.startsWith('tailwindcss') ||
+        !specifier.startsWith('.')
+      ) {
+        continue;
+      }
+
+      const imported = path.resolve(
+        path.dirname(file),
+        specifier,
+      );
+      if (isInside(themeDir, imported)) {
+        imports.push(imported);
+      }
+    }
+
+    collectStyleGraph(
+      imports,
+      themeDir,
+      visited,
+      output,
+    );
+  }
+}
+
 export function buildThemeStyles(
   options: BuildThemeStylesOptions,
 ): ThemeStylesResult {
@@ -237,10 +298,70 @@ export function buildThemeStyles(
     files.push(file);
   }
 
-  const chunks: string[] = [];
   const themeDir = realpathSync(
     options.themeRuntime.directory,
   );
+  const graph: Array<{ path: string; hash: string }> = [];
+  collectStyleGraph(
+    files,
+    themeDir,
+    new Set(),
+    graph,
+  );
+  graph.sort((a, b) => a.path.localeCompare(b.path));
+
+  const cacheKey =
+    options.cache?.enabled
+      ? options.cache.hash({
+          basePath: options.basePath ?? '',
+          targets: CSS_TARGETS,
+          order: files.map((file) =>
+            path
+              .relative(themeDir, file)
+              .split(path.sep)
+              .join('/'),
+          ),
+          graph,
+        })
+      : undefined;
+
+  if (options.cache && cacheKey) {
+    const entry = options.cache.getEntry('css', cacheKey);
+
+    if (
+      entry &&
+      typeof entry.meta.file === 'string' &&
+      typeof entry.meta.hash === 'string' &&
+      typeof entry.meta.bytes === 'number'
+    ) {
+      const filePath = path.join(
+        entry.dir,
+        entry.meta.file,
+      );
+
+      if (existsSync(filePath)) {
+        return {
+          css: {
+            url: assetUrl(
+              options.basePath,
+              `assets/css/${entry.meta.file}`,
+            ),
+            path: `assets/css/${entry.meta.file}`,
+            filePath,
+            bytes: entry.meta.bytes,
+            sources: Array.isArray(entry.meta.sources)
+              ? entry.meta.sources.filter(
+                  (item): item is string =>
+                    typeof item === 'string',
+                )
+              : [],
+          },
+        };
+      }
+    }
+  }
+
+  const chunks: string[] = [];
 
   for (const file of files) {
     assertNoTailwindDirectives(
@@ -272,10 +393,30 @@ export function buildThemeStyles(
   const cacheDir = path.resolve(options.cacheDir);
   const file = `theme-${hash}.css`;
   const filePath = path.join(cacheDir, file);
+  const bytes = new TextEncoder().encode(css).length;
+  const sources = files.map((item) =>
+    path
+      .relative(themeDir, item)
+      .split(path.sep)
+      .join('/'),
+  );
 
-  rmSync(cacheDir, { recursive: true, force: true });
   mkdirSync(cacheDir, { recursive: true });
   writeFileSync(filePath, css);
+
+  if (options.cache && cacheKey) {
+    options.cache.putEntry(
+      'css',
+      cacheKey,
+      {
+        file,
+        hash,
+        bytes,
+        sources,
+      },
+      [{ name: file, source: filePath }],
+    );
+  }
 
   return {
     css: {
@@ -285,18 +426,8 @@ export function buildThemeStyles(
       ),
       path: `assets/css/${file}`,
       filePath,
-      bytes: new TextEncoder().encode(css).length,
-      sources: files.map((item) =>
-        path
-          .relative(
-            realpathSync(
-              options.themeRuntime.directory,
-            ),
-            item,
-          )
-          .split(path.sep)
-          .join('/'),
-      ),
+      bytes,
+      sources,
     },
   };
 }

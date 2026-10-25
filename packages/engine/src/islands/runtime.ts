@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   renameSync,
   rmSync,
@@ -9,6 +10,7 @@ import {
 import path from 'node:path';
 
 import { assetUrl } from '../assets';
+import type { BuildCache } from '../cache/build-cache';
 import { IslandError } from '../errors';
 
 export type IslandRuntimeAsset = {
@@ -28,6 +30,7 @@ export type IslandRuntime = {
 export type BuildIslandRuntimeOptions = {
   cacheDir: string;
   basePath?: string;
+  cache?: BuildCache;
 };
 
 const MOUNT_SCRIPT = `import { createElement } from 'react';
@@ -194,6 +197,67 @@ export async function buildIslandRuntime(
   const cacheDir = path.resolve(options.cacheDir);
   mkdirSync(cacheDir, { recursive: true });
 
+  const cacheKey = options.cache?.enabled
+    ? options.cache.hash({
+        mount: contentHash(MOUNT_SCRIPT),
+      })
+    : undefined;
+
+  if (options.cache && cacheKey) {
+    const entry = options.cache.getEntry(
+      'runtime',
+      cacheKey,
+    );
+
+    if (
+      entry &&
+      typeof entry.meta.reactFile === 'string' &&
+      typeof entry.meta.mountFile === 'string' &&
+      typeof entry.meta.reactBytes === 'number' &&
+      typeof entry.meta.mountBytes === 'number'
+    ) {
+      const reactPath = path.join(
+        entry.dir,
+        entry.meta.reactFile,
+      );
+      const mountPath = path.join(
+        entry.dir,
+        entry.meta.mountFile,
+      );
+
+      if (existsSync(reactPath) && existsSync(mountPath)) {
+        const react = {
+          url: assetUrl(
+            options.basePath,
+            `assets/islands/${entry.meta.reactFile}`,
+          ),
+          filePath: reactPath,
+          bytes: entry.meta.reactBytes,
+        };
+        const mount = {
+          url: assetUrl(
+            options.basePath,
+            `assets/islands/${entry.meta.mountFile}`,
+          ),
+          filePath: mountPath,
+          bytes: entry.meta.mountBytes,
+        };
+
+        return {
+          react,
+          mount,
+          importMap: {
+            react: react.url,
+            'react/jsx-runtime': react.url,
+            'react/jsx-dev-runtime': react.url,
+            'react-dom': react.url,
+            'react-dom/client': react.url,
+          },
+        };
+      }
+    }
+  }
+
   const react = await buildReactRuntime(
     cacheDir,
     options.basePath,
@@ -202,6 +266,29 @@ export async function buildIslandRuntime(
     cacheDir,
     options.basePath,
   );
+
+  if (options.cache && cacheKey) {
+    options.cache.putEntry(
+      'runtime',
+      cacheKey,
+      {
+        reactFile: path.basename(react.filePath),
+        mountFile: path.basename(mount.filePath),
+        reactBytes: react.bytes,
+        mountBytes: mount.bytes,
+      },
+      [
+        {
+          name: path.basename(react.filePath),
+          source: react.filePath,
+        },
+        {
+          name: path.basename(mount.filePath),
+          source: mount.filePath,
+        },
+      ],
+    );
+  }
 
   return {
     react,

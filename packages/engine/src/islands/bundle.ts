@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   realpathSync,
@@ -13,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assetUrl } from '../assets';
+import type { BuildCache } from '../cache/build-cache';
 import { IslandError } from '../errors';
 import { minifyCss } from '../styles/css';
 import type { IslandReference } from './analyze';
@@ -57,6 +59,12 @@ export type BuildIslandBundlesOptions = {
   workspaceRoot: string;
   cacheDir: string;
   basePath?: string;
+  cache?: BuildCache;
+};
+
+type ImportGraph = {
+  files: Map<string, string>;
+  packages: Set<string>;
 };
 
 const SCRIPT_EXTENSIONS = new Set([
@@ -124,6 +132,7 @@ function scanUnsafeImports(
   workspaceRoot: string,
   visited: Set<string>,
   exportName?: string,
+  graph?: ImportGraph,
 ): void {
   if (visited.has(filePath)) return;
   visited.add(filePath);
@@ -154,6 +163,13 @@ function scanUnsafeImports(
       `无法解析组件：${filePath}\n${error instanceof Error ? error.message : String(error)}`,
       filePath,
       exportName,
+    );
+  }
+
+  if (graph) {
+    graph.files.set(
+      path.relative(workspaceRoot, filePath),
+      contentHash(source),
     );
   }
 
@@ -221,7 +237,21 @@ function scanUnsafeImports(
       );
     }
 
-    if (!isPathLike) continue;
+    if (graph) {
+      try {
+        graph.files.set(
+          path.relative(workspaceRoot, realPath),
+          contentHash(readFileSync(realPath, 'utf8')),
+        );
+      } catch {
+        // missing files are reported by Bun.build
+      }
+    }
+
+    if (!isPathLike) {
+      graph?.packages.add(specifier);
+      continue;
+    }
 
     if (
       SCRIPT_EXTENSIONS.has(
@@ -233,6 +263,7 @@ function scanUnsafeImports(
         workspaceRoot,
         visited,
         exportName,
+        graph,
       );
     }
   }
@@ -409,12 +440,97 @@ export async function buildIslandBundles(
 
   for (const input of unique) {
     const visited = new Set<string>();
+    const graph: ImportGraph = {
+      files: new Map(),
+      packages: new Set(),
+    };
     scanUnsafeImports(
       input.source,
       workspaceRoot,
       visited,
       input.exportName,
+      graph,
     );
+
+    const cacheKey =
+      options.cache?.enabled
+        ? options.cache.hash({
+            input: {
+              source: input.relativeSource,
+              exportName: input.exportName,
+              importedName: input.importedName,
+              propertyPath: input.propertyPath,
+            },
+            files: [...graph.files.entries()].sort(
+              ([a], [b]) => a.localeCompare(b),
+            ),
+            packages: [...graph.packages].sort(),
+            lock: options.cache.lockHash(),
+          })
+        : undefined;
+
+    if (options.cache && cacheKey) {
+      const entry = options.cache.getEntry(
+        'islands',
+        cacheKey,
+      );
+
+      if (
+        entry &&
+        typeof entry.meta.jsFile === 'string' &&
+        typeof entry.meta.bytes === 'number'
+      ) {
+        const jsFile = entry.meta.jsFile;
+        const cssFile =
+          typeof entry.meta.cssFile === 'string'
+            ? entry.meta.cssFile
+            : undefined;
+        const jsPath = path.join(entry.dir, jsFile);
+        const cssPath = cssFile
+          ? path.join(entry.dir, cssFile)
+          : undefined;
+
+        if (
+          existsSync(jsPath) &&
+          (!cssPath || existsSync(cssPath))
+        ) {
+          const key = islandKey(
+            input.source,
+            input.exportName,
+          );
+          const js = assetUrl(
+            options.basePath,
+            `assets/islands/${jsFile}`,
+          );
+          const css = cssFile
+            ? assetUrl(
+                options.basePath,
+                `assets/islands/${cssFile}`,
+              )
+            : undefined;
+
+          bundles.push({
+            key,
+            name: input.name,
+            source: input.source,
+            relativeSource: input.relativeSource,
+            exportName: input.exportName,
+            importedName: input.importedName,
+            propertyPath: [...input.propertyPath],
+            js,
+            ...(css ? { css } : {}),
+            jsPath,
+            ...(cssPath ? { cssPath } : {}),
+            bytes: entry.meta.bytes,
+          });
+          assets.set(key, {
+            js,
+            ...(css ? { css } : {}),
+          });
+          continue;
+        }
+      }
+    }
 
     const entryPath = path.join(
       cacheDir,
@@ -535,6 +651,39 @@ export async function buildIslandBundles(
       js,
       ...(css ? { css } : {}),
     });
+
+    if (options.cache && cacheKey) {
+      options.cache.putEntry(
+        'islands',
+        cacheKey,
+        {
+          source: input.relativeSource,
+          exportName: input.exportName,
+          importedName: input.importedName,
+          propertyPath: input.propertyPath,
+          name: input.name,
+          jsFile: path.basename(jsPath),
+          ...(cssPath
+            ? { cssFile: path.basename(cssPath) }
+            : {}),
+          bytes: bundle.bytes,
+        },
+        [
+          {
+            name: path.basename(jsPath),
+            source: jsPath,
+          },
+          ...(cssPath
+            ? [
+                {
+                  name: path.basename(cssPath),
+                  source: cssPath,
+                },
+              ]
+            : []),
+        ],
+      );
+    }
   }
 
   return { bundles, assets };

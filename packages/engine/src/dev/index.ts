@@ -116,6 +116,7 @@ function buildSuccessEvent(
     compiledEntries: result.compiledEntries,
     islands: result.islands,
     diagnostics: result.diagnostics,
+    cache: result.cache,
   };
 }
 
@@ -152,6 +153,7 @@ export async function startDev(
       root,
       outDir: nextDir,
       includeDrafts: options.includeDrafts,
+      cache: options.noCache ? false : true,
     });
 
     return {

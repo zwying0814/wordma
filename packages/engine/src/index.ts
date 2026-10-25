@@ -75,6 +75,18 @@ export type {
   StaticCopyResult,
   StaticFile,
 } from './output/static';
+export {
+  BuildCache,
+  CACHE_FORMAT_VERSION,
+  createBuildCache,
+  workspaceLockHash,
+} from './cache/build-cache';
+export type {
+  BuildCacheOptions,
+  CacheEntry,
+  CacheFile,
+  CacheStats,
+} from './cache/build-cache';
 export { startDev } from './dev';
 export type {
   DevHandle,

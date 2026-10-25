@@ -26,6 +26,8 @@ import {
 } from './output/content-assets';
 import { copyStaticAssets } from './output/static';
 import { writeFeeds } from './output/feeds';
+import { createBuildCache } from './cache/build-cache';
+import type { CacheStats } from './cache/build-cache';
 import { analyzeMdx, compileMdx } from './mdx/compile';
 import type {
   CompiledContent,
@@ -36,6 +38,7 @@ import {
   collectIslandInputs,
   copyIslandAssets,
 } from './islands/bundle';
+import { referenceIslandKey } from './islands/identity';
 import {
   buildIslandRuntime,
   copyIslandRuntime,
@@ -56,6 +59,7 @@ export type BuildOptions = {
   root: string;
   outDir?: string;
   includeDrafts?: boolean;
+  cache?: boolean;
 };
 
 export type BuildResult = {
@@ -63,6 +67,7 @@ export type BuildResult = {
   routes: number;
   compiledEntries: number;
   islands: number;
+  cache: CacheStats;
   theme: {
     id: string;
     version: string;
@@ -87,10 +92,15 @@ export async function buildSite(
     themeRuntime.manifest,
   );
   const outDir = resolveOutDir(root, options.outDir);
+  const cache = createBuildCache({
+    workspaceRoot: root,
+    enabled: options.cache !== false,
+  });
   const themeStyles = buildThemeStyles({
     themeRuntime,
-    cacheDir: path.join(root, '.wordma/cache/css'),
+    cacheDir: cache.workDir('css'),
     basePath: workspace.site.site.basePath,
+    cache,
   });
   const entriesById = new Map(
     workspace.index.entries.map((entry) => [entry.id, entry]),
@@ -126,18 +136,17 @@ export async function buildSite(
     ),
     {
       workspaceRoot: root,
-      cacheDir: path.join(root, '.wordma/cache/islands'),
+      cacheDir: cache.workDir('islands'),
       basePath: workspace.site.site.basePath,
+      cache,
     },
   );
   const islandRuntime =
     islandBundles.bundles.length > 0
       ? await buildIslandRuntime({
-          cacheDir: path.join(
-            root,
-            '.wordma/cache/islands',
-          ),
+          cacheDir: cache.workDir('runtime'),
           basePath: workspace.site.site.basePath,
+          cache,
         })
       : undefined;
 
@@ -192,6 +201,32 @@ export async function buildSite(
       if (cover) entryCovers.set(entryId, cover);
     }
 
+    const islandCacheKey = item.analysis.references.map(
+      (reference) => {
+        const key = referenceIslandKey(reference);
+        const asset = islandBundles.assets.get(key);
+
+        return {
+          key,
+          js: asset?.js ?? null,
+          css: asset?.css ?? null,
+        };
+      },
+    );
+    const cacheKey = cache.hash({
+      file: item.entry.relativePath,
+      body: cache.hash(item.entry.body),
+      basePath: workspace.site.site.basePath,
+      islands: islandCacheKey,
+      assets: (entryAssets.get(entryId) ?? []).map(
+        (asset) => ({
+          source: asset.source,
+          url: asset.url,
+          hash: asset.hash ?? null,
+        }),
+      ),
+    });
+
     compiledContent.set(
       entryId,
       await compileMdx(item.entry.body, {
@@ -204,6 +239,8 @@ export async function buildSite(
           workspaceRoot: root,
           byRealPath: contentAssets.byRealPath,
         }),
+        cache,
+        cacheKey,
       }),
     );
   }
@@ -408,6 +445,7 @@ export async function buildSite(
     routes: routeManifest.routes.length,
     compiledEntries: compiledContent.size,
     islands: islandBundles.bundles.length,
+    cache: cache.stats,
     theme: {
       id: themeRuntime.manifest.id,
       version: themeRuntime.manifest.version,

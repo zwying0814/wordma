@@ -398,6 +398,7 @@ async function runBuild(args: string[]): Promise<void> {
     root: flags.root ?? process.cwd(),
     outDir: flags.out,
     includeDrafts: flags.includeDrafts,
+    cache: flags.noCache ? false : true,
   });
   const durationMs = Date.now() - started;
 
@@ -409,6 +410,7 @@ async function runBuild(args: string[]): Promise<void> {
       compiledEntries: result.compiledEntries,
       islands: result.islands,
       diagnostics: result.diagnostics,
+      cache: result.cache,
     });
     return;
   }

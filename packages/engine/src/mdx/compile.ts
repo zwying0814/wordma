@@ -1,5 +1,6 @@
 import type { Heading } from '@wordma/content';
 
+import type { BuildCache } from '../cache/build-cache';
 import { analyzeIslands } from '../islands/analyze';
 import type { IslandReference } from '../islands/analyze';
 import {
@@ -32,6 +33,8 @@ export type CompileMdxOptions = AnalyzeMdxOptions & {
   islandAssets?: ReadonlyMap<string, IslandAsset>;
   /** 正文资源路径 → hash URL */
   resolveAsset?: (source: string) => string | undefined;
+  cache?: BuildCache;
+  cacheKey?: string;
 };
 
 export type CompiledContent = {
@@ -73,6 +76,22 @@ export async function compileMdx(
   source: string,
   options: CompileMdxOptions,
 ): Promise<CompiledContent> {
+  if (options.cache && options.cacheKey) {
+    const cached = options.cache.getJson<CompiledContent>(
+      'mdx',
+      options.cacheKey,
+    );
+
+    if (
+      cached &&
+      typeof cached.html === 'string' &&
+      Array.isArray(cached.headings) &&
+      Array.isArray(cached.islands)
+    ) {
+      return cached;
+    }
+  }
+
   const analysis =
     options.analysis ??
     analyzeMdx(source, {
@@ -97,10 +116,20 @@ export async function compileMdx(
     }),
   });
 
-  return {
+  const content: CompiledContent = {
     html: rendered.html,
     headings: rendered.headings,
     islands: rendered.islands,
     excerpt: rendered.excerpt,
   };
+
+  if (options.cache && options.cacheKey) {
+    options.cache.putJson(
+      'mdx',
+      options.cacheKey,
+      content,
+    );
+  }
+
+  return content;
 }
