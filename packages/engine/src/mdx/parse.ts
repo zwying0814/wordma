@@ -1,5 +1,7 @@
 import type { ImportDeclaration, Program } from 'estree-jsx';
 import type { Root } from 'mdast';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import remarkMdx from 'remark-mdx';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
@@ -32,7 +34,11 @@ type MdxEsmNode = {
   };
 };
 
-const processor = unified().use(remarkParse).use(remarkMdx);
+const processor = unified()
+  .use(remarkParse)
+  .use(remarkMdx)
+  .use(remarkGfm)
+  .use(remarkMath);
 
 function startPosition(
   node: MdxEsmNode,
