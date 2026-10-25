@@ -12,3 +12,6 @@ theme:
 navigation:
   - label: 首页
     path: /
+
+pagination:
+  pageSize: 1

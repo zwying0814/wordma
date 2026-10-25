@@ -80,6 +80,137 @@
         ],
         "additionalProperties": false
       }
+    },
+    "routes": {
+      "default": {
+        "post": "/posts/[slug]/",
+        "page": "/[slug]/",
+        "collection": "/[collection]/[slug]/",
+        "archive": "/archive/",
+        "categories": "/categories/",
+        "category": "/category/[slug]/",
+        "tags": "/tags/",
+        "tag": "/tag/[slug]/",
+        "pagination": "/page/[page]/"
+      },
+      "type": "object",
+      "properties": {
+        "post": {
+          "default": "/posts/[slug]/",
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^\\/"
+            },
+            {
+              "pattern": "\\[slug\\]"
+            }
+          ]
+        },
+        "page": {
+          "default": "/[slug]/",
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^\\/"
+            },
+            {
+              "pattern": "\\[slug\\]"
+            }
+          ]
+        },
+        "collection": {
+          "default": "/[collection]/[slug]/",
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^\\/"
+            },
+            {
+              "pattern": "\\[collection\\]"
+            },
+            {
+              "pattern": "\\[slug\\]"
+            }
+          ]
+        },
+        "archive": {
+          "default": "/archive/",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\/"
+        },
+        "categories": {
+          "default": "/categories/",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\/"
+        },
+        "category": {
+          "default": "/category/[slug]/",
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^\\/"
+            },
+            {
+              "pattern": "\\[slug\\]"
+            }
+          ]
+        },
+        "tags": {
+          "default": "/tags/",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\/"
+        },
+        "tag": {
+          "default": "/tag/[slug]/",
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^\\/"
+            },
+            {
+              "pattern": "\\[slug\\]"
+            }
+          ]
+        },
+        "pagination": {
+          "default": "/page/[page]/",
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "^\\/"
+            },
+            {
+              "pattern": "\\[page\\]"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "pagination": {
+      "default": {
+        "pageSize": 10
+      },
+      "type": "object",
+      "properties": {
+        "pageSize": {
+          "default": 10,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

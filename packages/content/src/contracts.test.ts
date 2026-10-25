@@ -51,6 +51,99 @@ describe('SiteConfigSchema', () => {
   });
 });
 
+describe('SiteConfig routes and pagination', () => {
+  it('应用默认路由与分页', () => {
+    const site = SiteConfigSchema.parse({
+      site: { title: 'Test' },
+    });
+
+    expect(site.routes.post).toBe('/posts/[slug]/');
+    expect(site.routes.page).toBe('/[slug]/');
+    expect(site.routes.collection).toBe(
+      '/[collection]/[slug]/',
+    );
+    expect(site.routes.archive).toBe('/archive/');
+    expect(site.routes.pagination).toBe('/page/[page]/');
+    expect(site.pagination.pageSize).toBe(10);
+  });
+
+  it('允许部分覆盖并补齐默认值', () => {
+    const site = SiteConfigSchema.parse({
+      site: { title: 'Test' },
+      routes: {
+        post: '/blog/[slug]/',
+      },
+      pagination: {
+        pageSize: 5,
+      },
+    });
+
+    expect(site.routes.post).toBe('/blog/[slug]/');
+    expect(site.routes.page).toBe('/[slug]/');
+    expect(site.pagination.pageSize).toBe(5);
+  });
+
+  it('post 缺少 [slug] 时失败', () => {
+    expect(() =>
+      SiteConfigSchema.parse({
+        site: { title: 'Test' },
+        routes: { post: '/blog/' },
+      }),
+    ).toThrow();
+  });
+
+  it('collection 缺少 [collection] 时失败', () => {
+    expect(() =>
+      SiteConfigSchema.parse({
+        site: { title: 'Test' },
+        routes: { collection: '/[slug]/' },
+      }),
+    ).toThrow();
+  });
+
+  it('archive 不能包含占位符', () => {
+    expect(() =>
+      SiteConfigSchema.parse({
+        site: { title: 'Test' },
+        routes: { archive: '/archive/[year]/' },
+      }),
+    ).toThrow();
+  });
+
+  it('pagination 缺少 [page] 时失败', () => {
+    expect(() =>
+      SiteConfigSchema.parse({
+        site: { title: 'Test' },
+        routes: { pagination: '/page/' },
+      }),
+    ).toThrow();
+  });
+
+  it('拒绝不支持的占位符', () => {
+    expect(() =>
+      SiteConfigSchema.parse({
+        site: { title: 'Test' },
+        routes: { post: '/posts/[year]/[slug]/' },
+      }),
+    ).toThrow();
+  });
+
+  it('pageSize 必须为正整数', () => {
+    expect(() =>
+      SiteConfigSchema.parse({
+        site: { title: 'Test' },
+        pagination: { pageSize: 0 },
+      }),
+    ).toThrow();
+    expect(() =>
+      SiteConfigSchema.parse({
+        site: { title: 'Test' },
+        pagination: { pageSize: 1.5 },
+      }),
+    ).toThrow();
+  });
+});
+
 describe('FieldDescriptorSchema', () => {
   it('接受全部字段类型', () => {
     const fields = [
