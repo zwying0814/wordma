@@ -1,14 +1,10 @@
 import type { ComponentType } from 'react';
 
-/**
- * M0.1 占位类型。
- *
- * 真实的 PageContext / layout props 会在 M0.2 定义，这里先用宽松的
- * component 类型保证主题包可以独立 typecheck。
- */
-export type ThemeLayout = ComponentType<any>;
+import type { PageContext } from './types/page-context';
 
-export type ThemeLayouts = Record<string, ThemeLayout>;
+export type ThemeLayout<Props = PageContext> = ComponentType<Props>;
+
+export type ThemeLayouts = Record<string, ThemeLayout<any>>;
 
 export type ThemeDefinition = {
   layouts: ThemeLayouts;

@@ -1,7 +1,7 @@
 /**
  * @wordma/theme
  *
- * 主题契约。M0.1 只提供最小骨架，PageContext 和完整类型在 M0.2 补全。
+ * 主题契约：布局、PageContext、主题 helper。
  */
 export { defineTheme } from './define-theme';
 export type {
@@ -9,3 +9,12 @@ export type {
   ThemeLayout,
   ThemeLayouts,
 } from './define-theme';
+export * from './helpers';
+export type {
+  PageCollections,
+  PageContent,
+  PageContext,
+  PageTaxonomy,
+  ThemeHelpers,
+  ThemeLayoutKey,
+} from './types/page-context';

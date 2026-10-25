@@ -1,7 +1,10 @@
 /**
  * @wordma/content
  *
- * 内容模型、schema 与内容索引。M0.1 只建立包骨架，
- * 类型和解析实现将在 M0.2 / M0.4 补全。
+ * 内容模型、schema 与主题字段命名空间工具。
  */
+export * from './types';
+export * from './schema';
+export * from './theme-fields';
+
 export const CONTENT_PACKAGE = '@wordma/content';
