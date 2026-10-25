@@ -10,6 +10,8 @@ import {
   writeHtmlFile,
 } from './output/writer';
 import type { BuildManifest } from './output/writer';
+import { compileMdx } from './mdx/compile';
+import type { CompiledContent } from './mdx/compile';
 import { createPageContext } from './render/page-context';
 import { renderRoute } from './render/ssr';
 import {
@@ -27,6 +29,7 @@ export type BuildOptions = {
 export type BuildResult = {
   outDir: string;
   routes: number;
+  compiledEntries: number;
   theme: {
     id: string;
     version: string;
@@ -51,6 +54,27 @@ export async function buildSite(
     themeRuntime.manifest,
   );
   const outDir = resolveOutDir(root, options.outDir);
+  const entriesById = new Map(
+    workspace.index.entries.map((entry) => [entry.id, entry]),
+  );
+  const compiledContent = new Map<string, CompiledContent>();
+
+  for (const route of routeManifest.routes) {
+    if (!route.entryId || compiledContent.has(route.entryId)) {
+      continue;
+    }
+
+    const entry = entriesById.get(route.entryId);
+    if (!entry) continue;
+
+    compiledContent.set(
+      route.entryId,
+      await compileMdx(entry.body, {
+        filePath: entry.filePath,
+        workspaceRoot: root,
+      }),
+    );
+  }
 
   prepareOutDir(outDir);
 
@@ -60,6 +84,9 @@ export async function buildSite(
       workspace,
       routeManifest,
       themeManifest: themeRuntime.manifest,
+      compiledContent: route.entryId
+        ? compiledContent.get(route.entryId)
+        : undefined,
     });
     const html = renderRoute({
       route,
@@ -93,6 +120,7 @@ export async function buildSite(
   return {
     outDir,
     routes: routeManifest.routes.length,
+    compiledEntries: compiledContent.size,
     theme: {
       id: themeRuntime.manifest.id,
       version: themeRuntime.manifest.version,

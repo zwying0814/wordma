@@ -5,6 +5,11 @@ export type {
   IslandNode,
   IslandReference,
 } from './islands/analyze';
+export { compileMdx } from './mdx/compile';
+export type {
+  CompiledContent,
+  CompileMdxOptions,
+} from './mdx/compile';
 export { parseMdx } from './mdx/parse';
 export type { MdxImport, ParsedMdx } from './mdx/parse';
 export { renderMdx } from './mdx/render';

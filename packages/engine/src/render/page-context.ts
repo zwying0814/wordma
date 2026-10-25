@@ -19,12 +19,14 @@ import type {
   Route,
   RouteManifest,
 } from '../routing/manifest';
+import type { CompiledContent } from '../mdx/compile';
 
 export type CreatePageContextOptions = {
   route: Route;
   workspace: Workspace;
   routeManifest: RouteManifest;
   themeManifest: ThemeManifest;
+  compiledContent?: CompiledContent;
 };
 
 type UrlMaps = {
@@ -202,7 +204,13 @@ function buildArchive(
 export function createPageContext(
   options: CreatePageContextOptions,
 ): PageContext {
-  const { route, workspace, routeManifest, themeManifest } = options;
+  const {
+    route,
+    workspace,
+    routeManifest,
+    themeManifest,
+    compiledContent,
+  } = options;
   const maps = buildUrlMaps(routeManifest.routes);
   const url = (path: string): string =>
     joinUrl(workspace.site.site.basePath, path);
@@ -299,11 +307,21 @@ export function createPageContext(
     site: workspace.site.site,
     page,
     content: {
-      html: '',
-      headings: [],
-      islands: [],
+      html: compiledContent?.html ?? '',
+      headings: compiledContent?.headings ?? [],
+      islands: (compiledContent?.islands ?? []).map(
+        (island) => ({
+          name: island.name,
+          source: island.relativeSource,
+          exportName: island.exportName,
+          props: island.props,
+          js: island.js,
+          css: island.css,
+        }),
+      ),
       assets: entry?.assets ?? [],
-      excerpt: entry?.meta.description,
+      excerpt:
+        compiledContent?.excerpt ?? entry?.meta.description,
     },
     collections: {
       posts,

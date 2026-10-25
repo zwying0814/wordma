@@ -32,6 +32,7 @@ describe('buildSite', () => {
       });
 
       expect(result.routes).toBe(17);
+      expect(result.compiledEntries).toBe(4);
       expect(result.theme.id).toBe('wordma-theme-default');
       expect(result.diagnostics).toEqual([]);
       expect(existsSync(path.join(outDir, 'stale.txt'))).toBe(false);
@@ -75,6 +76,16 @@ describe('buildSite', () => {
       );
       expect(notFound).toContain('<h1>404</h1>');
 
+      const post = readFileSync(
+        path.join(
+          outDir,
+          'posts/standalone-post/index.html',
+        ),
+        'utf8',
+      );
+      expect(post).toContain('Content layer fixture.');
+      expect(post).toContain('id="standalone-post"');
+
       const manifest = JSON.parse(
         readFileSync(
           path.join(outDir, '.wordma-manifest.json'),
@@ -110,9 +121,35 @@ describe('buildSite', () => {
       });
 
       expect(result.routes).toBe(20);
+      expect(result.compiledEntries).toBe(5);
       expect(
         existsSync(path.join(outDir, 'posts/draft/index.html')),
       ).toBe(true);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+
+  it('构建时输出 MDX 正文与岛屿占位符', async () => {
+    const root = path.join(repoRoot, 'fixtures/islands');
+    const outDir = makeOutDir();
+
+    try {
+      const result = await buildSite({ root, outDir });
+
+      expect(result.compiledEntries).toBe(1);
+
+      const html = readFileSync(
+        path.join(outDir, 'posts/islands/index.html'),
+        'utf8',
+      );
+
+      expect(html).toContain('id="islands"');
+      expect(html).toContain('data-wordma-island="Counter"');
+      expect(html).toContain('data-wordma-island="Note"');
+      expect(html).toContain(
+        'This content is rendered inside a Note island.',
+      );
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }
