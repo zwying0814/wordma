@@ -189,6 +189,7 @@ export async function startDev(
     closed: false,
   };
   let watcher: WatchHandle | undefined;
+  server.setDiagnostics(initial.result.diagnostics);
 
   let resolveClosed: () => void = () => undefined;
   const closed = new Promise<void>((resolve) => {
@@ -242,15 +243,22 @@ export async function startDev(
       logger.info(
         `Built ${built.result.routes} routes in ${built.durationMs}ms`,
       );
+      server.setDiagnostics(built.result.diagnostics);
       logger.event?.(
         buildSuccessEvent(built.result, built.durationMs),
       );
+      const buildId = String(Date.now());
+      server.publish({
+        type: 'reload',
+        buildId,
+      });
       logger.event?.({
         type: 'reload',
-        buildId: String(Date.now()),
+        buildId,
       });
     } catch (error) {
       logger.error(errorMessage(error));
+      server.setDiagnostics([errorEvent(error)]);
       logger.event?.({
         type: 'build-error',
         durationMs: 0,

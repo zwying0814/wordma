@@ -255,6 +255,7 @@ describe('buildSite', () => {
       expect(manifest.assets.mountScript).toBeUndefined();
       expect(home).not.toContain('type="importmap"');
       expect(home).not.toContain('data-wordma-src');
+      expect(home).not.toContain('_wordma/client.js');
     } finally {
       rmSync(outDir, { recursive: true, force: true });
       rmSync(path.join(fixture, '.wordma'), {
@@ -370,6 +371,7 @@ describe('buildSite', () => {
       );
       expect(home).not.toContain('type="importmap"');
       expect(home).not.toContain('data-wordma-src');
+      expect(home).not.toContain('_wordma/client.js');
 
       const manifest = JSON.parse(
         readFileSync(
