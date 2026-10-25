@@ -17,5 +17,8 @@
     "@wordma/theme": "workspace:*",
     "yaml": "^2.9.1",
     "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4"
   }
 }

@@ -3,6 +3,7 @@ import { readdirSync } from 'node:fs';
 import path from 'node:path';
 
 import {
+  YamlParseError,
   parsePageFrontmatter,
   parseSiteConfig,
   parseThemeManifest,
@@ -37,13 +38,24 @@ function expectOk(label: string, run: () => void): void {
   }
 }
 
-function expectFail(label: string, run: () => void): void {
+function expectFailWith(
+  label: string,
+  run: () => void,
+  predicate: (error: unknown) => boolean,
+): void {
   try {
     run();
     failed += 1;
     console.error(`✗ ${label}（本应失败）`);
-  } catch {
-    console.log(`✓ ${label}`);
+  } catch (error) {
+    if (predicate(error)) {
+      console.log(`✓ ${label}`);
+      return;
+    }
+
+    failed += 1;
+    console.error(`✗ ${label}（错误类型不符合预期）`);
+    console.error(error);
   }
 }
 
@@ -64,7 +76,15 @@ for (const filePath of files.filter((file) => file.endsWith('wordma.site.yaml'))
   const label = `site: ${relative(filePath)}`;
 
   if (relative(filePath).includes('broken/bad-yaml/')) {
-    expectFail(label, () => parseSiteConfig(parseYamlFile(filePath)));
+    expectFailWith(
+      label,
+      () => parseSiteConfig(parseYamlFile(filePath)),
+      (error) =>
+        error instanceof YamlParseError &&
+        error.diagnostics.some(
+          (diagnostic) => diagnostic.code === 'DUPLICATE_KEY',
+        ),
+    );
   } else {
     expectOk(label, () => parseSiteConfig(parseYamlFile(filePath)));
   }
@@ -74,7 +94,11 @@ for (const filePath of files.filter((file) => file.endsWith('theme.yaml'))) {
   const label = `theme: ${relative(filePath)}`;
 
   if (relative(filePath).includes('broken/bad-theme/')) {
-    expectFail(label, () => parseThemeManifest(parseYamlFile(filePath)));
+    expectFailWith(
+      label,
+      () => parseThemeManifest(parseYamlFile(filePath)),
+      (error) => error instanceof Error && error.name === 'ZodError',
+    );
   } else {
     expectOk(label, () => parseThemeManifest(parseYamlFile(filePath)));
   }
@@ -109,7 +133,7 @@ expectOk('custom-pages 的 [slug] 路由', () => {
     parseYamlFile(
       path.join(
         fixturesRoot,
-        'custom-pages/themes/custom-pages/theme.yaml',
+        'custom-pages/themes/wordma-theme-custom-pages/theme.yaml',
       ),
     ),
   );

@@ -1,2 +1,7 @@
-export const ENGINE_NAME = '@wordma/engine';
-export const ENGINE_VERSION = '0.0.0';
+export { ENGINE_NAME, ENGINE_VERSION } from './constants';
+export { inspectWorkspace } from './inspect';
+export type {
+  InspectPageType,
+  InspectResult,
+  InspectTheme,
+} from './inspect';

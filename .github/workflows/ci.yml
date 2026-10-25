@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - next
+      - dev
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch Bun sidecar
+        run: pnpm fetch:bun
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Contract tests and fixtures
+        run: pnpm test:contracts
+
+      - name: Generate and validate JSON Schemas
+        run: pnpm schema:check
+
+      - name: Smoke test engine CLI
+        run: pnpm engine --help
+
+      - name: Smoke test engine inspect
+        run: pnpm engine inspect --root fixtures/minimal --json
