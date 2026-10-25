@@ -1,8 +1,10 @@
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
+import { collectAssets } from './assets';
 import { parseDateMs } from './date';
 import { ContentError } from './diagnostics';
+import type { ContentDiagnostic } from './diagnostics';
 import { frontmatterToPageData, readContentFile } from './frontmatter';
 import { normalizeSlug, slugFromEntry } from './slug';
 import { buildTaxonomy } from './taxonomy';
@@ -66,7 +68,7 @@ function createEntry(params: {
   contentDir: string;
   workspaceRoot: string;
   isFolderEntry: boolean;
-}): ContentEntry {
+}): { entry: ContentEntry; diagnostics: ContentDiagnostic[] } {
   const {
     collection,
     collectionKind: kind,
@@ -103,17 +105,28 @@ function createEntry(params: {
     data: frontmatterToPageData(parsed.frontmatter),
   };
 
-  return {
-    id,
-    collection,
-    meta,
-    frontmatter: parsed.frontmatter,
-    filePath,
-    relativePath,
-    body: parsed.body,
+  const assetResult = collectAssets({
+    entryFilePath: filePath,
     isFolderEntry,
-    assets: [],
-    dateMs,
+    cover: parsed.frontmatter.cover,
+    body: parsed.body,
+    workspaceRoot,
+  });
+
+  return {
+    entry: {
+      id,
+      collection,
+      meta,
+      frontmatter: parsed.frontmatter,
+      filePath,
+      relativePath,
+      body: parsed.body,
+      isFolderEntry,
+      assets: assetResult.assets,
+      dateMs,
+    },
+    diagnostics: assetResult.diagnostics,
   };
 }
 
@@ -123,7 +136,7 @@ function loadCollectionEntries(params: {
   collectionDir: string;
   contentDir: string;
   workspaceRoot: string;
-}): ContentEntry[] {
+}): { entries: ContentEntry[]; diagnostics: ContentDiagnostic[] } {
   const {
     collection,
     kind,
@@ -133,6 +146,7 @@ function loadCollectionEntries(params: {
   } = params;
 
   const entries: ContentEntry[] = [];
+  const diagnostics: ContentDiagnostic[] = [];
   const seenSlugs = new Map<string, ContentEntry>();
 
   const dirents = readdirSync(collectionDir, {
@@ -156,7 +170,7 @@ function loadCollectionEntries(params: {
 
     if (!filePath) continue;
 
-    const entry = createEntry({
+    const created = createEntry({
       collection,
       collectionKind: kind,
       filePath,
@@ -164,6 +178,8 @@ function loadCollectionEntries(params: {
       workspaceRoot,
       isFolderEntry,
     });
+    const entry = created.entry;
+    diagnostics.push(...created.diagnostics);
 
     const previous = seenSlugs.get(entry.meta.slug);
     if (previous) {
@@ -178,7 +194,7 @@ function loadCollectionEntries(params: {
     entries.push(entry);
   }
 
-  return entries;
+  return { entries, diagnostics };
 }
 
 function compareByDate(a: ContentEntry, b: ContentEntry): number {
@@ -216,20 +232,22 @@ export function loadContentIndex(
 
   const collections: Record<string, ContentCollection> = {};
   const entries: ContentEntry[] = [];
+  const diagnostics: ContentDiagnostic[] = [];
 
   for (const name of names) {
     const kind = collectionKind(name);
-    const loadedEntries = loadCollectionEntries({
+    const loaded = loadCollectionEntries({
       collection: name,
       kind,
       collectionDir: path.join(contentDir, name),
       contentDir,
       workspaceRoot,
     });
+    diagnostics.push(...loaded.diagnostics);
 
     const collectionEntries = options.includeDrafts
-      ? loadedEntries
-      : loadedEntries.filter((entry) => !entry.meta.draft);
+      ? loaded.entries
+      : loaded.entries.filter((entry) => !entry.meta.draft);
 
     collectionEntries.sort(
       kind === 'page' ? comparePages : compareByDate,
@@ -247,17 +265,14 @@ export function loadContentIndex(
 
   const taxonomy = buildTaxonomy(entries);
 
-  const diagnostics =
-    names.length === 0
-      ? [
-          {
-            code: 'EMPTY_COLLECTION',
-            severity: 'warning' as const,
-            file: contentDir,
-            message: 'content 目录下没有可用的 collection',
-          },
-        ]
-      : [];
+  if (names.length === 0) {
+    diagnostics.push({
+      code: 'EMPTY_COLLECTION',
+      severity: 'warning',
+      file: contentDir,
+      message: 'content 目录下没有可用的 collection',
+    });
+  }
 
   return {
     collections,

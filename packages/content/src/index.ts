@@ -3,6 +3,7 @@
  *
  * 内容模型、schema 与主题字段命名空间工具。
  */
+export * from './assets';
 export * from './collections';
 export * from './date';
 export * from './diagnostics';
