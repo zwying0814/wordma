@@ -45,6 +45,7 @@ export type {
 export {
   buildThemeStyles,
   copyThemeStyles,
+  themeStylePaths,
 } from './styles/theme-styles';
 export type {
   BuildThemeStylesOptions,

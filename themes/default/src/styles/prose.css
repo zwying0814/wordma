@@ -1,0 +1,17 @@
+.prose img {
+  max-width: 100%;
+  height: auto;
+}
+
+.prose pre {
+  overflow-x: auto;
+  padding: 1rem;
+  border: 1px solid var(--wordma-border);
+  border-radius: 0.5rem;
+}
+
+.prose .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}

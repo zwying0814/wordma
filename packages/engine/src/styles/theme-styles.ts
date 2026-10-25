@@ -8,6 +8,8 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 
+import type { ThemeStyles } from '@wordma/theme';
+
 import { assetUrl } from '../assets';
 import { ThemeError } from '../errors';
 import type { ThemeRuntime } from '../theme/runtime';
@@ -120,13 +122,29 @@ function resolveStyleFile(
   return realPath;
 }
 
+export function themeStylePaths(
+  styles: ThemeStyles | undefined,
+): string[] {
+  if (!styles) return [];
+
+  if (Array.isArray(styles)) return styles;
+
+  return [
+    ...(styles.tokens ?? []),
+    ...(styles.global ?? []),
+    ...(styles.prose ?? []),
+  ];
+}
+
 /**
  * 编译主题 styles：解析相对路径、打包 @import、压缩并生成内容 hash。
  */
 export function buildThemeStyles(
   options: BuildThemeStylesOptions,
 ): ThemeStylesResult {
-  const styles = options.themeRuntime.definition.styles ?? [];
+  const styles = themeStylePaths(
+    options.themeRuntime.definition.styles,
+  );
   if (styles.length === 0) return {};
 
   const seen = new Set<string>();
@@ -179,10 +197,15 @@ export function buildThemeStyles(
       filePath,
       bytes: new TextEncoder().encode(css).length,
       sources: files.map((item) =>
-        path.relative(
-          realpathSync(options.themeRuntime.directory),
-          item,
-        ),
+        path
+          .relative(
+            realpathSync(
+              options.themeRuntime.directory,
+            ),
+            item,
+          )
+          .split(path.sep)
+          .join('/'),
       ),
     },
   };

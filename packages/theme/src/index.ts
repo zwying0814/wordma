@@ -17,6 +17,8 @@ export type {
   ThemeDefinition,
   ThemeLayout,
   ThemeLayouts,
+  ThemeStyleGroups,
+  ThemeStyles,
 } from './define-theme';
 export * from './helpers';
 export { loadThemePackage } from './load-theme';

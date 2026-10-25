@@ -1,24 +1,3 @@
-:root {
-  color-scheme: light dark;
-  --wordma-accent: #3563d9;
-  --wordma-bg: #ffffff;
-  --wordma-ink: #1f2328;
-  --wordma-muted: #6b7280;
-  --wordma-border: #e5e7eb;
-  --wordma-width: 42rem;
-  --wordma-font: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei',
-    sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --wordma-bg: #0f1115;
-    --wordma-ink: #f5f5f5;
-    --wordma-muted: #9ca3af;
-    --wordma-border: #262a31;
-  }
-}
-
 * {
   box-sizing: border-box;
 }
@@ -95,18 +74,6 @@ a {
 .lead {
   color: var(--wordma-muted);
   font-size: 1.05rem;
-}
-
-.prose img {
-  max-width: 100%;
-  height: auto;
-}
-
-.prose pre {
-  overflow-x: auto;
-  padding: 1rem;
-  border: 1px solid var(--wordma-border);
-  border-radius: 0.5rem;
 }
 
 .not-found {

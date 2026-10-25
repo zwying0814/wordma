@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { ThemeError } from '../errors';
+import type { ThemeStyles } from '@wordma/theme';
 import type { ThemeRuntime } from '../theme/runtime';
 import {
   buildThemeStyles,
@@ -19,7 +20,7 @@ import {
 
 function makeTheme(): {
   dir: string;
-  runtime: (styles: string[]) => ThemeRuntime;
+  runtime: (styles: ThemeStyles) => ThemeRuntime;
 } {
   const dir = mkdtempSync(
     path.join(tmpdir(), 'wordma-theme-css-'),
@@ -32,7 +33,7 @@ function makeTheme(): {
 
   return {
     dir,
-    runtime: (styles: string[]): ThemeRuntime => ({
+    runtime: (styles: ThemeStyles): ThemeRuntime => ({
       directory: dir,
       manifest: {
         id: 'wordma-theme-test',
@@ -114,6 +115,65 @@ describe('buildThemeStyles', () => {
       expect(css).toContain('--x:red');
       expect(css).toContain('color:var(--x)');
       expect(css).not.toContain('\n');
+    } finally {
+      rmSync(theme.dir, { recursive: true, force: true });
+      rmSync(cacheDir, { recursive: true, force: true });
+    }
+  });
+
+  it('按 tokens → global → prose 合并并去重', () => {
+    const theme = makeTheme();
+    const cacheDir = mkdtempSync(
+      path.join(tmpdir(), 'wordma-theme-css-cache-'),
+    );
+
+    try {
+      writeCss(
+        theme.dir,
+        'src/styles/tokens.css',
+        ':root { --x: 1; }',
+      );
+      writeCss(
+        theme.dir,
+        'src/styles/global.css',
+        'body { margin: 0; }',
+      );
+      writeCss(
+        theme.dir,
+        'src/styles/prose.css',
+        '.prose { max-width: 42rem; }',
+      );
+
+      const result = buildThemeStyles({
+        themeRuntime: theme.runtime({
+          prose: ['./styles/prose.css'],
+          global: [
+            './styles/global.css',
+            './styles/tokens.css',
+          ],
+          tokens: ['./styles/tokens.css'],
+        }),
+        cacheDir,
+      });
+      const css = readFileSync(
+        result.css?.filePath ?? '',
+        'utf8',
+      );
+
+      expect(result.css?.sources).toEqual([
+        'src/styles/tokens.css',
+        'src/styles/global.css',
+        'src/styles/prose.css',
+      ]);
+      expect(css.indexOf('--x:1')).toBeLessThan(
+        css.indexOf('body{margin:0}'),
+      );
+      expect(css.indexOf('body{margin:0}')).toBeLessThan(
+        css.indexOf('.prose{max-width:42rem}'),
+      );
+      expect(
+        css.match(/--x:1/g),
+      ).toHaveLength(1);
     } finally {
       rmSync(theme.dir, { recursive: true, force: true });
       rmSync(cacheDir, { recursive: true, force: true });

@@ -18,5 +18,9 @@ export default defineTheme({
     taxonomy: TaxonomyLayout,
     notFound: NotFoundLayout,
   },
-  styles: ['./styles/global.css'],
+  styles: {
+    tokens: ['./styles/tokens.css'],
+    global: ['./styles/global.css'],
+    prose: ['./styles/prose.css'],
+  },
 });
