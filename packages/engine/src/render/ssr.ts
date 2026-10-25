@@ -3,6 +3,10 @@ import type { ComponentType, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import type { PageContext, ThemeLayout } from '@wordma/theme';
+import {
+  PageAssetsProvider,
+} from '@wordma/theme';
+import type { PageAssets } from '@wordma/theme';
 
 import { ThemeError } from '../errors';
 import type { Route } from '../routing/manifest';
@@ -12,6 +16,7 @@ export type RenderRouteOptions = {
   route: Route;
   context: PageContext;
   themeRuntime: ThemeRuntime;
+  assets?: PageAssets;
 };
 
 function errorMessage(error: unknown): string {
@@ -40,6 +45,10 @@ function getLayout(
 
 export function renderRoute(options: RenderRouteOptions): string {
   const { route, context, themeRuntime } = options;
+  const assets = options.assets ?? {
+    styles: [],
+    bodyScripts: [],
+  };
 
   const pageLayout = getLayout(themeRuntime, route.layout);
   const rootLayout = getLayout(themeRuntime, 'root');
@@ -53,8 +62,13 @@ export function renderRoute(options: RenderRouteOptions): string {
       ...context,
       children: page,
     });
+    const tree = createElement(
+      PageAssetsProvider,
+      { assets },
+      root,
+    );
 
-    return `<!DOCTYPE html>\n${renderToStaticMarkup(root)}`;
+    return `<!DOCTYPE html>\n${renderToStaticMarkup(tree)}`;
   } catch (error) {
     if (error instanceof ThemeError) throw error;
 

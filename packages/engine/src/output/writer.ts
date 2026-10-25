@@ -18,6 +18,23 @@ export type BuildManifest = {
   };
   routes: Route[];
   diagnostics: ContentDiagnostic[];
+  assets: {
+    islands: Array<{
+      source: string;
+      exportName: string;
+      js: string;
+      css?: string;
+      bytes: number;
+    }>;
+    reactRuntime?: {
+      url: string;
+      bytes: number;
+    };
+    mountScript?: {
+      url: string;
+      bytes: number;
+    };
+  };
 };
 
 export const BUILD_MANIFEST_FILE = '.wordma-manifest.json';

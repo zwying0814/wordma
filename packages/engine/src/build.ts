@@ -5,6 +5,7 @@ import type {
   ContentDiagnostic,
   ContentEntry,
 } from '@wordma/content';
+import type { PageAssets } from '@wordma/theme';
 
 import {
   prepareOutDir,
@@ -148,10 +149,28 @@ export async function buildSite(
         ? compiledContent.get(route.entryId)
         : undefined,
     });
+    const assets: PageAssets =
+      islandRuntime && context.content.islands.length > 0
+        ? {
+            styles: [
+              ...new Set(
+                context.content.islands
+                  .map((island) => island.css)
+                  .filter(
+                    (css): css is string =>
+                      typeof css === 'string',
+                  ),
+              ),
+            ],
+            importMap: islandRuntime.importMap,
+            bodyScripts: [islandRuntime.mount.url],
+          }
+        : { styles: [], bodyScripts: [] };
     const html = renderRoute({
       route,
       context,
       themeRuntime,
+      assets,
     });
 
     writeHtmlFile(outDir, route, html);
@@ -173,6 +192,27 @@ export async function buildSite(
     },
     routes: routeManifest.routes,
     diagnostics,
+    assets: {
+      islands: islandBundles.bundles.map((bundle) => ({
+        source: bundle.relativeSource,
+        exportName: bundle.exportName,
+        js: bundle.js,
+        ...(bundle.css ? { css: bundle.css } : {}),
+        bytes: bundle.bytes,
+      })),
+      ...(islandRuntime
+        ? {
+            reactRuntime: {
+              url: islandRuntime.react.url,
+              bytes: islandRuntime.react.bytes,
+            },
+            mountScript: {
+              url: islandRuntime.mount.url,
+              bytes: islandRuntime.mount.bytes,
+            },
+          }
+        : {}),
+    },
   };
 
   writeBuildManifest(outDir, buildManifest);

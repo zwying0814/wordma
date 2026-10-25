@@ -102,6 +102,11 @@ describe('buildSite', () => {
         theme: { id: string; version: string };
         routes: unknown[];
         diagnostics: unknown[];
+        assets: {
+          islands: unknown[];
+          reactRuntime?: unknown;
+          mountScript?: unknown;
+        };
       };
 
       expect(manifest.version).toBe(1);
@@ -110,6 +115,11 @@ describe('buildSite', () => {
       expect(manifest.theme.id).toBe('wordma-theme-default');
       expect(manifest.routes).toHaveLength(17);
       expect(manifest.diagnostics).toEqual([]);
+      expect(manifest.assets.islands).toEqual([]);
+      expect(manifest.assets.reactRuntime).toBeUndefined();
+      expect(manifest.assets.mountScript).toBeUndefined();
+      expect(home).not.toContain('type="importmap"');
+      expect(home).not.toContain('data-wordma-src');
     } finally {
       rmSync(outDir, { recursive: true, force: true });
     }
@@ -159,6 +169,21 @@ describe('buildSite', () => {
       expect(html).toContain(
         'data-wordma-src="/assets/islands/island-',
       );
+      expect(html).toContain('<link rel="stylesheet"');
+      expect(html).toContain(
+        'href="/assets/islands/island-',
+      );
+      expect(html).toContain('.css"');
+      expect(html).toContain('<script type="importmap">');
+      expect(html).toContain(
+        '"react":"/assets/islands/react-',
+      );
+      expect(html).toContain(
+        '<script type="module" src="/assets/islands/mount-',
+      );
+      expect(html.indexOf('type="importmap"')).toBeLessThan(
+        html.indexOf('type="module"'),
+      );
 
       const islandFile = /data-wordma-src="\/assets\/islands\/(island-[^"]+\.js)"/.exec(
         html,
@@ -180,8 +205,69 @@ describe('buildSite', () => {
         assets.filter((file) => file.startsWith('mount-')),
       ).toHaveLength(1);
       expect(
-        assets.filter((file) => file.startsWith('island-')),
+        assets.filter(
+          (file) =>
+            file.startsWith('island-') &&
+            file.endsWith('.js'),
+        ),
       ).toHaveLength(2);
+      expect(
+        assets.filter((file) => file.endsWith('.css')),
+      ).toHaveLength(1);
+
+      const home = readFileSync(
+        path.join(outDir, 'index.html'),
+        'utf8',
+      );
+      expect(home).not.toContain('type="importmap"');
+      expect(home).not.toContain('data-wordma-src');
+
+      const manifest = JSON.parse(
+        readFileSync(
+          path.join(outDir, '.wordma-manifest.json'),
+          'utf8',
+        ),
+      ) as {
+        assets: {
+          islands: Array<{
+            source: string;
+            exportName: string;
+            js: string;
+            css?: string;
+            bytes: number;
+          }>;
+          reactRuntime?: { url: string; bytes: number };
+          mountScript?: { url: string; bytes: number };
+        };
+      };
+
+      expect(manifest.assets.islands).toHaveLength(2);
+      expect(manifest.assets.islands[0]).toMatchObject({
+        source: 'components/counter.tsx',
+        exportName: 'default',
+      });
+      expect(manifest.assets.islands[0]?.js).toContain(
+        '/assets/islands/island-',
+      );
+      expect(
+        manifest.assets.islands.some((item) =>
+          item.css?.endsWith('.css'),
+        ),
+      ).toBe(true);
+      expect(
+        manifest.assets.islands.every(
+          (item) => item.bytes > 0,
+        ),
+      ).toBe(true);
+      expect(manifest.assets.reactRuntime?.url).toContain(
+        '/assets/islands/react-',
+      );
+      expect(
+        manifest.assets.reactRuntime?.bytes,
+      ).toBeGreaterThan(0);
+      expect(manifest.assets.mountScript?.url).toContain(
+        '/assets/islands/mount-',
+      );
     } finally {
       rmSync(outDir, { recursive: true, force: true });
       rmSync(path.join(root, '.wordma'), {

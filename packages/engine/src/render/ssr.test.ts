@@ -158,6 +158,44 @@ describe('renderRoute', () => {
     expectGolden('404.html', await render('/404/'));
   });
 
+  it('注入页面资产与 importmap', async () => {
+    const route = routeManifest.routes.find(
+      (item) => item.path === '/posts/standalone-post/',
+    );
+    if (!route) throw new Error('缺少文章路由');
+
+    const context = createPageContext({
+      route,
+      workspace,
+      routeManifest,
+      themeManifest,
+    });
+    const html = renderRoute({
+      route,
+      context,
+      themeRuntime: await getRuntime(),
+      assets: {
+        styles: ['/assets/islands/island-a.css'],
+        importMap: {
+          react: '/assets/islands/react-a.js',
+        },
+        bodyScripts: ['/assets/islands/mount-a.js'],
+      },
+    });
+
+    expect(html).toContain(
+      'href="/assets/islands/island-a.css"',
+    );
+    expect(html).toContain('<script type="importmap">');
+    expect(html).toContain(
+      '<script type="module" src="/assets/islands/mount-a.js"></script>',
+    );
+    expect(html.indexOf('type="importmap"')).toBeLessThan(
+      html.indexOf('type="module"'),
+    );
+    expect(html).toContain('</body>');
+  });
+
   it('缺少布局时抛 MISSING_LAYOUT', async () => {
     const route = routeManifest.routes.find(
       (item) => item.path === '/posts/standalone-post/',

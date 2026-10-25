@@ -3,7 +3,15 @@
  *
  * 主题契约：布局、PageContext、主题 helper。
  */
-export { WordmaBodyEnd, WordmaHead } from './components/assets';
+export {
+  PageAssetsProvider,
+  WordmaBodyEnd,
+  WordmaHead,
+} from './components/assets';
+export type {
+  PageAssets,
+  PageAssetsProviderProps,
+} from './components/assets';
 export { defineTheme } from './define-theme';
 export type {
   ThemeDefinition,
