@@ -1,5 +1,12 @@
 export { ENGINE_NAME, ENGINE_VERSION } from './constants';
-export { RouteError, ThemeError, BuildError } from './errors';
+export { RouteError, ThemeError, MdxError, BuildError } from './errors';
+export { parseMdx } from './mdx/parse';
+export type { MdxImport, ParsedMdx } from './mdx/parse';
+export { resolveMdxImports } from './mdx/resolve';
+export type {
+  ResolvedMdxImport,
+  ResolveMdxImportsOptions,
+} from './mdx/resolve';
 export { buildSite } from './build';
 export type { BuildOptions, BuildResult } from './build';
 export { inspectWorkspace } from './inspect';

@@ -40,6 +40,30 @@ export class ThemeError extends Error {
   }
 }
 
+export class MdxError extends Error {
+  readonly code: string;
+  readonly file?: string;
+  readonly line?: number;
+  readonly column?: number;
+
+  constructor(
+    code: string,
+    message: string,
+    options: {
+      file?: string;
+      line?: number;
+      column?: number;
+    } = {},
+  ) {
+    super(message);
+    this.name = 'MdxError';
+    this.code = code;
+    this.file = options.file;
+    this.line = options.line;
+    this.column = options.column;
+  }
+}
+
 export class BuildError extends Error {
   readonly code: string;
   readonly path?: string;
