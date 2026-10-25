@@ -6,7 +6,16 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "bin": {
+    "wordma-engine": "./src/cli.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@wordma/content": "workspace:*",
+    "@wordma/theme": "workspace:*",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
   }
 }

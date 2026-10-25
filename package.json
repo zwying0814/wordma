@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "pnpm --filter desktop tauri:dev",
     "dev:web": "pnpm --filter desktop dev",
+    "engine": "node scripts/run-bun.mjs packages/engine/src/cli.ts",
     "build": "pnpm -r --if-present run build",
     "build:app": "pnpm --filter desktop tauri:build",
     "typecheck": "pnpm -r --if-present run typecheck",
