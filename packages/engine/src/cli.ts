@@ -3,6 +3,8 @@ import { ZodError } from 'zod';
 
 import { buildSite } from './build';
 import { startDev } from './dev';
+import { EventWriter } from './dev/events';
+import type { JsonDiagnostic } from './dev/events';
 import {
   BuildError,
   IslandError,
@@ -353,7 +355,7 @@ function runInspect(args: string[]): void {
 
 function errorPayload(
   error: unknown,
-): Record<string, unknown> {
+): JsonDiagnostic {
   if (error instanceof Error) {
     const detail = error as Error & {
       code?: string;
@@ -387,20 +389,7 @@ function errorPayload(
   };
 }
 
-let eventSeq = 0;
-
-function emitEvent(
-  event: Record<string, unknown>,
-): void {
-  console.log(
-    JSON.stringify({
-      v: 1,
-      seq: (eventSeq += 1),
-      time: new Date().toISOString(),
-      ...event,
-    }),
-  );
-}
+const jsonWriter = new EventWriter();
 
 async function runBuild(args: string[]): Promise<void> {
   const flags = parseBuildFlags(args);
@@ -413,14 +402,13 @@ async function runBuild(args: string[]): Promise<void> {
   const durationMs = Date.now() - started;
 
   if (flags.json) {
-    emitEvent({
+    jsonWriter.emit({
       type: 'build-success',
       durationMs,
       routes: result.routes,
       compiledEntries: result.compiledEntries,
       islands: result.islands,
       diagnostics: result.diagnostics,
-      outDir: result.outDir,
     });
     return;
   }
@@ -460,7 +448,9 @@ async function runDev(args: string[]): Promise<void> {
           error: (message) => {
             console.error(message);
           },
-          event: emitEvent,
+          event: (event) => {
+            jsonWriter.emit(event);
+          },
         }
       : {
           info: (message) => {
@@ -516,10 +506,14 @@ try {
   }
 } catch (error) {
   if (jsonMode) {
-    emitEvent({
+    jsonWriter.emit({
       type: 'build-error',
+      durationMs: 0,
       diagnostics: [errorPayload(error)],
     });
+    if (command === 'dev') {
+      jsonWriter.emit({ type: 'exit', code: 1 });
+    }
   } else {
     console.error(formatError(error));
   }

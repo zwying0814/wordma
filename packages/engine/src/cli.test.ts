@@ -118,6 +118,42 @@ function freePort(): number {
   return port;
 }
 
+async function waitForHttp(
+  url: string,
+  timeoutMs = 8000,
+): Promise<Response> {
+  const started = Date.now();
+  let lastError: unknown;
+
+  while (Date.now() - started < timeoutMs) {
+    try {
+      return await fetch(url);
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) =>
+        setTimeout(resolve, 25),
+      );
+    }
+  }
+
+  throw new Error(`等待 HTTP 服务超时：${url}\n${String(lastError)}`);
+}
+
+function parseEvents(output: string): Array<
+  Record<string, unknown> & {
+    v: number;
+    seq: number;
+    time: string;
+    type: string;
+  }
+> {
+  return output
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
 function expectBrokenFixture(
   fixture: string,
   code: string,
@@ -560,6 +596,140 @@ describe('wordma-engine CLI', () => {
           path.join(
             repoRoot,
             'fixtures/minimal/.wordma',
+          ),
+          { recursive: true, force: true },
+        );
+      }
+    },
+    15000,
+  );
+
+  it(
+    'dev --json 输出合法 NDJSON 且 exit 最后',
+    async () => {
+      const outDir = makeOutDir();
+      const port = freePort();
+      const proc = Bun.spawn(
+        [
+          process.execPath,
+          cliPath,
+          'dev',
+          '--root',
+          'fixtures/minimal',
+          `--out=${outDir}`,
+          `--port=${port}`,
+          '--no-watch',
+          '--json',
+        ],
+        {
+          cwd: repoRoot,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
+      const stdout = proc.stdout as ReadableStream<Uint8Array>;
+      const stderr = proc.stderr as ReadableStream<Uint8Array>;
+      const stderrText = new Response(stderr).text();
+      let exited = false;
+
+      try {
+        await waitForHttp(`http://127.0.0.1:${port}/`);
+        proc.kill('SIGINT');
+        const code = await proc.exited;
+        exited = true;
+
+        const output = await new Response(stdout).text();
+        const events = parseEvents(output);
+        await stderrText;
+
+        expect(code).toBe(0);
+        expect(events.length).toBeGreaterThanOrEqual(3);
+        expect(events.map((event) => event.type)).toEqual([
+          'build-success',
+          'ready',
+          'exit',
+        ]);
+        expect(
+          events.every(
+            (event, index) =>
+              event.v === 1 &&
+              event.seq === index + 1 &&
+              !Number.isNaN(Date.parse(event.time)),
+          ),
+        ).toBe(true);
+        expect(events[events.length - 1]?.code).toBe(0);
+      } finally {
+        if (!exited && proc.exitCode === null) {
+          proc.kill('SIGKILL');
+          await proc.exited;
+        }
+        rmSync(outDir, { recursive: true, force: true });
+        rmSync(
+          path.join(
+            repoRoot,
+            'fixtures/minimal/.wordma',
+          ),
+          { recursive: true, force: true },
+        );
+      }
+    },
+    15000,
+  );
+
+  it(
+    'dev --json 启动失败时 build-error 后输出 exit',
+    async () => {
+      const outDir = makeOutDir();
+      const port = freePort();
+      const proc = Bun.spawn(
+        [
+          process.execPath,
+          cliPath,
+          'dev',
+          '--root',
+          'fixtures/broken/missing-component',
+          `--out=${outDir}`,
+          `--port=${port}`,
+          '--no-watch',
+          '--json',
+        ],
+        {
+          cwd: repoRoot,
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
+
+      try {
+        const code = await proc.exited;
+        const output = await new Response(
+          proc.stdout as ReadableStream<Uint8Array>,
+        ).text();
+        const events = parseEvents(output);
+
+        expect(code).toBe(1);
+        expect(events.map((event) => event.type)).toEqual([
+          'build-error',
+          'exit',
+        ]);
+        expect(
+          (
+            events[0]?.diagnostics as Array<{
+              code: string;
+            }>
+          )[0]?.code,
+        ).toBe('MISSING_COMPONENT_IMPORT');
+        expect(events[1]?.code).toBe(1);
+      } finally {
+        if (proc.exitCode === null) {
+          proc.kill('SIGKILL');
+          await proc.exited;
+        }
+        rmSync(outDir, { recursive: true, force: true });
+        rmSync(
+          path.join(
+            repoRoot,
+            'fixtures/broken/missing-component/.wordma',
           ),
           { recursive: true, force: true },
         );

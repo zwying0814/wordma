@@ -9,6 +9,11 @@ import { loadWorkspace } from '@wordma/content';
 
 import { buildSite } from '../build';
 import type { BuildResult } from '../build';
+import type {
+  BuildSuccessEvent,
+  DevEventPayload,
+  JsonDiagnostic,
+} from './events';
 import { startDevServer } from './server';
 import type { DevServer } from './server';
 import { startWatch } from './watch';
@@ -17,7 +22,7 @@ import type { WatchHandle } from './watch';
 export type DevLogger = {
   info: (message: string) => void;
   error: (message: string) => void;
-  event?: (event: Record<string, unknown>) => void;
+  event?: (event: DevEventPayload) => void;
 };
 
 export type StartDevOptions = {
@@ -65,7 +70,7 @@ function promote(nextDir: string, outDir: string): void {
   rmSync(oldDir, { recursive: true, force: true });
 }
 
-function errorEvent(error: unknown): Record<string, unknown> {
+function errorEvent(error: unknown): JsonDiagnostic {
   if (error instanceof Error) {
     const detail = error as Error & {
       code?: string;
@@ -102,7 +107,7 @@ function errorEvent(error: unknown): Record<string, unknown> {
 function buildSuccessEvent(
   result: BuildResult,
   durationMs: number,
-): Record<string, unknown> {
+): BuildSuccessEvent {
   return {
     type: 'build-success',
     durationMs,

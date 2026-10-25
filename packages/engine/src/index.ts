@@ -81,6 +81,19 @@ export type {
   DevLogger,
   StartDevOptions,
 } from './dev';
+export { EVENTS_VERSION, EventWriter } from './dev/events';
+export type {
+  BuildErrorEvent,
+  BuildStartEvent,
+  BuildSuccessEvent,
+  DevEventPayload,
+  EventEnvelope,
+  ExitEvent,
+  JsonDiagnostic,
+  ReadyEvent,
+  ReloadEvent,
+  WatchEvent,
+} from './dev/events';
 export { startDevServer } from './dev/server';
 export type {
   DevServer,
