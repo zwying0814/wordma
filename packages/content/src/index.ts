@@ -6,5 +6,6 @@
 export * from './types';
 export * from './schema';
 export * from './theme-fields';
+export * from './yaml';
 
 export const CONTENT_PACKAGE = '@wordma/content';
