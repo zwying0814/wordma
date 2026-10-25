@@ -18,6 +18,7 @@
     "test:content": "node scripts/run-bun.mjs test packages/content",
     "test:theme": "node scripts/run-bun.mjs test packages/theme",
     "test:engine": "node scripts/run-bun.mjs test packages/engine",
+    "bench:build": "node scripts/run-bun.mjs scripts/bench-build.ts",
     "test:contracts": "pnpm test:content && pnpm test:theme && pnpm test:engine && pnpm fixtures:validate",
     "fixtures:validate": "node scripts/run-bun.mjs scripts/validate-fixtures.ts",
     "build": "pnpm -r --if-present run build",

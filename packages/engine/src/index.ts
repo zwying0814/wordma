@@ -76,6 +76,15 @@ export type {
   StaticFile,
 } from './output/static';
 export {
+  createBenchmarkWorkspace,
+  runBuildBenchmark,
+} from './benchmark';
+export type {
+  BenchmarkOptions,
+  BenchmarkResult,
+  BenchmarkScenario,
+} from './benchmark';
+export {
   diagnosticFromContent,
   diagnosticsFromError,
   formatDiagnostic,
