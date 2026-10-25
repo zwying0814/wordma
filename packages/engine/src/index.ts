@@ -1,5 +1,7 @@
 export { ENGINE_NAME, ENGINE_VERSION } from './constants';
-export { RouteError, ThemeError } from './errors';
+export { RouteError, ThemeError, BuildError } from './errors';
+export { buildSite } from './build';
+export type { BuildOptions, BuildResult } from './build';
 export { inspectWorkspace } from './inspect';
 export type {
   InspectPageType,

@@ -40,3 +40,21 @@ export class ThemeError extends Error {
   }
 }
 
+export class BuildError extends Error {
+  readonly code: string;
+  readonly path?: string;
+
+  constructor(
+    code: string,
+    message: string,
+    options: {
+      path?: string;
+    } = {},
+  ) {
+    super(message);
+    this.name = 'BuildError';
+    this.code = code;
+    this.path = options.path;
+  }
+}
+

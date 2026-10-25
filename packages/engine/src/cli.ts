@@ -1,8 +1,12 @@
 import { ContentError, YamlParseError } from '@wordma/content';
 import { ZodError } from 'zod';
 
-import { ThemeError } from './errors';
-
+import { buildSite } from './build';
+import {
+  BuildError,
+  RouteError,
+  ThemeError,
+} from './errors';
 import { ENGINE_VERSION } from './index';
 import { inspectWorkspace } from './inspect';
 
@@ -13,12 +17,17 @@ const help = `wordma-engine ${ENGINE_VERSION}
 
 命令:
   inspect   输出站点与主题契约信息
-  build     构建静态站点（尚未实现）
+  build     构建静态站点
   dev       启动开发服务器（尚未实现）
 
 inspect 选项:
   --root <path>   工作区目录，默认当前目录
   --json          输出 JSON
+
+build 选项:
+  --root <path>     工作区目录，默认当前目录
+  --out <path>      输出目录，默认 <root>/.wordma/dist
+  --include-drafts  包含草稿
 
 全局选项:
   -h, --help      显示帮助
@@ -28,6 +37,12 @@ inspect 选项:
 type InspectFlags = {
   root?: string;
   json?: boolean;
+};
+
+type BuildFlags = {
+  root?: string;
+  out?: string;
+  includeDrafts?: boolean;
 };
 
 function parseInspectFlags(args: string[]): InspectFlags {
@@ -63,12 +78,54 @@ function parseInspectFlags(args: string[]): InspectFlags {
   return flags;
 }
 
-function formatError(error: unknown): string {
-  if (error instanceof ContentError) {
-    return `[${error.code}] ${error.message}`;
+function parseBuildFlags(args: string[]): BuildFlags {
+  const flags: BuildFlags = {};
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === undefined) continue;
+
+    if (arg === '--include-drafts') {
+      flags.includeDrafts = true;
+      continue;
+    }
+
+    if (arg === '--root' || arg === '--out') {
+      const value = args[index + 1];
+      if (!value || value.startsWith('-')) {
+        throw new Error(`${arg} 需要一个路径`);
+      }
+
+      if (arg === '--root') flags.root = value;
+      else flags.out = value;
+
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--root=')) {
+      flags.root = arg.slice('--root='.length);
+      continue;
+    }
+
+    if (arg.startsWith('--out=')) {
+      flags.out = arg.slice('--out='.length);
+      continue;
+    }
+
+    throw new Error(`未知参数：${arg}`);
   }
 
-  if (error instanceof ThemeError) {
+  return flags;
+}
+
+function formatError(error: unknown): string {
+  if (
+    error instanceof ContentError ||
+    error instanceof ThemeError ||
+    error instanceof RouteError ||
+    error instanceof BuildError
+  ) {
     return `[${error.code}] ${error.message}`;
   }
 
@@ -151,9 +208,28 @@ try {
       runInspect(args.slice(1));
       break;
 
-    case 'build':
+    case 'build': {
+      const flags = parseBuildFlags(args.slice(1));
+      const result = await buildSite({
+        root: flags.root ?? process.cwd(),
+        outDir: flags.out,
+        includeDrafts: flags.includeDrafts,
+      });
+
+      console.log(
+        `Built ${result.routes} routes to ${result.outDir}`,
+      );
+      console.log(
+        `Theme: ${result.theme.id}@${result.theme.version}`,
+      );
+      if (result.diagnostics.length > 0) {
+        console.log(`Diagnostics: ${result.diagnostics.length}`);
+      }
+      break;
+    }
+
     case 'dev':
-      console.error(`wordma-engine ${command} 尚未实现（M1 之后提供）`);
+      console.error('wordma-engine dev 尚未实现（M5 之后提供）');
       process.exit(1);
       break;
 
