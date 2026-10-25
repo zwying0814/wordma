@@ -12,6 +12,9 @@
     "dev": "pnpm --filter desktop tauri:dev",
     "dev:web": "pnpm --filter desktop dev",
     "engine": "node scripts/run-bun.mjs packages/engine/src/cli.ts",
+    "schema:generate": "node scripts/run-bun.mjs scripts/generate-schemas.ts",
+    "schema:validate": "node scripts/run-bun.mjs scripts/validate-schemas.ts",
+    "schema:check": "pnpm schema:generate && pnpm schema:validate",
     "build": "pnpm -r --if-present run build",
     "build:app": "pnpm --filter desktop tauri:build",
     "typecheck": "pnpm -r --if-present run typecheck",
@@ -24,6 +27,10 @@
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
-    "typescript": "~6.0.3"
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "typescript": "~6.0.3",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
   }
 }

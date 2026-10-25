@@ -169,9 +169,21 @@ importers:
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
 
   apps/desktop:
     dependencies:
