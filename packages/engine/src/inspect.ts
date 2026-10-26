@@ -1,13 +1,8 @@
 import path from 'node:path';
 
-import {
-  loadWorkspace,
-  parseThemeManifest,
-  parseYamlFile,
-} from '@wordma/content';
+import { loadWorkspace } from '@wordma/content';
 import type {
   ContentCollectionKind,
-  ContentDiagnostic,
   FieldDescriptor,
   PageTypeDeclaration,
   TaxonomyTerm,
@@ -16,7 +11,11 @@ import type {
   ThemeSettingDescriptor,
 } from '@wordma/content';
 
-import { resolveThemeDirectory } from './theme/resolve';
+import {
+  diagnosticFromContent,
+} from './diagnostics';
+import type { Diagnostic } from './diagnostics';
+import { inspectThemeManifest } from './theme/manifest';
 
 export type InspectTheme = {
   id: string;
@@ -52,34 +51,23 @@ export type InspectResult = {
   collections: InspectCollection[];
   tags: TaxonomyTerm[];
   categories: TaxonomyTerm[];
-  diagnostics: ContentDiagnostic[];
+  diagnostics: Diagnostic[];
 };
-
-type ResolvedTheme = {
-  manifest: ThemeManifest;
-  path: string;
-};
-
-function resolveThemeManifest(
-  root: string,
-  themeId: string,
-): ResolvedTheme | null {
-  const directory = resolveThemeDirectory(root, themeId);
-  if (!directory) return null;
-
-  const manifestPath = path.join(directory, 'theme.yaml');
-  return {
-    manifest: parseThemeManifest(parseYamlFile(manifestPath)),
-    path: manifestPath,
-  };
-}
 
 export function inspectWorkspace(rootInput: string): InspectResult {
   const workspace = loadWorkspace(rootInput);
   const root = workspace.root;
   const themeId = workspace.site.theme.id;
-  const resolvedTheme = resolveThemeManifest(root, themeId);
-  const manifest = resolvedTheme?.manifest;
+  const inspection = inspectThemeManifest(root, themeId);
+  const manifest: ThemeManifest | undefined =
+    inspection.manifest;
+  const themePath =
+    inspection.directory && manifest
+      ? path.relative(
+          root,
+          path.join(inspection.directory, 'theme.yaml'),
+        ) || '.'
+      : undefined;
 
   return {
     workspace: root,
@@ -90,12 +78,12 @@ export function inspectWorkspace(rootInput: string): InspectResult {
       basePath: workspace.site.site.basePath,
     },
     theme:
-      resolvedTheme && manifest
+      manifest && themePath
         ? {
             id: manifest.id,
             displayName: manifest.displayName,
             version: manifest.version,
-            path: path.relative(root, resolvedTheme.path) || '.',
+            path: themePath,
           }
         : null,
     postFields: manifest?.content?.post.fields ?? [],
@@ -114,6 +102,11 @@ export function inspectWorkspace(rootInput: string): InspectResult {
     ),
     tags: workspace.index.tags,
     categories: workspace.index.categories,
-    diagnostics: workspace.diagnostics,
+    diagnostics: [
+      ...workspace.diagnostics.map((item) =>
+        diagnosticFromContent(item, 'content'),
+      ),
+      ...inspection.diagnostics,
+    ],
   };
 }

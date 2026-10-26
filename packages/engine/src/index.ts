@@ -147,6 +147,8 @@ export type {
   InspectResult,
   InspectTheme,
 } from './inspect';
+export { inspectThemeManifest } from './theme/manifest';
+export type { ThemeManifestInspection } from './theme/manifest';
 export { buildRouteManifest } from './routing/manifest';
 export type {
   Route,

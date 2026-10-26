@@ -1,4 +1,11 @@
 import { describe, expect, it } from 'bun:test';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { ContentError, YamlParseError } from '@wordma/content';
@@ -6,6 +13,56 @@ import { ContentError, YamlParseError } from '@wordma/content';
 import { inspectWorkspace } from './inspect';
 
 const root = path.resolve(import.meta.dirname, '../../..');
+
+function writeFile(
+  workspaceRoot: string,
+  relativePath: string,
+  source: string,
+): void {
+  const file = path.join(workspaceRoot, relativePath);
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, source);
+}
+
+function makeThemeWorkspace(options: {
+  themeYaml: string;
+  packageJson?: string;
+}): string {
+  const workspaceRoot = mkdtempSync(
+    path.join(tmpdir(), 'wordma-inspect-theme-'),
+  );
+  const themeId = 'wordma-theme-broken';
+
+  writeFile(
+    workspaceRoot,
+    'wordma.site.yaml',
+    [
+      'site:',
+      '  title: Broken Theme',
+      'theme:',
+      `  id: ${themeId}`,
+    ].join('\n'),
+  );
+  writeFile(
+    workspaceRoot,
+    'content/posts/ok.mdx',
+    '---\ntitle: OK\n---\n\n# OK',
+  );
+  writeFile(
+    workspaceRoot,
+    `themes/${themeId}/theme.yaml`,
+    options.themeYaml,
+  );
+  if (options.packageJson) {
+    writeFile(
+      workspaceRoot,
+      `themes/${themeId}/package.json`,
+      options.packageJson,
+    );
+  }
+
+  return workspaceRoot;
+}
 
 function expectContentError(run: () => unknown, code: string): void {
   try {
@@ -111,10 +168,114 @@ describe('inspectWorkspace', () => {
     ).toThrow(YamlParseError);
   });
 
-  it('坏主题 manifest 抛出错误', () => {
-    expect(() =>
-      inspectWorkspace(path.join(root, 'fixtures/broken/bad-theme')),
-    ).toThrow();
+  it('坏主题 manifest 返回诊断而不抛出', () => {
+    const result = inspectWorkspace(
+      path.join(root, 'fixtures/broken/bad-theme'),
+    );
+
+    expect(result.theme).toBeNull();
+    expect(result.collections).toEqual([
+      { name: 'posts', kind: 'post', count: 1 },
+    ]);
+
+    const diagnostic = result.diagnostics.find(
+      (item) => item.code === 'INVALID_THEME',
+    );
+
+    expect(diagnostic).toMatchObject({
+      severity: 'error',
+      source: 'theme',
+    });
+    expect(diagnostic?.file).toContain('theme.yaml');
+  });
+
+  it('坏主题 YAML 与缺失 package.json 均容错', () => {
+    const yamlRoot = makeThemeWorkspace({
+      themeYaml: 'id: [\n',
+      packageJson: JSON.stringify({
+        name: 'wordma-theme-broken',
+        version: '0.0.0',
+        type: 'module',
+        exports: { '.': './src/index.tsx' },
+      }),
+    });
+    const packageRoot = makeThemeWorkspace({
+      themeYaml: [
+        'id: wordma-theme-broken',
+        'displayName: Broken',
+        'version: 0.0.0',
+        'engines:',
+        '  wordma: ">=0.0.0"',
+        'settings: []',
+        'pages: []',
+      ].join('\n'),
+    });
+
+    try {
+      const yamlResult = inspectWorkspace(yamlRoot);
+      const yamlDiagnostic = yamlResult.diagnostics.find(
+        (item) => item.code === 'INVALID_THEME',
+      );
+
+      expect(yamlResult.theme).toBeNull();
+      expect(yamlResult.collections).toHaveLength(1);
+      expect(yamlDiagnostic?.line).toBeGreaterThan(0);
+      expect(yamlDiagnostic?.source).toBe('theme');
+
+      const packageResult = inspectWorkspace(packageRoot);
+      expect(packageResult.theme?.id).toBe(
+        'wordma-theme-broken',
+      );
+      expect(
+        packageResult.diagnostics.find(
+          (item) => item.code === 'INVALID_THEME',
+        ),
+      ).toMatchObject({
+        severity: 'warning',
+        source: 'theme',
+      });
+      expect(packageResult.collections).toHaveLength(1);
+    } finally {
+      rmSync(yamlRoot, { recursive: true, force: true });
+      rmSync(packageRoot, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  it('主题不存在时返回 THEME_NOT_FOUND 诊断', () => {
+    const workspaceRoot = makeThemeWorkspace({
+      themeYaml: 'id: unused',
+    });
+
+    writeFile(
+      workspaceRoot,
+      'wordma.site.yaml',
+      [
+        'site:',
+        '  title: Missing Theme',
+        'theme:',
+        '  id: wordma-theme-missing-inspect',
+      ].join('\n'),
+    );
+
+    try {
+      const result = inspectWorkspace(workspaceRoot);
+
+      expect(result.theme).toBeNull();
+      expect(
+        result.diagnostics.some(
+          (item) => item.code === 'THEME_NOT_FOUND',
+        ),
+      ).toBe(true);
+      expect(result.collections).toHaveLength(1);
+    } finally {
+      rmSync(workspaceRoot, {
+        recursive: true,
+        force: true,
+      });
+    }
   });
 
   it('invalid-frontmatter 抛出 ContentError', () => {

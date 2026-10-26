@@ -330,6 +330,35 @@ describe('wordma-engine CLI', () => {
     }
   });
 
+  it('inspect 对坏主题返回诊断而不崩溃', () => {
+    const result = runCli([
+      'inspect',
+      '--root=fixtures/broken/bad-theme',
+      '--json',
+    ]);
+
+    expect(result.status).toBe(0);
+
+    const data = JSON.parse(result.stdout) as {
+      theme: unknown;
+      collections: Array<{ name: string }>;
+      diagnostics: Array<{
+        code: string;
+        source: string;
+      }>;
+    };
+
+    expect(data.theme).toBeNull();
+    expect(data.collections).toHaveLength(1);
+    expect(
+      data.diagnostics.some(
+        (item) =>
+          item.code === 'INVALID_THEME' &&
+          item.source === 'theme',
+      ),
+    ).toBe(true);
+  });
+
   it('build 成功并输出页面', () => {
     const outDir = makeOutDir();
 
