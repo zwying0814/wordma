@@ -149,6 +149,11 @@ export type {
 } from './inspect';
 export { inspectThemeManifest } from './theme/manifest';
 export type { ThemeManifestInspection } from './theme/manifest';
+export {
+  assertThemeEngines,
+  checkThemeEngines,
+} from './theme/version';
+export type { ThemeEngineCheck } from './theme/version';
 export { buildRouteManifest } from './routing/manifest';
 export type {
   Route,

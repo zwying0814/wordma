@@ -244,6 +244,41 @@ describe('inspectWorkspace', () => {
     }
   });
 
+  it('主题版本不满足时返回诊断但保留 schema', () => {
+    const workspaceRoot = makeThemeWorkspace({
+      themeYaml: [
+        'id: wordma-theme-broken',
+        'displayName: Future Theme',
+        'version: 1.0.0',
+        'engines:',
+        '  wordma: ">=99.0.0"',
+        'settings: []',
+        'pages: []',
+      ].join('\n'),
+    });
+
+    try {
+      const result = inspectWorkspace(workspaceRoot);
+      const diagnostic = result.diagnostics.find(
+        (item) =>
+          item.code === 'ENGINE_VERSION_MISMATCH',
+      );
+
+      expect(result.theme?.id).toBe('wordma-theme-broken');
+      expect(diagnostic).toMatchObject({
+        severity: 'error',
+        source: 'theme',
+      });
+      expect(diagnostic?.message).toContain('>=99.0.0');
+      expect(result.collections).toHaveLength(1);
+    } finally {
+      rmSync(workspaceRoot, {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
   it('主题不存在时返回 THEME_NOT_FOUND 诊断', () => {
     const workspaceRoot = makeThemeWorkspace({
       themeYaml: 'id: unused',

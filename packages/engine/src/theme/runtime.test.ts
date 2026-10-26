@@ -20,6 +20,7 @@ function writeTheme(
   root: string,
   id: string,
   source: string,
+  engines = '>=0.0.0',
 ): void {
   const directory = path.join(root, 'themes', id);
   mkdirSync(path.join(directory, 'src'), { recursive: true });
@@ -31,7 +32,7 @@ function writeTheme(
       'displayName: Test Theme',
       'version: 0.0.0',
       'engines:',
-      '  wordma: ">=0.0.0"',
+      `  wordma: "${engines}"`,
       'settings: []',
       'pages: []',
     ].join('\n'),
@@ -177,6 +178,48 @@ describe('loadThemeRuntime', () => {
           warning.file?.endsWith('theme.yaml'),
         ),
       ).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('版本不满足时在导入主题入口前报错', async () => {
+    const root = makeThemeRoot();
+    const id = 'wordma-theme-version-mismatch';
+
+    writeTheme(
+      root,
+      id,
+      'throw new Error("theme entry should not load");\n',
+      '>=99.0.0',
+    );
+
+    try {
+      await expectThemeError(
+        () => loadThemeRuntime(root, id),
+        'ENGINE_VERSION_MISMATCH',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('非法引擎范围报 INVALID_ENGINE_RANGE', async () => {
+    const root = makeThemeRoot();
+    const id = 'wordma-theme-invalid-range';
+
+    writeTheme(
+      root,
+      id,
+      'export default { layouts: {} };\n',
+      'not-a-range',
+    );
+
+    try {
+      await expectThemeError(
+        () => loadThemeRuntime(root, id),
+        'INVALID_ENGINE_RANGE',
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

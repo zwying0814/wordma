@@ -11,6 +11,7 @@ import type { LoadedThemePackage } from '@wordma/theme';
 import { diagnosticsFromError } from '../diagnostics';
 import type { Diagnostic } from '../diagnostics';
 import { resolveThemeDirectory } from './resolve';
+import { checkThemeEngines } from './version';
 
 export type ThemeManifestInspection = {
   directory?: string;
@@ -67,6 +68,17 @@ export function inspectThemeManifest(
             ? error.message
             : String(error),
         file: path.join(directory, 'package.json'),
+      });
+    }
+
+    const engineCheck = checkThemeEngines(manifest);
+    if (!engineCheck.ok) {
+      diagnostics.push({
+        code: engineCheck.code,
+        severity: 'error',
+        source: 'theme',
+        message: engineCheck.message,
+        file: manifestPath,
       });
     }
 

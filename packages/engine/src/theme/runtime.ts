@@ -7,6 +7,7 @@ import type { ThemeDefinition } from '@wordma/theme';
 
 import { ThemeError } from '../errors';
 import { resolveThemeDirectory } from './resolve';
+import { assertThemeEngines } from './version';
 
 export type ThemeRuntime = {
   directory: string;
@@ -64,6 +65,11 @@ export async function loadThemeRuntime(
       { themeId, path: directory },
     );
   }
+
+  assertThemeEngines(loaded.manifest, {
+    themeId,
+    path: directory,
+  });
 
   let module: { default?: unknown };
 
