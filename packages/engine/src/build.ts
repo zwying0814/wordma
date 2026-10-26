@@ -57,6 +57,10 @@ import {
   resolveThemeSettings,
 } from './theme/settings';
 import {
+  applyThemeContentSchema,
+  assertValidThemeFields,
+} from './theme/content-fields';
+import {
   buildRouteManifest,
 } from './routing/manifest';
 import type { RouteManifest } from './routing/manifest';
@@ -104,6 +108,15 @@ export async function buildSite(
     workspace.site.theme.settings,
   );
   assertValidThemeSettings(themeSettings, {
+    themeId: themeRuntime.manifest.id,
+    path: themeRuntime.directory,
+  });
+  const themeFields = applyThemeContentSchema(
+    workspace,
+    themeRuntime.manifest,
+    themeRuntime.manifest.id,
+  );
+  assertValidThemeFields(themeFields, {
     themeId: themeRuntime.manifest.id,
     path: themeRuntime.directory,
   });
@@ -349,6 +362,7 @@ export async function buildSite(
       diagnosticFromContent(item, 'theme'),
     ),
     ...themeSettings.diagnostics,
+    ...themeFields.diagnostics,
     ...staticAssets.diagnostics.map((item) =>
       diagnosticFromContent(item, 'build'),
     ),

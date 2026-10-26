@@ -38,12 +38,19 @@ describe('buildSite', () => {
       expect(result.theme.id).toBe('wordma-theme-default');
       expect(
         result.diagnostics.filter(
-          (item) => item.code !== 'MISSING_SITE_URL',
+          (item) =>
+            item.code !== 'MISSING_SITE_URL' &&
+            item.code !== 'UNKNOWN_THEME_FIELD',
         ),
       ).toEqual([]);
       expect(
         result.diagnostics.some(
           (item) => item.code === 'MISSING_SITE_URL',
+        ),
+      ).toBe(true);
+      expect(
+        result.diagnostics.some(
+          (item) => item.code === 'UNKNOWN_THEME_FIELD',
         ),
       ).toBe(true);
       expect(
@@ -253,13 +260,20 @@ describe('buildSite', () => {
       expect(
         manifest.diagnostics.filter(
           (diagnostic) =>
-            diagnostic.code !== 'MISSING_SITE_URL',
+            diagnostic.code !== 'MISSING_SITE_URL' &&
+            diagnostic.code !== 'UNKNOWN_THEME_FIELD',
         ),
       ).toEqual([]);
       expect(
         manifest.diagnostics.some(
           (diagnostic) =>
             diagnostic.code === 'MISSING_SITE_URL',
+        ),
+      ).toBe(true);
+      expect(
+        manifest.diagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === 'UNKNOWN_THEME_FIELD',
         ),
       ).toBe(true);
       expect(

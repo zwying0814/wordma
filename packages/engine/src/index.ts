@@ -148,6 +148,16 @@ export type {
   InspectTheme,
 } from './inspect';
 export {
+  applyThemeContentSchema,
+  assertValidThemeFields,
+  fieldsForEntry,
+  resolveEntryThemeFields,
+} from './theme/content-fields';
+export type {
+  ApplyThemeContentSchemaResult,
+  ResolvedThemeFields,
+} from './theme/content-fields';
+export {
   assertValidThemeSettings,
   resolveThemeSettings,
 } from './theme/settings';
