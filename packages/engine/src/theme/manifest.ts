@@ -45,6 +45,12 @@ export function inspectThemeManifest(
     };
   }
 
+  return inspectThemeDirectory(directory);
+}
+
+export function inspectThemeDirectory(
+  directory: string,
+): ThemeManifestInspection {
   try {
     const manifestPath = path.join(
       directory,

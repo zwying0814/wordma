@@ -15,12 +15,14 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { MdxEditor } from '@/features/editor/mdx-editor';
 import {
   buildNoteProperties,
   updateNoteField,
 } from '@/features/editor/frontmatter';
 import { PropertiesPanel } from '@/features/editor/properties-panel';
+import { ThemeDialog } from '@/features/theme/theme-dialog';
 import {
   inspectWithEngine,
   type EngineDiagnostic,
@@ -38,6 +40,14 @@ import type { WorkspaceInfo } from './api';
 type WorkspaceShellProps = {
   workspace: WorkspaceInfo;
   onSwitch: () => void;
+};
+
+type PendingConfirmation = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  destructive?: boolean;
+  action: () => void;
 };
 
 const COLLECTION_LABELS: Record<string, string> = {
@@ -109,6 +119,9 @@ export function WorkspaceShell({
   const [editorError, setEditorError] = useState<
     string | null
   >(null);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const [confirmation, setConfirmation] =
+    useState<PendingConfirmation | null>(null);
   const saveRef = useRef<() => Promise<void>>(async () => {});
   const loadGeneration = useRef(0);
   const dirty = content !== savedContent;
@@ -144,23 +157,8 @@ export function WorkspaceShell({
       : []),
   ];
 
-  const loadNote = useCallback(
-    async (entry: EngineInspectEntry, force = false) => {
-      if (!force && entry.relativePath === selectedPath) {
-        return;
-      }
-
-      if (
-        !force &&
-        dirty &&
-        selectedPath !== entry.relativePath
-      ) {
-        const confirmed = window.confirm(
-          '当前笔记有未保存修改，确定放弃并切换？',
-        );
-        if (!confirmed) return;
-      }
-
+  const openNote = useCallback(
+    async (entry: EngineInspectEntry) => {
       const generation = ++loadGeneration.current;
       setSelectedPath(entry.relativePath);
       setReading(true);
@@ -188,7 +186,32 @@ export function WorkspaceShell({
         }
       }
     },
-    [dirty, selectedPath, workspace.path],
+    [workspace.path],
+  );
+
+  const loadNote = useCallback(
+    (entry: EngineInspectEntry) => {
+      if (entry.relativePath === selectedPath) {
+        return;
+      }
+
+      if (dirty) {
+        setConfirmation({
+          title: '放弃未保存修改？',
+          description:
+            '当前笔记有未保存修改，切换后这些修改会丢失。',
+          confirmLabel: '放弃并切换',
+          destructive: true,
+          action: () => {
+            void openNote(entry);
+          },
+        });
+        return;
+      }
+
+      void openNote(entry);
+    },
+    [dirty, openNote, selectedPath],
   );
 
   const refreshInspect = useCallback(async () => {
@@ -330,12 +353,15 @@ export function WorkspaceShell({
   }, []);
 
   const requestSwitch = () => {
-    if (
-      dirty &&
-      !window.confirm(
-        '当前笔记有未保存修改，确定切换空间？',
-      )
-    ) {
+    if (dirty) {
+      setConfirmation({
+        title: '放弃未保存修改？',
+        description:
+          '当前笔记有未保存修改，切换空间后这些修改会丢失。',
+        confirmLabel: '放弃并切换',
+        destructive: true,
+        action: onSwitch,
+      });
       return;
     }
 
@@ -404,8 +430,8 @@ export function WorkspaceShell({
           <Button
             variant="ghost"
             size="icon-sm"
-            disabled
-            title="主题设置将在 M7.6 接入"
+            onClick={() => setThemeOpen(true)}
+            title="主题与设置"
           >
             <Palette />
           </Button>
@@ -588,6 +614,32 @@ export function WorkspaceShell({
           </aside>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmation !== null}
+        title={confirmation?.title ?? ''}
+        description={confirmation?.description ?? ''}
+        confirmLabel={confirmation?.confirmLabel}
+        destructive={confirmation?.destructive}
+        onConfirm={() => {
+          const action = confirmation?.action;
+          setConfirmation(null);
+          action?.();
+        }}
+        onOpenChange={(open) => {
+          if (!open) setConfirmation(null);
+        }}
+      />
+
+      <ThemeDialog
+        open={themeOpen}
+        onOpenChange={setThemeOpen}
+        workspacePath={workspace.path}
+        inspect={inspect}
+        onApplied={async () => {
+          await refreshInspect();
+        }}
+      />
     </div>
   );
 }

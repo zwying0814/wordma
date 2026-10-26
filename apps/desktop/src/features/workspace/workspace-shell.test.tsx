@@ -7,6 +7,9 @@ import type { WorkspaceInfo } from '@/features/workspace/api';
 
 vi.mock('@/features/engine/api', () => ({
   inspectWithEngine: vi.fn(),
+  listThemesWithEngine: vi.fn(),
+  applyThemeWithEngine: vi.fn(),
+  applyThemeSettingsWithEngine: vi.fn(),
 }));
 
 vi.mock('@/features/workspace/files', () => ({
@@ -46,7 +49,7 @@ vi.mock('@/features/editor/mdx-editor', () => ({
   ),
 }));
 
-import { inspectWithEngine } from '@/features/engine/api';
+import { inspectWithEngine, listThemesWithEngine } from '@/features/engine/api';
 import {
   readNote,
   writeNote,
@@ -54,6 +57,7 @@ import {
 import { WorkspaceShell } from './workspace-shell';
 
 const inspectMock = vi.mocked(inspectWithEngine);
+const listThemesMock = vi.mocked(listThemesWithEngine);
 const readNoteMock = vi.mocked(readNote);
 const writeNoteMock = vi.mocked(writeNote);
 
@@ -152,6 +156,8 @@ beforeEach(() => {
   inspectMock.mockReset();
   readNoteMock.mockReset();
   writeNoteMock.mockReset();
+  listThemesMock.mockReset();
+  listThemesMock.mockResolvedValue([]);
 
   inspectMock.mockResolvedValue(inspectResult());
   readNoteMock.mockImplementation((_root, path) =>
@@ -238,9 +244,6 @@ describe('WorkspaceShell', () => {
 
   it('未保存时切换文件需要确认', async () => {
     const user = userEvent.setup();
-    const confirm = vi
-      .spyOn(window, 'confirm')
-      .mockReturnValue(false);
 
     render(
       <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
@@ -261,13 +264,22 @@ describe('WorkspaceShell', () => {
     await user.click(
       screen.getByRole('button', { name: /Two/ }),
     );
-    expect(confirm).toHaveBeenCalledWith(
-      '当前笔记有未保存修改，确定放弃并切换？',
+    expect(
+      await screen.findByText('放弃未保存修改？'),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: '取消' }),
     );
+    expect(editor).toHaveValue(unsaved);
+    expect(readNoteMock).toHaveBeenCalledTimes(1);
 
-    confirm.mockReturnValue(true);
     await user.click(
       screen.getByRole('button', { name: /Two/ }),
+    );
+    await user.click(
+      await screen.findByRole('button', {
+        name: '放弃并切换',
+      }),
     );
 
     await waitFor(async () =>
@@ -279,6 +291,45 @@ describe('WorkspaceShell', () => {
       '/tmp/demo',
       'content/pages/two.mdx',
     );
+  });
+
+  it('未保存时切换空间需要确认', async () => {
+    const user = userEvent.setup();
+    const onSwitch = vi.fn();
+    render(
+      <WorkspaceShell
+        workspace={workspace}
+        onSwitch={onSwitch}
+      />,
+    );
+
+    const editor = await screen.findByLabelText('MDX 编辑器');
+    fireEvent.change(editor, {
+      target: {
+        value: oneSource.replace('# One', '# Dirty'),
+      },
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: '切换空间' }),
+    );
+    expect(
+      await screen.findByText('放弃未保存修改？'),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: '取消' }),
+    );
+    expect(onSwitch).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByRole('button', { name: '切换空间' }),
+    );
+    await user.click(
+      await screen.findByRole('button', {
+        name: '放弃并切换',
+      }),
+    );
+    expect(onSwitch).toHaveBeenCalledTimes(1);
   });
 
   it('展示 inspect 诊断和保存错误', async () => {
@@ -453,5 +504,27 @@ describe('WorkspaceShell', () => {
     await waitFor(() =>
       expect(writeNoteMock).not.toHaveBeenCalled(),
     );
+  });
+
+  it('工具栏打开主题与设置弹窗', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    await screen.findByLabelText('MDX 编辑器');
+    await user.click(
+      screen.getByRole('button', { name: '主题与设置' }),
+    );
+
+    expect(
+      await screen.findByRole('dialog'),
+    ).toBeInTheDocument();
+    expect(listThemesMock).toHaveBeenCalledWith('/tmp/demo');
+    expect(
+      screen.getByText(
+        '切换主题或调整当前主题的站点设置。内容文件不会自动改写。',
+      ),
+    ).toBeInTheDocument();
   });
 });

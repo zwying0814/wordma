@@ -71,6 +71,68 @@ export type EnginePageType = {
   fields: EngineFieldDescriptor[];
 };
 
+type EngineSettingBase = {
+  key: string;
+  label: string;
+  help?: string;
+  required?: boolean;
+};
+
+export type EngineSettingDescriptor =
+  | (EngineSettingBase & {
+      type: 'text';
+      default?: string;
+    })
+  | (EngineSettingBase & {
+      type: 'textarea';
+      default?: string;
+      rows?: number;
+    })
+  | (EngineSettingBase & {
+      type: 'number';
+      default?: number;
+      min?: number;
+      max?: number;
+      step?: number;
+    })
+  | (EngineSettingBase & {
+      type: 'switch';
+      default?: boolean;
+    })
+  | (EngineSettingBase & {
+      type: 'select';
+      options: Array<{ label: string; value: string }>;
+      default?: string;
+    })
+  | (EngineSettingBase & {
+      type: 'color';
+      default?: string;
+    })
+  | (EngineSettingBase & {
+      type: 'image';
+      default?: string;
+    });
+
+export type EngineThemeSource =
+  | 'workspace'
+  | 'dependency'
+  | 'builtin';
+
+export type EngineThemeListItem = {
+  id: string;
+  displayName: string;
+  version: string;
+  path: string;
+  source: EngineThemeSource;
+  compatible: boolean;
+  diagnostics: EngineDiagnostic[];
+};
+
+export type EngineThemeApplyResult = {
+  themeId: string;
+  diagnostics: EngineDiagnostic[];
+};
+
 export type EngineRuntimeState =
   | 'starting'
   | 'running'
@@ -150,7 +212,7 @@ export type EngineInspectResult = {
   pageFields: EngineFieldDescriptor[];
   pageTypes: EnginePageType[];
   pages: Array<Record<string, unknown>>;
-  settings: Array<Record<string, unknown>>;
+  settings: EngineSettingDescriptor[];
   settingsDefaults: Record<string, unknown>;
   settingsValues: Record<string, unknown>;
   entries: EngineInspectEntry[];
@@ -204,6 +266,36 @@ export function inspectWithEngine(
   return invoke<EngineInspectResult>('engine_inspect', {
     root,
   });
+}
+
+export function listThemesWithEngine(
+  root: string,
+): Promise<EngineThemeListItem[]> {
+  return invoke<EngineThemeListItem[]>('theme_list', {
+    root,
+  });
+}
+
+export function applyThemeWithEngine(
+  root: string,
+  themeId: string,
+  resetSettings = true,
+): Promise<EngineThemeApplyResult> {
+  return invoke<EngineThemeApplyResult>('theme_apply', {
+    root,
+    themeId,
+    resetSettings,
+  });
+}
+
+export function applyThemeSettingsWithEngine(
+  root: string,
+  values: Record<string, unknown>,
+): Promise<EngineThemeApplyResult> {
+  return invoke<EngineThemeApplyResult>(
+    'theme_settings_apply',
+    { root, values },
+  );
 }
 
 export function onEngineEvent(

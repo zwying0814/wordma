@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -219,6 +220,9 @@ describe('wordma-engine CLI', () => {
     expect(result.stdout).toContain('inspect');
     expect(result.stdout).toContain('build');
     expect(result.stdout).toContain('dev');
+    expect(result.stdout).toContain('theme list');
+    expect(result.stdout).toContain('config set-theme');
+    expect(result.stdout).toContain('config set-settings');
     expect(result.stdout).toContain('--include-drafts');
     expect(result.stdout).toContain('--port');
     expect(result.stdout).toContain('--no-watch');
@@ -1006,4 +1010,83 @@ describe('wordma-engine CLI', () => {
     },
     20000,
   );
+
+  it('theme list --json 列出工作区与内置主题', () => {
+    const result = runCli([
+      'theme',
+      'list',
+      '--root=fixtures/theme-switch',
+      '--json',
+    ]);
+
+    expect(result.status).toBe(0);
+
+    const themes = JSON.parse(result.stdout) as Array<{
+      id: string;
+      source: string;
+    }>;
+
+    expect(themes).toContainEqual(
+      expect.objectContaining({
+        id: 'wordma-theme-journal',
+        source: 'workspace',
+      }),
+    );
+    expect(themes).toContainEqual(
+      expect.objectContaining({
+        id: 'wordma-theme-default',
+        source: 'builtin',
+      }),
+    );
+  });
+
+  it('config set-theme 修改 site 且不触碰内容文件', () => {
+    const fixture = path.join(
+      repoRoot,
+      'fixtures/theme-switch',
+    );
+    const temp = mkdtempSync(
+      path.join(tmpdir(), 'wordma-cli-theme-'),
+    );
+    const root = path.join(temp, 'workspace');
+    cpSync(fixture, root, { recursive: true });
+
+    try {
+      const contentPath = path.join(
+        root,
+        'content/posts/switching.mdx',
+      );
+      const before = readFileSync(contentPath, 'utf8');
+      const result = runCli([
+        'config',
+        'set-theme',
+        '--root',
+        root,
+        '--theme',
+        'wordma-theme-minimal',
+        '--reset-settings',
+        '--json',
+      ]);
+
+      expect(result.status).toBe(0);
+      const data = JSON.parse(result.stdout) as {
+        themeId: string;
+      };
+      expect(data.themeId).toBe('wordma-theme-minimal');
+
+      const site = readFileSync(
+        path.join(root, 'wordma.site.yaml'),
+        'utf8',
+      );
+      expect(site).toContain('id: wordma-theme-minimal');
+      expect(site).toContain(
+        '# yaml-language-server: $schema=',
+      );
+      expect(readFileSync(contentPath, 'utf8')).toBe(
+        before,
+      );
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
+  });
 });

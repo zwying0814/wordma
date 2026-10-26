@@ -1,6 +1,7 @@
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use serde_json::Value;
@@ -283,7 +284,7 @@ async fn run_engine(
     })
 }
 
-fn inspect_error_message(outcome: &RunOutcome) -> String {
+fn engine_error_message(outcome: &RunOutcome) -> String {
     if let Some(diagnostics) = outcome
         .events
         .last()
@@ -536,11 +537,122 @@ pub async fn engine_inspect(
     .await?;
 
     if outcome.code != Some(0) {
-        return Err(inspect_error_message(&outcome));
+        return Err(engine_error_message(&outcome));
     }
 
     serde_json::from_slice::<Value>(&outcome.stdout)
         .map_err(|error| format!("解析 inspect JSON 失败：{error}"))
+}
+
+#[tauri::command]
+pub async fn theme_list(
+    app: AppHandle,
+    root: String,
+) -> Result<Value, String> {
+    let root = canonical_root(&root)?;
+    let outcome = run_engine(
+        &app,
+        vec![
+            "theme".to_string(),
+            "list".to_string(),
+            "--root".to_string(),
+            root,
+            "--json".to_string(),
+        ],
+        false,
+    )
+    .await?;
+
+    if outcome.code != Some(0) {
+        return Err(engine_error_message(&outcome));
+    }
+
+    serde_json::from_slice::<Value>(&outcome.stdout)
+        .map_err(|error| format!("解析主题列表失败：{error}"))
+}
+
+#[tauri::command]
+pub async fn theme_apply(
+    app: AppHandle,
+    root: String,
+    theme_id: String,
+    reset_settings: Option<bool>,
+) -> Result<Value, String> {
+    let root = canonical_root(&root)?;
+    let mut args = vec![
+        "config".to_string(),
+        "set-theme".to_string(),
+        "--root".to_string(),
+        root,
+        "--theme".to_string(),
+        theme_id,
+        "--json".to_string(),
+    ];
+
+    if reset_settings.unwrap_or(false) {
+        args.push("--reset-settings".to_string());
+    }
+
+    let outcome = run_engine(&app, args, false).await?;
+
+    if outcome.code != Some(0) {
+        return Err(engine_error_message(&outcome));
+    }
+
+    serde_json::from_slice::<Value>(&outcome.stdout)
+        .map_err(|error| format!("解析主题切换结果失败：{error}"))
+}
+
+#[tauri::command]
+pub async fn theme_settings_apply(
+    app: AppHandle,
+    root: String,
+    values: Value,
+) -> Result<Value, String> {
+    if !values.is_object() {
+        return Err("主题设置必须是对象".to_string());
+    }
+
+    let root = canonical_root(&root)?;
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let values_path = std::env::temp_dir().join(format!(
+        "wordma-settings-{}-{nanos}.json",
+        std::process::id()
+    ));
+    let serialized = serde_json::to_vec_pretty(&values)
+        .map_err(|error| format!("序列化主题设置失败：{error}"))?;
+
+    std::fs::write(&values_path, serialized)
+        .map_err(|error| format!("写入临时设置文件失败：{error}"))?;
+
+    let outcome = run_engine(
+        &app,
+        vec![
+            "config".to_string(),
+            "set-settings".to_string(),
+            "--root".to_string(),
+            root,
+            "--values".to_string(),
+            values_path.to_string_lossy().into_owned(),
+            "--json".to_string(),
+        ],
+        false,
+    )
+    .await;
+
+    let _ = std::fs::remove_file(&values_path);
+
+    let outcome = outcome?;
+
+    if outcome.code != Some(0) {
+        return Err(engine_error_message(&outcome));
+    }
+
+    serde_json::from_slice::<Value>(&outcome.stdout)
+        .map_err(|error| format!("解析设置保存结果失败：{error}"))
 }
 
 pub fn shutdown(app: &AppHandle) {
@@ -595,7 +707,7 @@ mod tests {
     }
 
     #[test]
-    fn inspect_error_message_uses_build_diagnostics() {
+    fn engine_error_message_uses_build_diagnostics() {
         let outcome = RunOutcome {
             code: Some(1),
             events: vec![serde_json::json!({
@@ -610,13 +722,13 @@ mod tests {
         };
 
         assert_eq!(
-            inspect_error_message(&outcome),
+            engine_error_message(&outcome),
             "engine inspect 失败：缺少 frontmatter；标题为空"
         );
     }
 
     #[test]
-    fn inspect_error_message_falls_back_to_stderr() {
+    fn engine_error_message_falls_back_to_stderr() {
         let outcome = RunOutcome {
             code: Some(1),
             events: Vec::new(),
@@ -624,6 +736,6 @@ mod tests {
             stderr: "boom".to_string(),
         };
 
-        assert_eq!(inspect_error_message(&outcome), "boom");
+        assert_eq!(engine_error_message(&outcome), "boom");
     }
 }

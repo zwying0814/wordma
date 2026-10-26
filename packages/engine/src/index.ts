@@ -171,6 +171,17 @@ export {
 export type { ResolvedThemeSettings } from './theme/settings';
 export { inspectThemeManifest } from './theme/manifest';
 export type { ThemeManifestInspection } from './theme/manifest';
+export { listThemes } from './theme/list';
+export type {
+  ThemeListItem,
+  ThemeSource,
+} from './theme/list';
+export { applyTheme, applyThemeSettings } from './theme/apply';
+export type {
+  ThemeApplyOptions,
+  ThemeApplyResult,
+  ThemeSettingsApplyOptions,
+} from './theme/apply';
 export {
   assertThemeEngines,
   checkThemeEngines,

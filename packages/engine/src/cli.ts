@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { buildSite } from './build';
 import { startDev } from './dev';
 import { EventWriter } from './dev/events';
@@ -7,6 +9,8 @@ import {
 } from './diagnostics';
 import { ENGINE_VERSION } from './index';
 import { inspectWorkspace } from './inspect';
+import { applyTheme, applyThemeSettings } from './theme/apply';
+import { listThemes } from './theme/list';
 
 const help = `wordma-engine ${ENGINE_VERSION}
 
@@ -17,6 +21,23 @@ const help = `wordma-engine ${ENGINE_VERSION}
   inspect   输出站点与主题契约信息
   build     构建静态站点
   dev       启动开发服务器（尚未实现）
+  theme     主题操作
+  config    修改站点配置
+
+theme list 选项:
+  --root <path>   工作区目录，默认当前目录
+  --json          输出 JSON
+
+config set-theme 选项:
+  --root <path>       工作区目录，默认当前目录
+  --theme <id>        目标主题 id
+  --reset-settings    清空主题 settings
+  --json              输出 JSON
+
+config set-settings 选项:
+  --root <path>       工作区目录，默认当前目录
+  --values <file>     设置 JSON 文件
+  --json              输出 JSON
 
 inspect 选项:
   --root <path>   工作区目录，默认当前目录
@@ -252,6 +273,110 @@ function formatError(error: unknown): string {
     .join('\n');
 }
 
+type ConfigThemeFlags = {
+  root?: string;
+  theme?: string;
+  resetSettings?: boolean;
+  json?: boolean;
+};
+
+type ConfigSettingsFlags = {
+  root?: string;
+  values?: string;
+  json?: boolean;
+};
+
+function parseConfigThemeFlags(
+  args: string[],
+): ConfigThemeFlags {
+  const flags: ConfigThemeFlags = {};
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === undefined) continue;
+
+    if (arg === '--json') {
+      flags.json = true;
+      continue;
+    }
+
+    if (arg === '--reset-settings') {
+      flags.resetSettings = true;
+      continue;
+    }
+
+    if (arg === '--root' || arg === '--theme') {
+      const value = args[index + 1];
+      if (!value || value.startsWith('-')) {
+        throw new Error(`${arg} 需要一个值`);
+      }
+
+      if (arg === '--root') flags.root = value;
+      else flags.theme = value;
+
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--root=')) {
+      flags.root = arg.slice('--root='.length);
+      continue;
+    }
+
+    if (arg.startsWith('--theme=')) {
+      flags.theme = arg.slice('--theme='.length);
+      continue;
+    }
+
+    throw new Error(`未知参数：${arg}`);
+  }
+
+  return flags;
+}
+
+function parseConfigSettingsFlags(
+  args: string[],
+): ConfigSettingsFlags {
+  const flags: ConfigSettingsFlags = {};
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === undefined) continue;
+
+    if (arg === '--json') {
+      flags.json = true;
+      continue;
+    }
+
+    if (arg === '--root' || arg === '--values') {
+      const value = args[index + 1];
+      if (!value || value.startsWith('-')) {
+        throw new Error(`${arg} 需要一个值`);
+      }
+
+      if (arg === '--root') flags.root = value;
+      else flags.values = value;
+
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--root=')) {
+      flags.root = arg.slice('--root='.length);
+      continue;
+    }
+
+    if (arg.startsWith('--values=')) {
+      flags.values = arg.slice('--values='.length);
+      continue;
+    }
+
+    throw new Error(`未知参数：${arg}`);
+  }
+
+  return flags;
+}
+
 function runInspect(args: string[]): void {
   const flags = parseInspectFlags(args);
   const result = inspectWorkspace(flags.root ?? process.cwd());
@@ -287,6 +412,94 @@ function runInspect(args: string[]): void {
 }
 
 const jsonWriter = new EventWriter();
+
+function runThemeList(args: string[]): void {
+  const flags = parseInspectFlags(args);
+  const themes = listThemes(flags.root ?? process.cwd());
+
+  if (flags.json) {
+    console.log(JSON.stringify(themes, null, 2));
+    return;
+  }
+
+  if (themes.length === 0) {
+    console.log('没有可用主题');
+    return;
+  }
+
+  for (const theme of themes) {
+    console.log(
+      `${theme.id}@${theme.version} ${theme.displayName} [${theme.source}]${
+        theme.compatible ? '' : ' (不兼容)'
+      }`,
+    );
+  }
+}
+
+function runConfigSetTheme(args: string[]): void {
+  const flags = parseConfigThemeFlags(args);
+  if (!flags.theme) {
+    throw new Error('config set-theme 需要 --theme <id>');
+  }
+
+  const result = applyTheme({
+    root: flags.root ?? process.cwd(),
+    themeId: flags.theme,
+    resetSettings: flags.resetSettings,
+  });
+
+  if (flags.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.log(`Theme: ${result.themeId}`);
+}
+
+function runConfigSetSettings(args: string[]): void {
+  const flags = parseConfigSettingsFlags(args);
+  if (!flags.values) {
+    throw new Error('config set-settings 需要 --values <file>');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(flags.values, 'utf8'));
+  } catch (error) {
+    throw new Error(
+      `读取设置 JSON 失败：${
+        error instanceof Error
+          ? error.message
+          : String(error)
+      }`,
+    );
+  }
+
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error('设置 JSON 必须是对象');
+  }
+
+  const result = applyThemeSettings({
+    root: flags.root ?? process.cwd(),
+    values: parsed as Record<string, unknown>,
+  });
+
+  if (flags.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.log(`Theme settings: ${result.themeId}`);
+  if (result.diagnostics.length > 0) {
+    console.log(
+      `Diagnostics: ${result.diagnostics.length}`,
+    );
+  }
+}
 
 async function runBuild(args: string[]): Promise<void> {
   const flags = parseBuildFlags(args);
@@ -397,6 +610,32 @@ try {
     case 'dev':
       await runDev(args.slice(1));
       break;
+
+    case 'theme': {
+      const subcommand = args[1];
+      if (subcommand === 'list') {
+        runThemeList(args.slice(2));
+      } else {
+        throw new Error(
+          `未知 theme 子命令：${subcommand ?? '(空)'}`,
+        );
+      }
+      break;
+    }
+
+    case 'config': {
+      const subcommand = args[1];
+      if (subcommand === 'set-theme') {
+        runConfigSetTheme(args.slice(2));
+      } else if (subcommand === 'set-settings') {
+        runConfigSetSettings(args.slice(2));
+      } else {
+        throw new Error(
+          `未知 config 子命令：${subcommand ?? '(空)'}`,
+        );
+      }
+      break;
+    }
 
     default:
       console.error(`未知命令：${command}`);
