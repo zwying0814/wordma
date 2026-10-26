@@ -61,6 +61,11 @@ import {
   assertValidThemeFields,
 } from './theme/content-fields';
 import {
+  assertRouteLayouts,
+  assertValidThemeContent,
+  validateThemeContent,
+} from './theme/validate';
+import {
   buildRouteManifest,
 } from './routing/manifest';
 import type { RouteManifest } from './routing/manifest';
@@ -102,6 +107,15 @@ export async function buildSite(
     workspace,
     themeRuntime.manifest,
   );
+  assertRouteLayouts(routeManifest, themeRuntime);
+  const themeValidation = validateThemeContent(
+    workspace,
+    themeRuntime.manifest,
+  );
+  assertValidThemeContent(themeValidation, {
+    themeId: themeRuntime.manifest.id,
+    path: themeRuntime.directory,
+  });
   const outDir = resolveOutDir(root, options.outDir);
   const themeSettings = resolveThemeSettings(
     themeRuntime.manifest,
@@ -363,6 +377,7 @@ export async function buildSite(
     ),
     ...themeSettings.diagnostics,
     ...themeFields.diagnostics,
+    ...themeValidation.diagnostics,
     ...staticAssets.diagnostics.map((item) =>
       diagnosticFromContent(item, 'build'),
     ),

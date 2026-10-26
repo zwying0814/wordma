@@ -158,6 +158,12 @@ export type {
   ResolvedThemeFields,
 } from './theme/content-fields';
 export {
+  assertRouteLayouts,
+  assertValidThemeContent,
+  validateThemeContent,
+} from './theme/validate';
+export type { ThemeValidationResult } from './theme/validate';
+export {
   assertValidThemeSettings,
   resolveThemeSettings,
 } from './theme/settings';

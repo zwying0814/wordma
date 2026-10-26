@@ -104,14 +104,20 @@ describe('loadThemeRuntime', () => {
   });
 
   it('主题包缺少入口时报 INVALID_THEME_ENTRY', async () => {
-    await expectThemeError(
-      () =>
-        loadThemeRuntime(
-          path.join(repoRoot, 'fixtures/custom-pages'),
-          'wordma-theme-custom-pages',
-        ),
-      'INVALID_THEME_ENTRY',
-    );
+    const root = makeThemeRoot();
+    const id = 'wordma-theme-no-package';
+
+    writeTheme(root, id, 'export default { layouts: {} };\n');
+    rmSync(path.join(root, 'themes', id, 'package.json'));
+
+    try {
+      await expectThemeError(
+        () => loadThemeRuntime(root, id),
+        'INVALID_THEME_ENTRY',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('缺少必需布局时报 MISSING_LAYOUT', async () => {

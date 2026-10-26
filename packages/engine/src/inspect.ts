@@ -17,6 +17,7 @@ import {
 import type { Diagnostic } from './diagnostics';
 import { inspectThemeManifest } from './theme/manifest';
 import { resolveThemeSettings } from './theme/settings';
+import { validateThemeContent } from './theme/validate';
 
 export type InspectTheme = {
   id: string;
@@ -82,6 +83,9 @@ export function inspectWorkspace(rootInput: string): InspectResult {
         overrides: {},
         diagnostics: [],
       };
+  const themeValidation = manifest
+    ? validateThemeContent(workspace, manifest)
+    : { diagnostics: [] };
 
   return {
     workspace: root,
@@ -124,6 +128,7 @@ export function inspectWorkspace(rootInput: string): InspectResult {
       ),
       ...inspection.diagnostics,
       ...resolvedSettings.diagnostics,
+      ...themeValidation.diagnostics,
     ],
   };
 }
