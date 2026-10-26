@@ -143,6 +143,7 @@ export type {
 } from './output/writer';
 export { inspectWorkspace } from './inspect';
 export type {
+  InspectEntry,
   InspectPageType,
   InspectResult,
   InspectTheme,

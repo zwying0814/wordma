@@ -93,6 +93,27 @@ describe('inspectWorkspace', () => {
       accent: '#3563d9',
       showDescription: true,
     });
+    expect(result.entries).toEqual([
+      {
+        id: 'pages/about',
+        collection: 'pages',
+        kind: 'page',
+        title: 'About',
+        slug: 'about',
+        relativePath: 'content/pages/about.mdx',
+        draft: false,
+      },
+      {
+        id: 'posts/hello',
+        collection: 'posts',
+        kind: 'post',
+        title: 'Hello Wordma',
+        slug: 'hello',
+        relativePath: 'content/posts/hello.mdx',
+        date: '2026-10-25',
+        draft: false,
+      },
+    ]);
     expect(result.collections).toEqual([
       { name: 'pages', kind: 'page', count: 1 },
       { name: 'posts', kind: 'post', count: 1 },

@@ -36,6 +36,18 @@ export type InspectCollection = {
   count: number;
 };
 
+export type InspectEntry = {
+  id: string;
+  collection: string;
+  kind: 'post' | 'page';
+  type?: string;
+  title: string;
+  slug: string;
+  relativePath: string;
+  date?: string;
+  draft: boolean;
+};
+
 export type InspectResult = {
   workspace: string;
   themeId: string;
@@ -52,6 +64,7 @@ export type InspectResult = {
   settings: ThemeSettingDescriptor[];
   settingsDefaults: Record<string, unknown>;
   settingsValues: Record<string, unknown>;
+  entries: InspectEntry[];
   collections: InspectCollection[];
   tags: TaxonomyTerm[];
   categories: TaxonomyTerm[];
@@ -113,6 +126,21 @@ export function inspectWorkspace(rootInput: string): InspectResult {
     settings: manifest?.settings ?? [],
     settingsDefaults: resolvedSettings.defaults,
     settingsValues: resolvedSettings.values,
+    entries: workspace.index.entries
+      .map((entry) => ({
+        id: entry.id,
+        collection: entry.collection,
+        kind: entry.meta.kind,
+        ...(entry.meta.type ? { type: entry.meta.type } : {}),
+        title: entry.meta.title,
+        slug: entry.meta.slug,
+        relativePath: entry.relativePath,
+        ...(entry.meta.date ? { date: entry.meta.date } : {}),
+        draft: entry.meta.draft,
+      }))
+      .sort((a, b) =>
+        a.relativePath.localeCompare(b.relativePath),
+      ),
     collections: Object.values(workspace.index.collections).map(
       (collection) => ({
         name: collection.name,
