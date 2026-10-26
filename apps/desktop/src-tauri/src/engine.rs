@@ -283,6 +283,35 @@ async fn run_engine(
     })
 }
 
+fn inspect_error_message(outcome: &RunOutcome) -> String {
+    if let Some(diagnostics) = outcome
+        .events
+        .last()
+        .and_then(|event| event.get("diagnostics"))
+        .and_then(Value::as_array)
+    {
+        let messages = diagnostics
+            .iter()
+            .filter_map(|diagnostic| {
+                diagnostic.get("message").and_then(Value::as_str)
+            })
+            .collect::<Vec<_>>();
+
+        if !messages.is_empty() {
+            return format!(
+                "engine inspect 失败：{}",
+                messages.join("；")
+            );
+        }
+    }
+
+    if outcome.stderr.is_empty() {
+        "engine inspect 失败".to_string()
+    } else {
+        outcome.stderr.clone()
+    }
+}
+
 fn stop_engine(manager: &EngineManager) {
     let child = {
         let mut inner = match manager.inner.lock() {
@@ -507,11 +536,7 @@ pub async fn engine_inspect(
     .await?;
 
     if outcome.code != Some(0) {
-        return Err(if outcome.stderr.is_empty() {
-            "engine inspect 失败".to_string()
-        } else {
-            outcome.stderr
-        });
+        return Err(inspect_error_message(&outcome));
     }
 
     serde_json::from_slice::<Value>(&outcome.stdout)
@@ -567,5 +592,38 @@ mod tests {
             "/definitely/not/a/wordma/workspace",
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn inspect_error_message_uses_build_diagnostics() {
+        let outcome = RunOutcome {
+            code: Some(1),
+            events: vec![serde_json::json!({
+                "type": "build-error",
+                "diagnostics": [
+                    { "message": "缺少 frontmatter" },
+                    { "message": "标题为空" }
+                ]
+            })],
+            stdout: Vec::new(),
+            stderr: String::new(),
+        };
+
+        assert_eq!(
+            inspect_error_message(&outcome),
+            "engine inspect 失败：缺少 frontmatter；标题为空"
+        );
+    }
+
+    #[test]
+    fn inspect_error_message_falls_back_to_stderr() {
+        let outcome = RunOutcome {
+            code: Some(1),
+            events: Vec::new(),
+            stdout: Vec::new(),
+            stderr: "boom".to_string(),
+        };
+
+        assert_eq!(inspect_error_message(&outcome), "boom");
     }
 }
