@@ -53,6 +53,10 @@ import {
   copyThemeStyles,
 } from './styles/theme-styles';
 import {
+  assertValidThemeSettings,
+  resolveThemeSettings,
+} from './theme/settings';
+import {
   buildRouteManifest,
 } from './routing/manifest';
 import type { RouteManifest } from './routing/manifest';
@@ -95,6 +99,14 @@ export async function buildSite(
     themeRuntime.manifest,
   );
   const outDir = resolveOutDir(root, options.outDir);
+  const themeSettings = resolveThemeSettings(
+    themeRuntime.manifest,
+    workspace.site.theme.settings,
+  );
+  assertValidThemeSettings(themeSettings, {
+    themeId: themeRuntime.manifest.id,
+    path: themeRuntime.directory,
+  });
   const cache = createBuildCache({
     workspaceRoot: root,
     enabled: options.cache !== false,
@@ -265,6 +277,7 @@ export async function buildSite(
       contentCover: route.entryId
         ? entryCovers.get(route.entryId)
         : undefined,
+      themeSettings: themeSettings.values,
     });
     const islandStyles =
       islandRuntime && context.content.islands.length > 0
@@ -335,6 +348,7 @@ export async function buildSite(
     ...themeRuntime.diagnostics.map((item) =>
       diagnosticFromContent(item, 'theme'),
     ),
+    ...themeSettings.diagnostics,
     ...staticAssets.diagnostics.map((item) =>
       diagnosticFromContent(item, 'build'),
     ),

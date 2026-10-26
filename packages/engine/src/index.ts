@@ -147,6 +147,11 @@ export type {
   InspectResult,
   InspectTheme,
 } from './inspect';
+export {
+  assertValidThemeSettings,
+  resolveThemeSettings,
+} from './theme/settings';
+export type { ResolvedThemeSettings } from './theme/settings';
 export { inspectThemeManifest } from './theme/manifest';
 export type { ThemeManifestInspection } from './theme/manifest';
 export {

@@ -16,6 +16,7 @@ import {
 } from './diagnostics';
 import type { Diagnostic } from './diagnostics';
 import { inspectThemeManifest } from './theme/manifest';
+import { resolveThemeSettings } from './theme/settings';
 
 export type InspectTheme = {
   id: string;
@@ -48,6 +49,8 @@ export type InspectResult = {
   pageTypes: InspectPageType[];
   pages: ThemePageDeclaration[];
   settings: ThemeSettingDescriptor[];
+  settingsDefaults: Record<string, unknown>;
+  settingsValues: Record<string, unknown>;
   collections: InspectCollection[];
   tags: TaxonomyTerm[];
   categories: TaxonomyTerm[];
@@ -68,6 +71,17 @@ export function inspectWorkspace(rootInput: string): InspectResult {
           path.join(inspection.directory, 'theme.yaml'),
         ) || '.'
       : undefined;
+  const resolvedSettings = manifest
+    ? resolveThemeSettings(
+        manifest,
+        workspace.site.theme.settings,
+      )
+    : {
+        values: {},
+        defaults: {},
+        overrides: {},
+        diagnostics: [],
+      };
 
   return {
     workspace: root,
@@ -93,6 +107,8 @@ export function inspectWorkspace(rootInput: string): InspectResult {
     ).map(([id, declaration]) => ({ id, ...declaration })),
     pages: manifest?.pages ?? [],
     settings: manifest?.settings ?? [],
+    settingsDefaults: resolvedSettings.defaults,
+    settingsValues: resolvedSettings.values,
     collections: Object.values(workspace.index.collections).map(
       (collection) => ({
         name: collection.name,
@@ -107,6 +123,7 @@ export function inspectWorkspace(rootInput: string): InspectResult {
         diagnosticFromContent(item, 'content'),
       ),
       ...inspection.diagnostics,
+      ...resolvedSettings.diagnostics,
     ],
   };
 }

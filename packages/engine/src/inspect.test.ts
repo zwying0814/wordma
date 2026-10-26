@@ -85,6 +85,14 @@ describe('inspectWorkspace', () => {
     expect(result.theme?.id).toBe('wordma-theme-default');
     expect(result.postFields).toEqual([]);
     expect(result.pageTypes).toEqual([]);
+    expect(result.settingsValues).toEqual({
+      accent: '#3563d9',
+      showDescription: true,
+    });
+    expect(result.settingsDefaults).toEqual({
+      accent: '#3563d9',
+      showDescription: true,
+    });
     expect(result.collections).toEqual([
       { name: 'pages', kind: 'page', count: 1 },
       { name: 'posts', kind: 'post', count: 1 },

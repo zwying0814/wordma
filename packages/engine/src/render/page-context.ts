@@ -31,6 +31,7 @@ export type CreatePageContextOptions = {
   compiledContent?: CompiledContent;
   contentAssets?: AssetRef[];
   contentCover?: AssetRef;
+  themeSettings?: Record<string, unknown>;
 };
 
 type UrlMaps = {
@@ -216,6 +217,7 @@ export function createPageContext(
     compiledContent,
     contentAssets,
     contentCover,
+    themeSettings,
   } = options;
   const maps = buildUrlMaps(routeManifest.routes);
   const url = (path: string): string =>
@@ -350,7 +352,7 @@ export function createPageContext(
       ...(taxonomyView ? { view: taxonomyView } : {}),
     },
     navigation: workspace.site.navigation,
-    theme: workspace.site.theme.settings,
+    theme: themeSettings ?? workspace.site.theme.settings,
     helpers,
     ...(pagination ? { pagination } : {}),
     ...(archive ? { archive } : {}),
