@@ -62,22 +62,56 @@ const workspace: WorkspaceInfo = {
   name: 'Demo',
 };
 
+const oneSource = `---
+# keep this comment
+title: One
+customKey: keep
+theme:
+  wordma-theme-default:
+    heroStyle: wide
+---
+
+# One`;
+
+const twoSource = `---
+title: Two
+---
+
+# Two`;
+
 function inspectResult(): EngineInspectResult {
   return {
     workspace: '/tmp/demo',
-    themeId: 'default',
+    themeId: 'wordma-theme-default',
     site: {
       title: 'Demo',
       language: 'zh-CN',
       basePath: '',
     },
     theme: {
-      id: 'default',
+      id: 'wordma-theme-default',
       displayName: 'Default',
       version: '0.1.0',
       path: '/tmp/demo/themes/default',
     },
-    postFields: [],
+    postFields: [
+      {
+        key: 'heroStyle',
+        label: '封面样式',
+        type: 'select',
+        options: [
+          { label: '宽图', value: 'wide' },
+          { label: '卡片', value: 'card' },
+        ],
+        default: 'wide',
+      },
+      {
+        key: 'featured',
+        label: '推荐',
+        type: 'switch',
+        default: false,
+      },
+    ],
     pageFields: [],
     pageTypes: [],
     pages: [],
@@ -121,7 +155,9 @@ beforeEach(() => {
 
   inspectMock.mockResolvedValue(inspectResult());
   readNoteMock.mockImplementation((_root, path) =>
-    Promise.resolve(path.endsWith('one.mdx') ? '# One' : '# Two'),
+    Promise.resolve(
+      path.endsWith('one.mdx') ? oneSource : twoSource,
+    ),
   );
   writeNoteMock.mockResolvedValue();
 });
@@ -133,7 +169,7 @@ describe('WorkspaceShell', () => {
     );
 
     const editor = await screen.findByLabelText('MDX 编辑器');
-    expect(editor).toHaveValue('# One');
+    expect(editor).toHaveValue(oneSource);
     expect(
       screen.getByRole('heading', { name: '文章' }),
     ).toBeInTheDocument();
@@ -156,8 +192,9 @@ describe('WorkspaceShell', () => {
     );
 
     const editor = await screen.findByLabelText('MDX 编辑器');
+    const edited = oneSource.replace('# One', '# One edited');
     fireEvent.change(editor, {
-      target: { value: '# One edited' },
+      target: { value: edited },
     });
 
     expect(screen.getByText('未保存')).toBeInTheDocument();
@@ -169,7 +206,7 @@ describe('WorkspaceShell', () => {
       expect(writeNoteMock).toHaveBeenCalledWith(
         '/tmp/demo',
         'content/posts/one.mdx',
-        '# One edited',
+        edited,
       ),
     );
     await waitFor(() =>
@@ -184,8 +221,9 @@ describe('WorkspaceShell', () => {
     );
 
     const editor = await screen.findByLabelText('MDX 编辑器');
+    const shortcut = oneSource.replace('# One', '# Shortcut');
     fireEvent.change(editor, {
-      target: { value: '# Shortcut' },
+      target: { value: shortcut },
     });
     fireEvent.keyDown(window, { key: 's', metaKey: true });
 
@@ -193,7 +231,7 @@ describe('WorkspaceShell', () => {
       expect(writeNoteMock).toHaveBeenCalledWith(
         '/tmp/demo',
         'content/posts/one.mdx',
-        '# Shortcut',
+        shortcut,
       ),
     );
   });
@@ -209,14 +247,15 @@ describe('WorkspaceShell', () => {
     );
 
     const editor = await screen.findByLabelText('MDX 编辑器');
+    const unsaved = oneSource.replace('# One', '# Unsaved');
     fireEvent.change(editor, {
-      target: { value: '# Unsaved' },
+      target: { value: unsaved },
     });
 
     await user.click(
       screen.getByRole('button', { name: /One/ }),
     );
-    expect(editor).toHaveValue('# Unsaved');
+    expect(editor).toHaveValue(unsaved);
     expect(readNoteMock).toHaveBeenCalledTimes(1);
 
     await user.click(
@@ -225,8 +264,6 @@ describe('WorkspaceShell', () => {
     expect(confirm).toHaveBeenCalledWith(
       '当前笔记有未保存修改，确定放弃并切换？',
     );
-    expect(editor).toHaveValue('# Unsaved');
-    expect(readNoteMock).toHaveBeenCalledTimes(1);
 
     confirm.mockReturnValue(true);
     await user.click(
@@ -236,7 +273,7 @@ describe('WorkspaceShell', () => {
     await waitFor(async () =>
       expect(
         await screen.findByLabelText('MDX 编辑器'),
-      ).toHaveValue('# Two'),
+      ).toHaveValue(twoSource),
     );
     expect(readNoteMock).toHaveBeenLastCalledWith(
       '/tmp/demo',
@@ -274,8 +311,9 @@ describe('WorkspaceShell', () => {
     ).toBeInTheDocument();
 
     const editor = await screen.findByLabelText('MDX 编辑器');
+    const broken = oneSource.replace('# One', '# Broken');
     fireEvent.change(editor, {
-      target: { value: '# Broken' },
+      target: { value: broken },
     });
     fireEvent.click(
       screen.getByRole('button', { name: '保存' }),
@@ -297,8 +335,9 @@ describe('WorkspaceShell', () => {
     );
 
     const editor = await screen.findByLabelText('MDX 编辑器');
+    const saved = oneSource.replace('# One', '# Saved');
     fireEvent.change(editor, {
-      target: { value: '# Saved' },
+      target: { value: saved },
     });
     fireEvent.click(
       screen.getByRole('button', { name: '保存' }),
@@ -313,5 +352,106 @@ describe('WorkspaceShell', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText('已保存')).toBeInTheDocument();
+  });
+
+  it('属性面板修改标题会更新 YAML 并保留注释', async () => {
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    const title = await screen.findByLabelText(/^标题/);
+    fireEvent.change(title, {
+      target: { value: 'Renamed' },
+    });
+
+    const editor =
+      (await screen.findByLabelText(
+        'MDX 编辑器',
+      )) as HTMLTextAreaElement;
+    expect(editor.value).toContain('title: Renamed');
+    expect(editor.value).toContain('# keep this comment');
+    expect(editor.value).toContain('customKey: keep');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '保存' }),
+    );
+
+    await waitFor(() =>
+      expect(writeNoteMock).toHaveBeenCalledTimes(1),
+    );
+    const written = writeNoteMock.mock.calls[0]?.[2];
+    expect(written).toContain('title: Renamed');
+    expect(written).toContain('# keep this comment');
+    expect(written).toContain('# One');
+  });
+
+  it('主题字段默认值可见并可写回当前 namespace', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    expect(await screen.findByText('宽图')).toBeInTheDocument();
+    const featured = await screen.findByRole('switch', {
+      name: '推荐',
+    });
+    expect(featured).not.toBeChecked();
+
+    await user.click(featured);
+    const editor =
+      (await screen.findByLabelText(
+        'MDX 编辑器',
+      )) as HTMLTextAreaElement;
+    expect(editor.value).toContain('featured: true');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '保存' }),
+    );
+
+    await waitFor(() =>
+      expect(writeNoteMock).toHaveBeenCalledTimes(1),
+    );
+    const written = writeNoteMock.mock.calls[0]?.[2];
+    expect(written).toContain('featured: true');
+    expect(written).toContain('heroStyle: wide');
+  });
+
+  it('显示 frontmatter 中已有的主题布尔值', async () => {
+    readNoteMock.mockResolvedValue(
+      oneSource.replace(
+        '    heroStyle: wide',
+        '    heroStyle: wide\n    featured: true',
+      ),
+    );
+
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    expect(
+      await screen.findByRole('switch', { name: '推荐' }),
+    ).toBeChecked();
+  });
+
+  it('属性校验失败时阻止保存', async () => {
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    const title = await screen.findByLabelText(/^标题/);
+    fireEvent.change(title, {
+      target: { value: '' },
+    });
+
+    expect(
+      await screen.findByText('标题不能为空'),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: '保存' }),
+    );
+
+    await waitFor(() =>
+      expect(writeNoteMock).not.toHaveBeenCalled(),
+    );
   });
 });

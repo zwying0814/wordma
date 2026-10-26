@@ -2,6 +2,75 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
+// 与 @wordma/content 的 FieldDescriptor 等契约保持一致。
+type EngineFieldBase = {
+  key: string;
+  label: string;
+  help?: string;
+  group?: string;
+  placeholder?: string;
+  required?: boolean;
+};
+
+export type EngineFieldDescriptor =
+  | (EngineFieldBase & {
+      type: 'text';
+      default?: string;
+      minLength?: number;
+      maxLength?: number;
+    })
+  | (EngineFieldBase & {
+      type: 'textarea';
+      default?: string;
+      rows?: number;
+      minLength?: number;
+      maxLength?: number;
+    })
+  | (EngineFieldBase & {
+      type: 'number';
+      default?: number;
+      min?: number;
+      max?: number;
+      step?: number;
+    })
+  | (EngineFieldBase & {
+      type: 'switch';
+      default?: boolean;
+    })
+  | (EngineFieldBase & {
+      type: 'select';
+      options: Array<{ label: string; value: string }>;
+      default?: string;
+    })
+  | (EngineFieldBase & {
+      type: 'color';
+      default?: string;
+    })
+  | (EngineFieldBase & {
+      type: 'image';
+      default?: string;
+    })
+  | (EngineFieldBase & {
+      type: 'date';
+      default?: string;
+    })
+  | (EngineFieldBase & {
+      type: 'list';
+      item: 'string' | 'number';
+      default?: string[] | number[];
+      minItems?: number;
+      maxItems?: number;
+    });
+
+export type EnginePageType = {
+  id: string;
+  label: string;
+  route: string;
+  layout: string;
+  collection?: string;
+  fields: EngineFieldDescriptor[];
+};
+
 export type EngineRuntimeState =
   | 'starting'
   | 'running'
@@ -77,9 +146,9 @@ export type EngineInspectResult = {
     version: string;
     path: string;
   } | null;
-  postFields: Array<Record<string, unknown>>;
-  pageFields: Array<Record<string, unknown>>;
-  pageTypes: Array<Record<string, unknown>>;
+  postFields: EngineFieldDescriptor[];
+  pageFields: EngineFieldDescriptor[];
+  pageTypes: EnginePageType[];
   pages: Array<Record<string, unknown>>;
   settings: Array<Record<string, unknown>>;
   settingsDefaults: Record<string, unknown>;

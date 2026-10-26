@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -16,6 +16,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { MdxEditor } from '@/features/editor/mdx-editor';
+import {
+  buildNoteProperties,
+  updateNoteField,
+} from '@/features/editor/frontmatter';
+import { PropertiesPanel } from '@/features/editor/properties-panel';
 import {
   inspectWithEngine,
   type EngineDiagnostic,
@@ -111,6 +116,19 @@ export function WorkspaceShell({
   const note = inspect?.entries.find(
     (entry) => entry.relativePath === selectedPath,
   );
+  const noteProperties = useMemo(
+    () =>
+      buildNoteProperties(content, note, {
+        themeId: inspect?.themeId ?? '',
+        postFields: inspect?.postFields ?? [],
+        pageFields: inspect?.pageFields ?? [],
+        pageTypes: inspect?.pageTypes ?? [],
+      }),
+    [content, inspect, note],
+  );
+  const propertyErrors = Object.keys(
+    noteProperties.errors,
+  ).length;
   const groups = groupEntries(inspect?.entries ?? []);
   const diagnostics = [
     ...(inspect?.diagnostics ?? []),
@@ -240,6 +258,11 @@ export function WorkspaceShell({
       return;
     }
 
+    if (propertyErrors > 0) {
+      toast.error('请先修正属性面板中的错误');
+      return;
+    }
+
     setSaving(true);
     setEditorError(null);
 
@@ -271,12 +294,22 @@ export function WorkspaceShell({
     dirty,
     reading,
     refreshInspect,
+    propertyErrors,
     saving,
     selectedPath,
     workspace.path,
   ]);
 
   saveRef.current = save;
+
+  const updateField = useCallback(
+    (path: string[], value: unknown) => {
+      setContent((current) =>
+        updateNoteField(current, path, value),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -321,7 +354,7 @@ export function WorkspaceShell({
   }
 
   return (
-    <div className="flex min-h-svh flex-col bg-background">
+    <div className="flex h-svh flex-col overflow-hidden bg-background">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
         <Button variant="ghost" size="sm" onClick={requestSwitch}>
           <ArrowLeft />
@@ -498,45 +531,25 @@ export function WorkspaceShell({
             </div>
           </main>
 
-          <aside className="hidden w-72 shrink-0 flex-col border-l lg:flex">
-            <div className="flex h-10 items-center px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <aside className="hidden w-80 shrink-0 flex-col border-l lg:flex">
+            <div className="flex h-10 shrink-0 items-center px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
               属性
             </div>
-            <div className="space-y-3 border-b px-3 pb-4 text-sm">
+            <div className="min-h-0 flex-1 overflow-y-auto border-b">
               {note ? (
-                <>
-                  <div>
-                    <div className="text-xs text-muted-foreground">
-                      标题
-                    </div>
-                    <div className="font-medium">{note.title}</div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <div className="text-muted-foreground">
-                        类型
-                      </div>
-                      <div>{note.type ?? note.kind}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">
-                        Slug
-                      </div>
-                      <div className="truncate">{note.slug}</div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    完整字段编辑将在 M7.5 接入。
-                  </p>
-                </>
+                <PropertiesPanel
+                  properties={noteProperties}
+                  disabled={saving || reading}
+                  onChange={updateField}
+                />
               ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="p-3 text-sm text-muted-foreground">
                   未选择笔记
                 </p>
               )}
             </div>
 
-            <div className="flex h-10 items-center gap-2 px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            <div className="flex h-10 shrink-0 items-center gap-2 px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
               诊断
               {diagnostics.length > 0 && (
                 <Badge variant="secondary">
@@ -544,7 +557,7 @@ export function WorkspaceShell({
                 </Badge>
               )}
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+            <div className="max-h-56 min-h-0 shrink-0 overflow-y-auto px-3 pb-4">
               {diagnostics.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   没有问题
