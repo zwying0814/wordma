@@ -7,6 +7,7 @@ import {
   Loader2,
   Palette,
   Play,
+  Plus,
   Save,
   Upload,
 } from 'lucide-react';
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { MdxEditor } from '@/features/editor/mdx-editor';
+import { CreateNoteDialog } from '@/features/editor/create-note-dialog';
 import {
   buildNoteProperties,
   updateNoteField,
@@ -120,6 +122,7 @@ export function WorkspaceShell({
     string | null
   >(null);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [confirmation, setConfirmation] =
     useState<PendingConfirmation | null>(null);
   const saveRef = useRef<() => Promise<void>>(async () => {});
@@ -464,8 +467,16 @@ export function WorkspaceShell({
       ) : (
         <div className="flex min-h-0 flex-1">
           <aside className="flex w-60 shrink-0 flex-col border-r">
-            <div className="flex h-10 items-center px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              笔记
+            <div className="flex h-10 items-center justify-between px-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              <span>笔记</span>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => setCreateOpen(true)}
+                title="新建页面"
+              >
+                <Plus />
+              </Button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
               {groups.length === 0 ? (
@@ -628,6 +639,25 @@ export function WorkspaceShell({
         }}
         onOpenChange={(open) => {
           if (!open) setConfirmation(null);
+        }}
+      />
+
+      <CreateNoteDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        workspacePath={workspace.path}
+        inspect={inspect}
+        onCreated={async (path) => {
+          const result = await refreshInspect();
+          const entry = result.entries.find(
+            (item) => item.relativePath === path,
+          );
+          if (!entry) {
+            throw new Error(
+              '笔记已创建，但刷新后未在索引中找到',
+            );
+          }
+          await openNote(entry);
         }}
       />
 

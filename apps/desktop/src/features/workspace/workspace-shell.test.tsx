@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +15,7 @@ vi.mock('@/features/engine/api', () => ({
 vi.mock('@/features/workspace/files', () => ({
   readNote: vi.fn(),
   writeNote: vi.fn(),
+  createNote: vi.fn(),
   workspaceErrorMessage: (error: unknown) => {
     if (
       typeof error === 'object' &&
@@ -51,6 +52,7 @@ vi.mock('@/features/editor/mdx-editor', () => ({
 
 import { inspectWithEngine, listThemesWithEngine } from '@/features/engine/api';
 import {
+  createNote,
   readNote,
   writeNote,
 } from '@/features/workspace/files';
@@ -60,6 +62,7 @@ const inspectMock = vi.mocked(inspectWithEngine);
 const listThemesMock = vi.mocked(listThemesWithEngine);
 const readNoteMock = vi.mocked(readNote);
 const writeNoteMock = vi.mocked(writeNote);
+const createNoteMock = vi.mocked(createNote);
 
 const workspace: WorkspaceInfo = {
   path: '/tmp/demo',
@@ -117,7 +120,22 @@ function inspectResult(): EngineInspectResult {
       },
     ],
     pageFields: [],
-    pageTypes: [],
+    pageTypes: [
+      {
+        id: 'project',
+        label: '项目',
+        route: '/projects/[slug]',
+        layout: 'project',
+        collection: 'projects',
+        fields: [
+          {
+            key: 'repo',
+            label: '仓库地址',
+            type: 'text',
+          },
+        ],
+      },
+    ],
     pages: [],
     settings: [],
     settingsDefaults: {},
@@ -145,6 +163,7 @@ function inspectResult(): EngineInspectResult {
     collections: [
       { name: 'posts', kind: 'post', count: 1 },
       { name: 'pages', kind: 'page', count: 1 },
+      { name: 'projects', kind: 'page', count: 0 },
     ],
     tags: [],
     categories: [],
@@ -156,6 +175,7 @@ beforeEach(() => {
   inspectMock.mockReset();
   readNoteMock.mockReset();
   writeNoteMock.mockReset();
+  createNoteMock.mockReset();
   listThemesMock.mockReset();
   listThemesMock.mockResolvedValue([]);
 
@@ -526,5 +546,88 @@ describe('WorkspaceShell', () => {
         '切换主题或调整当前主题的站点设置。内容文件不会自动改写。',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('新建页面后刷新列表并打开新笔记', async () => {
+    const user = userEvent.setup();
+    const after = inspectResult();
+    after.entries.push({
+      id: 'projects/new-page',
+      collection: 'projects',
+      kind: 'page',
+      type: 'project',
+      title: 'New Page',
+      slug: 'new-page',
+      relativePath: 'content/projects/new-page.mdx',
+      draft: false,
+    });
+    const projects = after.collections.find(
+      (collection) => collection.name === 'projects',
+    );
+    if (projects) projects.count = 1;
+
+    inspectMock.mockReset();
+    inspectMock
+      .mockResolvedValueOnce(inspectResult())
+      .mockResolvedValueOnce(after);
+    createNoteMock.mockResolvedValue({
+      path: 'content/projects/new-page.mdx',
+    });
+    const createdSource = `---
+title: New Page
+type: project
+---
+
+# New Page`;
+    readNoteMock.mockImplementation((_root, path) => {
+      if (path === 'content/projects/new-page.mdx') {
+        return Promise.resolve(createdSource);
+      }
+      return Promise.resolve(
+        path.endsWith('one.mdx') ? oneSource : twoSource,
+      );
+    });
+
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    await screen.findByLabelText('MDX 编辑器');
+    await user.click(
+      screen.getByRole('button', { name: '新建页面' }),
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    await user.type(
+      within(dialog).getByLabelText(/^标题/),
+      'New Page',
+    );
+    expect(
+      within(dialog).getByLabelText(/^Slug/),
+    ).toHaveValue('new-page');
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: '创建并打开',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(createNoteMock).toHaveBeenCalledWith({
+        root: '/tmp/demo',
+        collection: 'projects',
+        slug: 'new-page',
+        title: 'New Page',
+        pageType: 'project',
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog'),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      await screen.findByLabelText('MDX 编辑器'),
+    ).toHaveValue(createdSource);
+    expect(screen.getByText('New Page')).toBeInTheDocument();
   });
 });
