@@ -604,6 +604,56 @@ pub fn engine_stop(
     Ok(())
 }
 
+fn validate_publish_out_dir(
+    out_dir: &str,
+) -> Result<(), String> {
+    let path = PathBuf::from(out_dir);
+
+    if !path.is_absolute() {
+        return Err("发布目录必须是绝对路径".to_string());
+    }
+
+    if path.exists() {
+        if !path.is_dir() {
+            return Err(format!(
+                "发布目录不是文件夹：{}",
+                path.display()
+            ));
+        }
+
+        let non_empty = std::fs::read_dir(&path)
+            .map_err(|error| {
+                format!(
+                    "无法读取发布目录 {}：{error}",
+                    path.display()
+                )
+            })?
+            .next()
+            .is_some();
+
+        if non_empty
+            && !path.join(".wordma-manifest.json").is_file()
+        {
+            return Err(format!(
+                "发布目录非空且不是 Wordma 产物：{}",
+                path.display()
+            ));
+        }
+    } else {
+        let parent = path.parent().ok_or_else(|| {
+            "发布目录缺少父目录".to_string()
+        })?;
+        if !parent.is_dir() {
+            return Err(format!(
+                "发布目录的父目录不存在：{}",
+                parent.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn engine_build(
     app: AppHandle,
@@ -619,6 +669,7 @@ pub async fn engine_build(
     ];
 
     if let Some(out_dir) = out_dir {
+        validate_publish_out_dir(&out_dir)?;
         args.push("--out".to_string());
         args.push(out_dir);
     }
@@ -852,5 +903,44 @@ mod tests {
         };
 
         assert_eq!(engine_error_message(&outcome), "boom");
+    }
+
+    #[test]
+    fn publish_out_dir_requires_empty_or_manifest() {
+        let root = tempfile::tempdir().expect("tempdir");
+        let out = root.path().join("dist");
+        std::fs::create_dir(&out).expect("out");
+
+        assert!(validate_publish_out_dir(
+            out.to_string_lossy().as_ref()
+        )
+        .is_ok());
+
+        std::fs::write(out.join("keep.txt"), "keep")
+            .expect("keep");
+        let error = validate_publish_out_dir(
+            out.to_string_lossy().as_ref(),
+        )
+        .expect_err("non-empty");
+        assert!(error.contains("非空"));
+
+        std::fs::write(
+            out.join(".wordma-manifest.json"),
+            "{}",
+        )
+        .expect("manifest");
+        assert!(validate_publish_out_dir(
+            out.to_string_lossy().as_ref()
+        )
+        .is_ok());
+
+        let file = root.path().join("file.txt");
+        std::fs::write(&file, "x").expect("file");
+        assert!(validate_publish_out_dir(
+            file.to_string_lossy().as_ref()
+        )
+        .is_err());
+
+        assert!(validate_publish_out_dir("relative/dist").is_err());
     }
 }

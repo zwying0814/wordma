@@ -10,6 +10,8 @@ vi.mock('@/features/engine/api', () => ({
   listThemesWithEngine: vi.fn(),
   applyThemeWithEngine: vi.fn(),
   applyThemeSettingsWithEngine: vi.fn(),
+  buildWithEngine: vi.fn(),
+  onEngineLog: vi.fn(),
 }));
 
 vi.mock('@/features/workspace/files', () => ({
@@ -47,6 +49,14 @@ vi.mock('@/features/preview/api', () => ({
   stopPreview: vi.fn(),
   getPreviewStatus: vi.fn(),
   onPreviewState: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  open: vi.fn(),
+}));
+
+vi.mock('@tauri-apps/plugin-opener', () => ({
+  openPath: vi.fn(),
 }));
 
 vi.mock('@/features/editor/mdx-editor', () => ({
@@ -844,5 +854,24 @@ type: project
     expect(
       await screen.findByRole('button', { name: '预览' }),
     ).toBeInTheDocument();
+  });
+
+  it('工具栏打开发布弹窗', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    await screen.findByLabelText('MDX 编辑器');
+    await user.click(
+      screen.getByRole('button', { name: '发布' }),
+    );
+
+    expect(
+      await screen.findByText('发布站点'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('输出目录')).toHaveValue(
+      '/tmp/demo/.wordma/dist',
+    );
   });
 });

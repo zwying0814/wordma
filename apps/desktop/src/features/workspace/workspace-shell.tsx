@@ -38,6 +38,7 @@ import {
   startPreview,
   stopPreview,
 } from '@/features/preview/api';
+import { PublishDialog } from '@/features/publish/publish-dialog';
 import {
   inspectWithEngine,
   type EngineDiagnostic,
@@ -146,6 +147,7 @@ export function WorkspaceShell({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewStarting, setPreviewStarting] =
     useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [confirmation, setConfirmation] =
     useState<PendingConfirmation | null>(null);
@@ -554,8 +556,8 @@ export function WorkspaceShell({
           <Button
             variant="outline"
             size="sm"
-            disabled
-            title="发布将在 M7.11 接入"
+            onClick={() => setPublishOpen(true)}
+            title="构建并打开静态产物"
           >
             <Upload />
             发布
@@ -821,6 +823,12 @@ export function WorkspaceShell({
         onApplied={async () => {
           await refreshInspect();
         }}
+      />
+
+      <PublishDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        workspacePath={workspace.path}
       />
 
       <ThemeDialog

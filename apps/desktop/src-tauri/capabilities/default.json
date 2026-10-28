@@ -9,6 +9,7 @@
     "core:event:allow-unlisten",
     "core:window:allow-set-title",
     "opener:allow-reveal-item-in-dir",
+    "opener:allow-open-path",
     "dialog:allow-open"
   ]
 }
