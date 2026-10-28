@@ -335,15 +335,24 @@ pub fn engine_start_dev(
     root: String,
     port: Option<u16>,
 ) -> Result<EngineStart, String> {
+    start_dev_engine(&app, &manager, root, port)
+}
+
+fn start_dev_engine(
+    app: &AppHandle,
+    manager: &EngineManager,
+    root: String,
+    port: Option<u16>,
+) -> Result<EngineStart, String> {
     let root = canonical_root(&root)?;
     let port = match port {
         Some(value) if value > 0 => value,
         _ => free_port()?,
     };
 
-    stop_engine(&manager);
+    stop_engine(manager);
 
-    let entry = engine_entry(&app)?;
+    let entry = engine_entry(app)?;
     let args = vec![
         "dev".to_string(),
         "--root".to_string(),
@@ -352,7 +361,7 @@ pub fn engine_start_dev(
         port.to_string(),
         "--json".to_string(),
     ];
-    let command = engine_command(&app, &entry, args)?;
+    let command = engine_command(app, &entry, args)?;
     let (mut receiver, child) = command
         .spawn()
         .map_err(|error| format!("启动 dev engine 失败：{error}"))?;
@@ -370,7 +379,7 @@ pub fn engine_start_dev(
         inner.generation
     };
 
-    emit_state(&app, "starting", None);
+    emit_state(app, "starting", None);
 
     let task_app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -473,12 +482,39 @@ pub fn engine_start_dev(
         }
     });
 
-    emit_state(&app, "running", None);
+    emit_state(app, "running", None);
 
     Ok(EngineStart {
         url: format!("http://127.0.0.1:{port}/"),
         port,
     })
+}
+
+pub fn restart_dev_if_running(
+    app: &AppHandle,
+) -> Result<bool, String> {
+    let Some(manager) = app.try_state::<EngineManager>() else {
+        return Ok(false);
+    };
+
+    let (root, port, running) = {
+        let inner = manager
+            .inner
+            .lock()
+            .map_err(|_| "engine 状态锁失败".to_string())?;
+        (inner.root.clone(), inner.port, inner.child.is_some())
+    };
+
+    if !running {
+        return Ok(false);
+    }
+
+    let Some(root) = root else {
+        return Ok(false);
+    };
+
+    start_dev_engine(app, &manager, root, port)?;
+    Ok(true)
 }
 
 #[tauri::command]

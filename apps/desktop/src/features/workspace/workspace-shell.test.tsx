@@ -34,6 +34,14 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+vi.mock('@/features/dependencies/api', () => ({
+  listDependencies: vi.fn(),
+  installDependencies: vi.fn(),
+  onDependencyLog: vi.fn(),
+  dependencyErrorMessage: (error: unknown) =>
+    String(error),
+}));
+
 vi.mock('@/features/editor/mdx-editor', () => ({
   MdxEditor: ({
     value,
@@ -52,6 +60,10 @@ vi.mock('@/features/editor/mdx-editor', () => ({
 
 import { inspectWithEngine, listThemesWithEngine } from '@/features/engine/api';
 import {
+  listDependencies,
+  onDependencyLog,
+} from '@/features/dependencies/api';
+import {
   createNote,
   readNote,
   writeNote,
@@ -60,6 +72,8 @@ import { WorkspaceShell } from './workspace-shell';
 
 const inspectMock = vi.mocked(inspectWithEngine);
 const listThemesMock = vi.mocked(listThemesWithEngine);
+const listDependenciesMock = vi.mocked(listDependencies);
+const onDependencyLogMock = vi.mocked(onDependencyLog);
 const readNoteMock = vi.mocked(readNote);
 const writeNoteMock = vi.mocked(writeNote);
 const createNoteMock = vi.mocked(createNote);
@@ -178,6 +192,14 @@ beforeEach(() => {
   createNoteMock.mockReset();
   listThemesMock.mockReset();
   listThemesMock.mockResolvedValue([]);
+  listDependenciesMock.mockReset();
+  listDependenciesMock.mockResolvedValue({
+    exists: false,
+    dependencies: [],
+    trustedDependencies: [],
+  });
+  onDependencyLogMock.mockReset();
+  onDependencyLogMock.mockResolvedValue(() => {});
 
   inspectMock.mockResolvedValue(inspectResult());
   readNoteMock.mockImplementation((_root, path) =>
@@ -546,6 +568,25 @@ describe('WorkspaceShell', () => {
         '切换主题或调整当前主题的站点设置。内容文件不会自动改写。',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('工具栏打开依赖弹窗', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    await screen.findByLabelText('MDX 编辑器');
+    await user.click(
+      screen.getByRole('button', { name: '依赖' }),
+    );
+
+    expect(
+      await screen.findByText('工作区依赖'),
+    ).toBeInTheDocument();
+    expect(listDependenciesMock).toHaveBeenCalledWith(
+      '/tmp/demo',
+    );
   });
 
   it('新建页面后刷新列表并打开新笔记', async () => {

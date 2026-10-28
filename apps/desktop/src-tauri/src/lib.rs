@@ -1,3 +1,4 @@
+mod deps;
 mod engine;
 mod workspace;
 mod workspace_fs;
@@ -9,6 +10,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(engine::EngineManager::default())
+        .manage(deps::DependencyManager::default())
         .invoke_handler(tauri::generate_handler![
             workspace::load_workspaces,
             workspace::open_workspace,
@@ -21,6 +23,8 @@ pub fn run() {
             engine::theme_list,
             engine::theme_apply,
             engine::theme_settings_apply,
+            deps::deps_list,
+            deps::deps_install,
             workspace_fs::workspace_read,
             workspace_fs::workspace_write,
             workspace_fs::workspace_create_note,

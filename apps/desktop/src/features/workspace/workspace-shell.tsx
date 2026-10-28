@@ -5,6 +5,7 @@ import {
   FileText,
   FolderOpen,
   Loader2,
+  Package,
   Palette,
   Play,
   Plus,
@@ -25,6 +26,7 @@ import {
 } from '@/features/editor/frontmatter';
 import { PropertiesPanel } from '@/features/editor/properties-panel';
 import { ThemeDialog } from '@/features/theme/theme-dialog';
+import { DependencyDialog } from '@/features/dependencies/dependency-dialog';
 import {
   inspectWithEngine,
   type EngineDiagnostic,
@@ -122,6 +124,7 @@ export function WorkspaceShell({
     string | null
   >(null);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [depsOpen, setDepsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [confirmation, setConfirmation] =
     useState<PendingConfirmation | null>(null);
@@ -433,6 +436,14 @@ export function WorkspaceShell({
           <Button
             variant="ghost"
             size="icon-sm"
+            onClick={() => setDepsOpen(true)}
+            title="依赖"
+          >
+            <Package />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={() => setThemeOpen(true)}
             title="主题与设置"
           >
@@ -658,6 +669,15 @@ export function WorkspaceShell({
             );
           }
           await openNote(entry);
+        }}
+      />
+
+      <DependencyDialog
+        open={depsOpen}
+        onOpenChange={setDepsOpen}
+        workspacePath={workspace.path}
+        onApplied={async () => {
+          await refreshInspect();
         }}
       />
 
