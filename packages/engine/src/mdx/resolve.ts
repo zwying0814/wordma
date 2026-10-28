@@ -100,6 +100,7 @@ function importError(
       file: options.filePath,
       line: imported.line,
       column: imported.column,
+      module: imported.source,
     },
   );
 }
@@ -211,9 +212,18 @@ function resolveImport(
   }
 
   if (!isInside(workspaceRoot, realPath)) {
+    if (isRelative) {
+      throw importError(
+        'UNSAFE_IMPORT',
+        'import 解析结果位于 workspace 外',
+        imported,
+        options,
+      );
+    }
+
     throw importError(
-      'UNSAFE_IMPORT',
-      'import 解析结果位于 workspace 外',
+      'MISSING_COMPONENT_SOURCE',
+      '依赖未安装在工作区',
       imported,
       options,
     );

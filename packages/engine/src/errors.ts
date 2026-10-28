@@ -45,6 +45,7 @@ export class MdxError extends Error {
   readonly file?: string;
   readonly line?: number;
   readonly column?: number;
+  readonly module?: string;
 
   constructor(
     code: string,
@@ -53,6 +54,7 @@ export class MdxError extends Error {
       file?: string;
       line?: number;
       column?: number;
+      module?: string;
     } = {},
   ) {
     super(message);
@@ -61,6 +63,7 @@ export class MdxError extends Error {
     this.file = options.file;
     this.line = options.line;
     this.column = options.column;
+    this.module = options.module;
   }
 }
 

@@ -60,6 +60,7 @@ vi.mock('@/features/editor/mdx-editor', () => ({
 
 import { inspectWithEngine, listThemesWithEngine } from '@/features/engine/api';
 import {
+  installDependencies,
   listDependencies,
   onDependencyLog,
 } from '@/features/dependencies/api';
@@ -73,6 +74,9 @@ import { WorkspaceShell } from './workspace-shell';
 const inspectMock = vi.mocked(inspectWithEngine);
 const listThemesMock = vi.mocked(listThemesWithEngine);
 const listDependenciesMock = vi.mocked(listDependencies);
+const installDependenciesMock = vi.mocked(
+  installDependencies,
+);
 const onDependencyLogMock = vi.mocked(onDependencyLog);
 const readNoteMock = vi.mocked(readNote);
 const writeNoteMock = vi.mocked(writeNote);
@@ -200,6 +204,15 @@ beforeEach(() => {
   });
   onDependencyLogMock.mockReset();
   onDependencyLogMock.mockResolvedValue(() => {});
+  installDependenciesMock.mockReset();
+  installDependenciesMock.mockResolvedValue({
+    operationId: 'op-test',
+    success: true,
+    code: 0,
+    stdout: '',
+    stderr: '',
+    restartedEngine: false,
+  });
 
   inspectMock.mockResolvedValue(inspectResult());
   readNoteMock.mockImplementation((_root, path) =>
@@ -670,5 +683,70 @@ type: project
       await screen.findByLabelText('MDX 编辑器'),
     ).toHaveValue(createdSource);
     expect(screen.getByText('New Page')).toBeInTheDocument();
+  });
+
+  it('缺失 import 提供安装建议并在安装后刷新诊断', async () => {
+    const user = userEvent.setup();
+    const relative = {
+      code: 'MISSING_COMPONENT_SOURCE',
+      severity: 'error' as const,
+      source: 'mdx',
+      message: '找不到组件文件：./components/Missing',
+      file: '/tmp/demo/content/posts/one.mdx',
+      line: 4,
+      column: 1,
+      module: './components/Missing',
+    };
+    const bare = {
+      code: 'MISSING_COMPONENT_SOURCE',
+      severity: 'error' as const,
+      source: 'mdx',
+      message: '无法解析依赖：lucide-react',
+      file: '/tmp/demo/content/posts/one.mdx',
+      line: 5,
+      column: 1,
+      module: 'lucide-react',
+    };
+    const initial = inspectResult();
+    initial.diagnostics = [relative, bare];
+    const fixed = inspectResult();
+    fixed.diagnostics = [relative];
+
+    inspectMock.mockReset();
+    inspectMock
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(fixed);
+
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    expect(
+      await screen.findByText(/缺失依赖：/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/组件文件不存在/),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: '安装依赖' }),
+    );
+
+    await waitFor(() =>
+      expect(installDependenciesMock).toHaveBeenCalledWith({
+        root: '/tmp/demo',
+        action: 'add',
+        packages: ['lucide-react'],
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/缺失依赖：/),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText(/组件文件不存在/),
+    ).toBeInTheDocument();
+    expect(inspectMock).toHaveBeenCalledTimes(2);
   });
 });

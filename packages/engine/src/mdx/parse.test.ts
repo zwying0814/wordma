@@ -247,5 +247,40 @@ describe('resolveMdxImports', () => {
 
     expect(error.line).toBe(3);
     expect(error.column).toBe(1);
+    expect(error.module).toBe('./missing');
+  });
+
+  it('缺失裸包诊断带模块名', () => {
+    const parsed = parseMdx(
+      "import value from 'definitely-missing-wordma-pkg';",
+      { filePath: islandsFile },
+    );
+    const error = expectMdxError(
+      () =>
+        resolveMdxImports(parsed, {
+          workspaceRoot: islandsRoot,
+        }),
+      'MISSING_COMPONENT_SOURCE',
+    );
+
+    expect(error.module).toBe(
+      'definitely-missing-wordma-pkg',
+    );
+  });
+
+  it('工作区外解析的裸包按缺失依赖报告', () => {
+    const parsed = parseMdx(
+      "import React from 'react';",
+      { filePath: islandsFile },
+    );
+    const error = expectMdxError(
+      () =>
+        resolveMdxImports(parsed, {
+          workspaceRoot: islandsRoot,
+        }),
+      'MISSING_COMPONENT_SOURCE',
+    );
+
+    expect(error.module).toBe('react');
   });
 });

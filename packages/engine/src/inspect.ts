@@ -13,8 +13,10 @@ import type {
 
 import {
   diagnosticFromContent,
+  diagnosticsFromError,
 } from './diagnostics';
 import type { Diagnostic } from './diagnostics';
+import { analyzeMdx } from './mdx/compile';
 import { inspectThemeManifest } from './theme/manifest';
 import { resolveThemeSettings } from './theme/settings';
 import { validateThemeContent } from './theme/validate';
@@ -99,6 +101,19 @@ export function inspectWorkspace(rootInput: string): InspectResult {
   const themeValidation = manifest
     ? validateThemeContent(workspace, manifest)
     : { diagnostics: [] };
+  const mdxDiagnostics: Diagnostic[] = [];
+
+  for (const entry of workspace.index.entries) {
+    try {
+      analyzeMdx(entry.body, {
+        filePath: entry.filePath,
+        workspaceRoot: root,
+        lineOffset: entry.bodyLine - 1,
+      });
+    } catch (error) {
+      mdxDiagnostics.push(...diagnosticsFromError(error));
+    }
+  }
 
   return {
     workspace: root,
@@ -157,6 +172,7 @@ export function inspectWorkspace(rootInput: string): InspectResult {
       ...inspection.diagnostics,
       ...resolvedSettings.diagnostics,
       ...themeValidation.diagnostics,
+      ...mdxDiagnostics,
     ],
   };
 }

@@ -20,6 +20,7 @@ import { Separator } from '@/components/ui/separator';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { MdxEditor } from '@/features/editor/mdx-editor';
 import { CreateNoteDialog } from '@/features/editor/create-note-dialog';
+import { MissingImportHint } from '@/features/editor/missing-import-hint';
 import {
   buildNoteProperties,
   updateNoteField,
@@ -27,6 +28,10 @@ import {
 import { PropertiesPanel } from '@/features/editor/properties-panel';
 import { ThemeDialog } from '@/features/theme/theme-dialog';
 import { DependencyDialog } from '@/features/dependencies/dependency-dialog';
+import {
+  dependencyErrorMessage,
+  installDependencies,
+} from '@/features/dependencies/api';
 import {
   inspectWithEngine,
   type EngineDiagnostic,
@@ -125,6 +130,8 @@ export function WorkspaceShell({
   >(null);
   const [themeOpen, setThemeOpen] = useState(false);
   const [depsOpen, setDepsOpen] = useState(false);
+  const [installingPackage, setInstallingPackage] =
+    useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [confirmation, setConfirmation] =
     useState<PendingConfirmation | null>(null);
@@ -225,6 +232,52 @@ export function WorkspaceShell({
     setInspect(result);
     return result;
   }, [workspace.path]);
+
+  const installMissingPackage = useCallback(
+    async (packageName: string) => {
+      setInstallingPackage(packageName);
+
+      try {
+        const result = await installDependencies({
+          root: workspace.path,
+          action: 'add',
+          packages: [packageName],
+        });
+
+        if (!result.success) {
+          const message =
+            result.stderr.trim() ||
+            `bun 退出码：${result.code ?? 'unknown'}`;
+          const short =
+            message.length > 500
+              ? `${message.slice(0, 500)}…`
+              : message;
+          toast.error(short);
+          setEditorError(
+            `安装依赖 ${packageName} 失败：${short}`,
+          );
+          return;
+        }
+
+        toast.success(`已安装 ${packageName}`);
+        if (result.restartError) {
+          toast.error(
+            `依赖已安装，但重启预览失败：${result.restartError}`,
+          );
+        }
+        await refreshInspect();
+      } catch (error) {
+        const message = dependencyErrorMessage(error);
+        toast.error(message);
+        setEditorError(
+          `安装依赖 ${packageName} 失败：${message}`,
+        );
+      } finally {
+        setInstallingPackage(null);
+      }
+    },
+    [refreshInspect, workspace.path],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -628,6 +681,21 @@ export function WorkspaceShell({
                           {diagnosticLocation(diagnostic)}
                         </div>
                       )}
+                      {diagnostic.code ===
+                        'MISSING_COMPONENT_SOURCE' &&
+                        diagnostic.module && (
+                          <MissingImportHint
+                            module={diagnostic.module}
+                            installingPackage={
+                              installingPackage
+                            }
+                            onInstall={(packageName) => {
+                              void installMissingPackage(
+                                packageName,
+                              );
+                            }}
+                          />
+                        )}
                     </li>
                   ))}
                 </ul>

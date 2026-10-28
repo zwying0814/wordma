@@ -41,6 +41,18 @@ describe('diagnosticsFromError', () => {
 
     expect(
       diagnosticsFromError(
+        new MdxError('MISSING_COMPONENT_SOURCE', 'missing', {
+          file: '/site/a.mdx',
+          module: 'lucide-react',
+        }),
+      )[0],
+    ).toMatchObject({
+      module: 'lucide-react',
+      source: 'mdx',
+    });
+
+    expect(
+      diagnosticsFromError(
         new IslandError('DUPLICATE_REACT', 'duplicate', {
           file: '/site/c.tsx',
         }),

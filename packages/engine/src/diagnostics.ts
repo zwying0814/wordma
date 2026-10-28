@@ -35,6 +35,7 @@ export type Diagnostic = {
   path?: string;
   field?: string;
   exportName?: string;
+  module?: string;
 };
 
 function themeSource(error: ThemeError): DiagnosticSource {
@@ -99,6 +100,9 @@ export function diagnosticsFromError(
           : {}),
         ...(error.column !== undefined
           ? { column: error.column }
+          : {}),
+        ...(error.module
+          ? { module: error.module }
           : {}),
       },
     ];

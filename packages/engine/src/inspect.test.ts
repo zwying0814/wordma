@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -360,5 +361,75 @@ describe('inspectWorkspace', () => {
         ),
       'INVALID_DATE',
     );
+  });
+
+  it('汇总 MDX 缺失 import 诊断并带 module', () => {
+    const temp = mkdtempSync(
+      path.join(tmpdir(), 'wordma-inspect-mdx-'),
+    );
+    const workspaceRoot = path.join(temp, 'workspace');
+    cpSync(
+      path.join(root, 'fixtures/minimal'),
+      workspaceRoot,
+      { recursive: true },
+    );
+
+    writeFile(
+      workspaceRoot,
+      'content/posts/missing-relative.mdx',
+      [
+        '---',
+        'title: Missing Relative',
+        '---',
+        '',
+        "import Missing from './missing-component';",
+        '',
+        '<Missing />',
+      ].join('\n'),
+    );
+    writeFile(
+      workspaceRoot,
+      'content/posts/missing-package.mdx',
+      [
+        '---',
+        'title: Missing Package',
+        '---',
+        '',
+        "import Pkg from 'not-installed-wordma-pkg';",
+        '',
+        '<Pkg />',
+      ].join('\n'),
+    );
+
+    try {
+      const result = inspectWorkspace(workspaceRoot);
+      const relative = result.diagnostics.find(
+        (diagnostic) =>
+          diagnostic.module === './missing-component',
+      );
+      const missingPackage = result.diagnostics.find(
+        (diagnostic) =>
+          diagnostic.module ===
+          'not-installed-wordma-pkg',
+      );
+
+      expect(relative).toMatchObject({
+        code: 'MISSING_COMPONENT_SOURCE',
+        severity: 'error',
+        source: 'mdx',
+        module: './missing-component',
+      });
+      expect(relative?.file).toContain(
+        'missing-relative.mdx',
+      );
+      expect(missingPackage).toMatchObject({
+        code: 'MISSING_COMPONENT_SOURCE',
+        severity: 'error',
+        source: 'mdx',
+        module: 'not-installed-wordma-pkg',
+      });
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
   });
 });
