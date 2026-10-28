@@ -33,6 +33,12 @@ import {
   installDependencies,
 } from '@/features/dependencies/api';
 import {
+  getPreviewStatus,
+  onPreviewState,
+  startPreview,
+  stopPreview,
+} from '@/features/preview/api';
+import {
   inspectWithEngine,
   type EngineDiagnostic,
   type EngineInspectEntry,
@@ -68,10 +74,15 @@ function collectionLabel(name: string): string {
   return COLLECTION_LABELS[name] ?? name;
 }
 
+function previewErrorMessage(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error instanceof Error) return error.message;
+  return '预览操作失败';
+}
+
 function diagnosticLocation(
   diagnostic: EngineDiagnostic,
-): string | undefined {
-  if (!diagnostic.file) return undefined;
+): string | undefined {  if (!diagnostic.file) return undefined;
 
   return `${diagnostic.file}${
     diagnostic.line === undefined
@@ -132,6 +143,9 @@ export function WorkspaceShell({
   const [depsOpen, setDepsOpen] = useState(false);
   const [installingPackage, setInstallingPackage] =
     useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewStarting, setPreviewStarting] =
+    useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [confirmation, setConfirmation] =
     useState<PendingConfirmation | null>(null);
@@ -278,6 +292,57 @@ export function WorkspaceShell({
     },
     [refreshInspect, workspace.path],
   );
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+
+    void getPreviewStatus()
+      .then((state) => {
+        if (!disposed) setPreviewOpen(state.open);
+      })
+      .catch(() => {
+        // 预览状态不可用时保持关闭
+      });
+
+    void onPreviewState((state) => {
+      if (!disposed) setPreviewOpen(state.open);
+    })
+      .then((dispose) => {
+        if (disposed) dispose();
+        else unlisten = dispose;
+      })
+      .catch(() => {
+        // 监听失败不影响主编辑流程
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
+  const togglePreview = useCallback(async () => {
+    if (previewStarting) return;
+
+    setPreviewStarting(true);
+
+    try {
+      if (previewOpen) {
+        await stopPreview();
+        setPreviewOpen(false);
+        toast.success('预览已停止');
+      } else {
+        const state = await startPreview(workspace.path);
+        setPreviewOpen(state.open);
+        toast.success('预览已打开');
+      }
+    } catch (error) {
+      toast.error(previewErrorMessage(error));
+    } finally {
+      setPreviewStarting(false);
+    }
+  }, [previewOpen, previewStarting, workspace.path]);
 
   useEffect(() => {
     let cancelled = false;
@@ -469,13 +534,22 @@ export function WorkspaceShell({
             保存
           </Button>
           <Button
-            variant="outline"
+            variant={previewOpen ? 'secondary' : 'outline'}
             size="sm"
-            disabled
-            title="预览将在 M7.10 接入"
+            disabled={previewStarting}
+            onClick={() => void togglePreview()}
+            title={
+              previewOpen
+                ? '关闭预览窗口并停止 dev server'
+                : '打开隔离预览窗口'
+            }
           >
-            <Play />
-            预览
+            {previewStarting ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Play />
+            )}
+            {previewOpen ? '停止预览' : '预览'}
           </Button>
           <Button
             variant="outline"

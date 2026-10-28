@@ -40,6 +40,18 @@ const EVENTS_PATH = '/_wordma/events';
 const CLIENT_PATH = '/_wordma/client.js';
 const CLIENT_SNIPPET =
   '<script type="module" src="/_wordma/client.js"></script>';
+const PREVIEW_CSP = [
+  "default-src 'self'",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' https:",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data: https:",
+  "script-src 'self' 'unsafe-inline'",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -324,6 +336,8 @@ export function startDevServer(
     });
 
     if (extension === '.html') {
+      headers.set('content-security-policy', PREVIEW_CSP);
+
       if (method === 'HEAD') {
         return new Response(null, { status, headers });
       }
@@ -487,6 +501,7 @@ export function startDevServer(
             const headers = {
               'content-type': MIME_TYPES['.html'] as string,
               'cache-control': 'no-store',
+              'content-security-policy': PREVIEW_CSP,
             };
 
             return method === 'HEAD'

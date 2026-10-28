@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -42,6 +42,13 @@ vi.mock('@/features/dependencies/api', () => ({
     String(error),
 }));
 
+vi.mock('@/features/preview/api', () => ({
+  startPreview: vi.fn(),
+  stopPreview: vi.fn(),
+  getPreviewStatus: vi.fn(),
+  onPreviewState: vi.fn(),
+}));
+
 vi.mock('@/features/editor/mdx-editor', () => ({
   MdxEditor: ({
     value,
@@ -65,6 +72,13 @@ import {
   onDependencyLog,
 } from '@/features/dependencies/api';
 import {
+  getPreviewStatus,
+  onPreviewState,
+  startPreview,
+  stopPreview,
+} from '@/features/preview/api';
+import type { PreviewState } from '@/features/preview/api';
+import {
   createNote,
   readNote,
   writeNote,
@@ -78,6 +92,13 @@ const installDependenciesMock = vi.mocked(
   installDependencies,
 );
 const onDependencyLogMock = vi.mocked(onDependencyLog);
+const startPreviewMock = vi.mocked(startPreview);
+const stopPreviewMock = vi.mocked(stopPreview);
+const getPreviewStatusMock = vi.mocked(getPreviewStatus);
+const onPreviewStateMock = vi.mocked(onPreviewState);
+let emitPreviewState:
+  | ((state: PreviewState) => void)
+  | null = null;
 const readNoteMock = vi.mocked(readNote);
 const writeNoteMock = vi.mocked(writeNote);
 const createNoteMock = vi.mocked(createNote);
@@ -212,6 +233,21 @@ beforeEach(() => {
     stdout: '',
     stderr: '',
     restartedEngine: false,
+  });
+  emitPreviewState = null;
+  startPreviewMock.mockReset();
+  startPreviewMock.mockResolvedValue({
+    open: true,
+    url: 'http://127.0.0.1:4321/',
+  });
+  stopPreviewMock.mockReset();
+  stopPreviewMock.mockResolvedValue();
+  getPreviewStatusMock.mockReset();
+  getPreviewStatusMock.mockResolvedValue({ open: false });
+  onPreviewStateMock.mockReset();
+  onPreviewStateMock.mockImplementation(async (handler) => {
+    emitPreviewState = handler;
+    return () => {};
   });
 
   inspectMock.mockResolvedValue(inspectResult());
@@ -748,5 +784,65 @@ type: project
       screen.getByText(/组件文件不存在/),
     ).toBeInTheDocument();
     expect(inspectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('打开和停止隔离预览', async () => {
+    const user = userEvent.setup();
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    await screen.findByLabelText('MDX 编辑器');
+    await user.click(
+      screen.getByRole('button', { name: '预览' }),
+    );
+
+    await waitFor(() =>
+      expect(startPreviewMock).toHaveBeenCalledWith(
+        '/tmp/demo',
+      ),
+    );
+    expect(
+      await screen.findByRole('button', {
+        name: '停止预览',
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: '停止预览' }),
+    );
+    await waitFor(() =>
+      expect(stopPreviewMock).toHaveBeenCalledTimes(1),
+    );
+    expect(
+      await screen.findByRole('button', { name: '预览' }),
+    ).toBeInTheDocument();
+  });
+
+  it('预览窗口关闭事件同步主窗口状态', async () => {
+    render(
+      <WorkspaceShell workspace={workspace} onSwitch={vi.fn()} />,
+    );
+
+    await screen.findByLabelText('MDX 编辑器');
+    await waitFor(() =>
+      expect(emitPreviewState).not.toBeNull(),
+    );
+
+    act(() => {
+      emitPreviewState?.({ open: true });
+    });
+    expect(
+      await screen.findByRole('button', {
+        name: '停止预览',
+      }),
+    ).toBeInTheDocument();
+
+    act(() => {
+      emitPreviewState?.({ open: false });
+    });
+    expect(
+      await screen.findByRole('button', { name: '预览' }),
+    ).toBeInTheDocument();
   });
 });

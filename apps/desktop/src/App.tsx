@@ -16,6 +16,7 @@ import {
 } from '@/features/workspace/api';
 import { WelcomeScreen } from '@/features/workspace/welcome-screen';
 import { WorkspaceShell } from '@/features/workspace/workspace-shell';
+import { stopPreview } from '@/features/preview/api';
 
 function errorMessage(error: unknown): string {
   if (typeof error === 'string') return error;
@@ -145,6 +146,11 @@ function App() {
   }, []);
 
   const handleSwitch = useCallback(async () => {
+    try {
+      await stopPreview();
+    } catch {
+      // 没有运行中的预览或 engine 时忽略
+    }
     setWorkspace(null);
     try {
       applyState(await loadWorkspaces());

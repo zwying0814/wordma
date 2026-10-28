@@ -20,6 +20,7 @@ struct EngineInner {
     generation: u64,
     root: Option<String>,
     port: Option<u16>,
+    url: Option<String>,
     stopping_generation: Option<u64>,
 }
 
@@ -313,6 +314,20 @@ fn engine_error_message(outcome: &RunOutcome) -> String {
     }
 }
 
+fn update_dev_url(
+    app: &AppHandle,
+    generation: u64,
+    url: &str,
+) {
+    if let Some(manager) = app.try_state::<EngineManager>() {
+        if let Ok(mut inner) = manager.inner.lock() {
+            if inner.generation == generation {
+                inner.url = Some(url.to_string());
+            }
+        }
+    }
+}
+
 fn stop_engine(manager: &EngineManager) {
     let child = {
         let mut inner = match manager.inner.lock() {
@@ -375,6 +390,7 @@ fn start_dev_engine(
         inner.child = Some(child);
         inner.root = Some(root.clone());
         inner.port = Some(port);
+        inner.url = None;
         inner.stopping_generation = None;
         inner.generation
     };
@@ -396,6 +412,23 @@ fn start_dev_engine(
 
                         match serde_json::from_str::<Value>(&line) {
                             Ok(value) => {
+                                if value
+                                    .get("type")
+                                    .and_then(Value::as_str)
+                                    == Some("ready")
+                                {
+                                    if let Some(url) = value
+                                        .get("url")
+                                        .and_then(Value::as_str)
+                                    {
+                                        update_dev_url(
+                                            &task_app,
+                                            generation,
+                                            url,
+                                        );
+                                    }
+                                }
+
                                 let _ = task_app
                                     .emit("engine://event", value);
                             }
@@ -515,6 +548,52 @@ pub fn restart_dev_if_running(
 
     start_dev_engine(app, &manager, root, port)?;
     Ok(true)
+}
+
+/// 复用同一工作区的 dev 进程；工作区变化时启动新的 dev。
+/// 返回 canonical root，供 preview 等待 ready URL。
+pub fn ensure_dev(
+    app: &AppHandle,
+    root: String,
+) -> Result<String, String> {
+    let root = canonical_root(&root)?;
+    let manager = app.state::<EngineManager>();
+    let running_same = {
+        let inner = manager
+            .inner
+            .lock()
+            .map_err(|_| "engine 状态锁失败".to_string())?;
+        inner.child.is_some()
+            && inner.root.as_deref() == Some(root.as_str())
+    };
+
+    if !running_same {
+        start_dev_engine(app, &manager, root.clone(), None)?;
+    }
+
+    Ok(root)
+}
+
+pub fn dev_url_for_root(
+    app: &AppHandle,
+    root: &str,
+) -> Option<String> {
+    let manager = app.try_state::<EngineManager>()?;
+    let inner = manager.inner.lock().ok()?;
+
+    if inner.child.is_some()
+        && inner.root.as_deref() == Some(root)
+    {
+        inner.url.clone()
+    } else {
+        None
+    }
+}
+
+pub fn stop(app: &AppHandle) {
+    if let Some(manager) = app.try_state::<EngineManager>() {
+        stop_engine(&manager);
+    }
 }
 
 #[tauri::command]

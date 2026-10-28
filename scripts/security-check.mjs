@@ -114,6 +114,24 @@ for (const file of capabilityFiles) {
       )}`,
     );
   }
+
+  if (file === 'preview.json') {
+    if (
+      JSON.stringify(capability.windows) !==
+      JSON.stringify(['preview'])
+    ) {
+      fail(
+        `preview.json 只应作用于 preview 窗口，当前：${JSON.stringify(
+          capability.windows,
+        )}`,
+      );
+    }
+    if (permissions.length > 0) {
+      fail(
+        `preview.json 必须为空权限，当前：${permissions.length} 项`,
+      );
+    }
+  }
 }
 
 // 3. CSP 必须存在，生产模式不得允许 eval
@@ -160,3 +178,4 @@ if (problems.length > 0) {
 console.log('✓ 主窗口无 shell/Bun 执行权限');
 console.log('✓ 前端无 shell 插件调用');
 console.log('✓ 生产 CSP 已设置且无 unsafe-eval');
+console.log('✓ preview 窗口无 Tauri 权限');

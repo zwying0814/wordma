@@ -91,6 +91,15 @@ describe('dev server', () => {
         homeHtml.indexOf('</body>'),
       );
 
+      const csp = home.headers.get(
+        'content-security-policy',
+      );
+      expect(csp).toContain(
+        "script-src 'self' 'unsafe-inline'",
+      );
+      expect(csp).toContain("connect-src 'self'");
+      expect(csp).not.toContain("'unsafe-eval'");
+
       const post = await fetch(
         `${server.url}posts/hello/`,
       );
@@ -272,6 +281,9 @@ describe('dev server', () => {
       const html = await response.text();
 
       expect(response.status).toBe(500);
+      expect(
+        response.headers.get('content-security-policy'),
+      ).toContain("script-src 'self' 'unsafe-inline'");
       expect(html).toContain('MDX_PARSE_ERROR');
       expect(html).toContain('/site/a.mdx:2:3');
       expect(html).toContain('Warnings');

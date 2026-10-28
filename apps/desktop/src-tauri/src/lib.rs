@@ -1,5 +1,6 @@
 mod deps;
 mod engine;
+mod preview;
 mod workspace;
 mod workspace_fs;
 
@@ -25,11 +26,15 @@ pub fn run() {
             engine::theme_settings_apply,
             deps::deps_list,
             deps::deps_install,
+            preview::preview_start,
+            preview::preview_stop,
+            preview::preview_status,
             workspace_fs::workspace_read,
             workspace_fs::workspace_write,
             workspace_fs::workspace_create_note,
             workspace_fs::workspace_delete_note,
         ])
+        .on_window_event(preview::handle_window_event)
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
