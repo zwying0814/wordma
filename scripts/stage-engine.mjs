@@ -172,6 +172,12 @@ function stagePackageJson() {
     lightningcss:
       packageVersion('lightningcss') ??
       enginePackage.dependencies.lightningcss,
+    yaml:
+      packageVersion('yaml') ??
+      enginePackage.dependencies.yaml,
+    zod:
+      packageVersion('zod') ??
+      enginePackage.dependencies.zod,
   };
 
   writeJson(path.join(stageDir, 'package.json'), {
@@ -214,6 +220,14 @@ function bundleEngine(bun) {
       'react-dom',
       '--external',
       'react-dom/*',
+      '--external',
+      '@wordma/theme',
+      '--external',
+      '@wordma/content',
+      '--external',
+      'yaml',
+      '--external',
+      'zod',
     ],
     {
       cwd: root,

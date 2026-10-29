@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -28,9 +29,11 @@ const fixtureRoot = path.join(
   repoRoot,
   'fixtures/theme-switch',
 );
-const defaultThemeEntry = path.join(
-  repoRoot,
-  'themes/default/src/index.tsx',
+const defaultThemeEntry = realpathSync(
+  path.join(
+    repoRoot,
+    'themes/default/src/index.tsx',
+  ),
 );
 
 function writeFile(
@@ -44,8 +47,10 @@ function writeFile(
 }
 
 function createWorkspace(): string {
-  const root = mkdtempSync(
-    path.join(tmpdir(), 'wordma-theme-switch-'),
+  const root = realpathSync(
+    mkdtempSync(
+      path.join(tmpdir(), 'wordma-theme-switch-'),
+    ),
   );
 
   writeFile(

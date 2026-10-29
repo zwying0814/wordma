@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { ThemeError, loadThemeRuntime } from '../index';
+import {
+  ThemeError,
+  buildSite,
+  loadThemeRuntime,
+} from '../index';
 
 const repoRoot = path.resolve(import.meta.dirname, '../../../..');
 
@@ -90,6 +97,132 @@ describe('loadThemeRuntime', () => {
 
     expect(typeof runtime.definition.layouts.archive).toBe('function');
     expect(typeof runtime.definition.layouts.taxonomy).toBe('function');
+  });
+
+  it('workspace 外部主题共享 engine 运行时并支持本地依赖', async () => {
+    const root = makeThemeRoot();
+    const themeId = 'wordma-theme-external';
+    const themeDir = path.join(root, 'themes', themeId);
+
+    cpSync(
+      path.join(repoRoot, 'themes/default'),
+      themeDir,
+      { recursive: true },
+    );
+
+    const themeYamlPath = path.join(themeDir, 'theme.yaml');
+    writeFileSync(
+      themeYamlPath,
+      readFileSync(themeYamlPath, 'utf8')
+        .replace(
+          'id: wordma-theme-default',
+          `id: ${themeId}`,
+        )
+        .replace(
+          'displayName: Default',
+          'displayName: External Theme',
+        ),
+    );
+
+    const packagePath = path.join(
+      themeDir,
+      'package.json',
+    );
+    const packageJson = JSON.parse(
+      readFileSync(packagePath, 'utf8'),
+    );
+    packageJson.name = themeId;
+    writeFileSync(
+      packagePath,
+      `${JSON.stringify(packageJson, null, 2)}\n`,
+    );
+
+    mkdirSync(
+      path.join(themeDir, 'node_modules/theme-helper'),
+      { recursive: true },
+    );
+    writeFileSync(
+      path.join(
+        themeDir,
+        'node_modules/theme-helper/package.json',
+      ),
+      JSON.stringify({
+        name: 'theme-helper',
+        version: '1.0.0',
+        type: 'module',
+        exports: './index.js',
+      }),
+    );
+    writeFileSync(
+      path.join(
+        themeDir,
+        'node_modules/theme-helper/index.js',
+      ),
+      'export const helper = "ok";\n',
+    );
+    writeFileSync(
+      path.join(themeDir, 'src/index.tsx'),
+      `${readFileSync(
+        path.join(themeDir, 'src/index.tsx'),
+        'utf8',
+      )}\nimport "theme-helper";\n`,
+    );
+
+    mkdirSync(
+      path.join(root, 'content/posts'),
+      { recursive: true },
+    );
+    writeFileSync(
+      path.join(root, 'wordma.site.yaml'),
+      [
+        'site:',
+        '  title: External Theme Site',
+        '  language: zh-CN',
+        'theme:',
+        `  id: ${themeId}`,
+        '',
+      ].join('\n'),
+    );
+    writeFileSync(
+      path.join(root, 'content/posts/hello.mdx'),
+      [
+        '---',
+        'title: External Hello',
+        '---',
+        '',
+        '# External Hello',
+        '',
+      ].join('\n'),
+    );
+
+    try {
+      const outDir = path.join(root, 'dist');
+      const result = await buildSite({
+        root,
+        outDir,
+        cache: false,
+      });
+      const html = readFileSync(
+        path.join(outDir, 'index.html'),
+        'utf8',
+      );
+
+      expect(result.theme.id).toBe(themeId);
+      expect(html).toContain('External Theme Site');
+      expect(html).toMatch(
+        /assets\/css\/theme-[a-f0-9]+\.css/,
+      );
+      expect(
+        existsSync(
+          path.join(
+            root,
+            '.wordma/cache/v1/theme-runtime',
+          ),
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('主题不存在时报 THEME_NOT_FOUND', async () => {

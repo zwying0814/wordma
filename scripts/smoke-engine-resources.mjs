@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -91,6 +92,71 @@ function createWorkspace() {
       '',
     ].join('\n'),
   );
+  return workspace;
+}
+
+function createExternalThemeWorkspace() {
+  const workspace = mkdtempSync(
+    path.join(tmpdir(), 'wordma-engine-external-'),
+  );
+  const themeId = 'wordma-theme-external';
+  const themeDir = path.join(
+    workspace,
+    'themes',
+    themeId,
+  );
+
+  cpSync(
+    path.join(stageDir, 'themes/default'),
+    themeDir,
+    { recursive: true },
+  );
+
+  const themeYaml = path.join(themeDir, 'theme.yaml');
+  writeFileSync(
+    themeYaml,
+    readFileSync(themeYaml, 'utf8').replace(
+      'id: wordma-theme-default',
+      `id: ${themeId}`,
+    ),
+  );
+
+  const packagePath = path.join(themeDir, 'package.json');
+  const packageJson = JSON.parse(
+    readFileSync(packagePath, 'utf8'),
+  );
+  packageJson.name = themeId;
+  writeFileSync(
+    packagePath,
+    `${JSON.stringify(packageJson, null, 2)}\n`,
+  );
+
+  mkdirSync(path.join(workspace, 'content/posts'), {
+    recursive: true,
+  });
+  writeFileSync(
+    path.join(workspace, 'wordma.site.yaml'),
+    [
+      'site:',
+      '  title: External Theme Smoke',
+      '  language: zh-CN',
+      'theme:',
+      `  id: ${themeId}`,
+      '',
+    ].join('\n'),
+  );
+  writeFileSync(
+    path.join(workspace, 'content/posts/hello.mdx'),
+    [
+      '---',
+      'title: External Hello',
+      '---',
+      '',
+      '# External Hello',
+      '',
+    ].join('\n'),
+  );
+
   return workspace;
 }
 
@@ -188,6 +254,8 @@ async function main() {
 
   const bun = bunBinary();
   const workspace = createWorkspace();
+  const externalWorkspace =
+    createExternalThemeWorkspace();
 
   try {
     const inspect = run(bun, [
@@ -229,13 +297,51 @@ async function main() {
       throw new Error('staged build 产物缺少站点标题');
     }
 
+    const externalOut = path.join(
+      externalWorkspace,
+      'dist',
+    );
+    const externalBuild = run(bun, [
+      'build',
+      '--root',
+      externalWorkspace,
+      '--out',
+      externalOut,
+      '--json',
+      '--no-cache',
+    ]);
+    if (externalBuild.status !== 0) {
+      throw new Error(
+        `外部主题 build 失败：\n${externalBuild.stderr}\n${externalBuild.stdout}`,
+      );
+    }
+    const externalHtml = readFileSync(
+      path.join(externalOut, 'index.html'),
+      'utf8',
+    );
+    if (
+      !externalHtml.includes(
+        'External Theme Smoke',
+      ) ||
+      !/assets\/css\/theme-[a-f0-9]+\.css/.test(
+        externalHtml,
+      )
+    ) {
+      throw new Error('外部主题产物缺少内容或样式');
+    }
+
     await devSmoke(bun, workspace);
 
     console.log('✓ staged engine inspect');
     console.log('✓ staged engine build');
     console.log('✓ staged engine dev');
+    console.log('✓ staged external theme build');
   } finally {
     rmSync(workspace, { recursive: true, force: true });
+    rmSync(externalWorkspace, {
+      recursive: true,
+      force: true,
+    });
   }
 }
 
