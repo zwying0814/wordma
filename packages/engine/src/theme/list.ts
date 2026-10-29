@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import type { Diagnostic } from '../diagnostics';
 import { inspectThemeDirectory } from './manifest';
+import { defaultThemeDirectory } from './resolve';
 
 export type ThemeSource =
   | 'workspace'
@@ -90,13 +91,6 @@ function scanThemeDirectory(
   }
 }
 
-function defaultThemeDirectory(): string {
-  return path.resolve(
-    import.meta.dirname,
-    '../../../../themes/default',
-  );
-}
-
 /**
  * 列出工作区、依赖与内置主题。
  *
@@ -116,11 +110,10 @@ export function listThemes(rootInput: string): ThemeListItem[] {
     'dependency',
     candidates,
   );
-  addThemeCandidate(
-    candidates,
-    defaultThemeDirectory(),
-    'builtin',
-  );
+  const builtin = defaultThemeDirectory();
+  if (builtin) {
+    addThemeCandidate(candidates, builtin, 'builtin');
+  }
 
   const themes = new Map<string, ThemeListItem>();
 

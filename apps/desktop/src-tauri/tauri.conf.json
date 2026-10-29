@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm stage:engine && pnpm build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -35,6 +35,9 @@
     "longDescription": "Wordma 是一个本地优先的写作空间：使用 MDX 编辑内容，通过主题渲染，并在本地预览与发布静态站点。",
     "macOS": {
       "minimumSystemVersion": "13.0"
+    },
+    "resources": {
+      "resources/engine": "engine"
     },
     "externalBin": ["binaries/bun"],
     "icon": [

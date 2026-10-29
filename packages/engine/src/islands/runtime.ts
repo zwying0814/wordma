@@ -107,10 +107,9 @@ async function buildReactRuntime(
   cacheDir: string,
   basePath: string | undefined,
 ): Promise<IslandRuntimeAsset> {
-  const entry = path.join(
-    import.meta.dirname,
-    'runtime-entry.ts',
-  );
+  const entry =
+    process.env.WORDMA_ISLAND_RUNTIME_ENTRY ??
+    path.join(import.meta.dirname, 'runtime-entry.ts');
 
   let output: Awaited<ReturnType<typeof Bun.build>>;
 

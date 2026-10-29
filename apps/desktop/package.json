@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "fetch:bun": "node scripts/fetch-bun.mjs",
+    "stage:engine": "node ../../scripts/stage-engine.mjs",
     "tauri": "node scripts/fetch-bun.mjs && tauri"
   },
   "dependencies": {

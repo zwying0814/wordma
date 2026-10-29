@@ -118,6 +118,22 @@ fn emit_log(app: &AppHandle, stream: &str, line: &str) {
     );
 }
 
+fn resource_engine_dir(app: &AppHandle) -> Option<PathBuf> {
+    let resource_dir = app.path().resource_dir().ok()?;
+    let directory = resource_dir.join("engine");
+
+    if directory.join("cli.js").is_file()
+        || directory.join("cli.ts").is_file()
+    {
+        Some(
+            dunce::canonicalize(&directory)
+                .unwrap_or(directory),
+        )
+    } else {
+        None
+    }
+}
+
 fn engine_entry(app: &AppHandle) -> Result<PathBuf, String> {
     let mut candidates = Vec::new();
 
@@ -125,13 +141,17 @@ fn engine_entry(app: &AppHandle) -> Result<PathBuf, String> {
         candidates.push(PathBuf::from(entry));
     }
 
-    if let Ok(resource_dir) = app.path().resource_dir() {
-        candidates.push(resource_dir.join("engine/cli.ts"));
-        candidates.push(resource_dir.join("engine/dist/cli.js"));
+    #[cfg(debug_assertions)]
+    {
+        let repo_root =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        candidates.push(repo_root.join("packages/engine/src/cli.ts"));
     }
 
-    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
-    candidates.push(repo_root.join("packages/engine/src/cli.ts"));
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        candidates.push(resource_dir.join("engine/cli.js"));
+        candidates.push(resource_dir.join("engine/cli.ts"));
+    }
 
     for candidate in candidates {
         if candidate.is_file() {
@@ -146,8 +166,8 @@ fn engine_entry(app: &AppHandle) -> Result<PathBuf, String> {
     }
 
     Err(
-        "未找到 engine 入口；开发环境请确认 packages/engine 存在，\
-         或设置 WORDMA_ENGINE_ENTRY"
+        "未找到 engine 入口；请确认安装包包含 Resources/engine，\
+         开发环境请确认 packages/engine 存在，或设置 WORDMA_ENGINE_ENTRY"
             .to_string(),
     )
 }
@@ -184,15 +204,34 @@ fn engine_command(
     let mut all = vec![entry.to_string_lossy().into_owned()];
     all.extend(args);
 
-    app.shell()
+    let command = app
+        .shell()
         .sidecar("bun")
-        .map_err(|error| format!("无法启动 Bun sidecar：{error}"))
-        .map(|command| {
-            command
-                .args(all)
-                .set_raw_out(true)
-                .set_process_group(true)
-        })
+        .map_err(|error| format!("无法启动 Bun sidecar：{error}"))?
+        .args(all)
+        .set_raw_out(true)
+        .set_process_group(true);
+
+    let Some(resource_engine) = resource_engine_dir(app) else {
+        return Ok(command);
+    };
+    let canonical_entry =
+        dunce::canonicalize(entry).unwrap_or_else(|_| entry.to_path_buf());
+
+    if !canonical_entry.starts_with(&resource_engine) {
+        return Ok(command);
+    }
+
+    Ok(command
+        .env("WORDMA_ENGINE_ROOT", &resource_engine)
+        .env(
+            "WORDMA_DEFAULT_THEME_DIR",
+            resource_engine.join("themes/default"),
+        )
+        .env(
+            "WORDMA_ISLAND_RUNTIME_ENTRY",
+            resource_engine.join("runtime-entry.ts"),
+        ))
 }
 
 async fn run_engine(

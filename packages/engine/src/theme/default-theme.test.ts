@@ -18,7 +18,10 @@ import {
 import { loadThemePackage } from '@wordma/theme';
 
 import { buildSite } from '../build';
-import { resolveThemeDirectory } from './resolve';
+import {
+  defaultThemeDirectory,
+  resolveThemeDirectory,
+} from './resolve';
 import { loadThemeRuntime } from './runtime';
 import { resolveThemeSettings } from './settings';
 import { checkThemeEngines } from './version';
@@ -32,8 +35,7 @@ const defaultThemeDir = path.join(
   'themes/default',
 );
 
-describe('default theme contract', () => {
-  it('package、manifest、版本与 settings 满足契约', () => {
+describe('default theme contract', () => {  it('package、manifest、版本与 settings 满足契约', () => {
     const loaded = loadThemePackage(defaultThemeDir);
     const manifest = parseThemeManifest(
       parseYamlFile(
@@ -75,6 +77,48 @@ describe('default theme contract', () => {
       accent: '#3563d9',
       showDescription: true,
     });
+  });
+
+  it('内置主题支持资源目录环境变量', () => {
+    const previousDefault =
+      process.env.WORDMA_DEFAULT_THEME_DIR;
+    const previousRoot = process.env.WORDMA_ENGINE_ROOT;
+    const emptyRoot = path.join(
+      tmpdir(),
+      'wordma-no-default-theme',
+    );
+
+    try {
+      process.env.WORDMA_DEFAULT_THEME_DIR =
+        defaultThemeDir;
+      delete process.env.WORDMA_ENGINE_ROOT;
+
+      expect(defaultThemeDirectory()).toBe(defaultThemeDir);
+      expect(
+        resolveThemeDirectory(
+          emptyRoot,
+          'wordma-theme-default',
+        ),
+      ).toBe(defaultThemeDir);
+
+      delete process.env.WORDMA_DEFAULT_THEME_DIR;
+      process.env.WORDMA_ENGINE_ROOT = repoRoot;
+
+      expect(defaultThemeDirectory()).toBe(defaultThemeDir);
+    } finally {
+      if (previousDefault === undefined) {
+        delete process.env.WORDMA_DEFAULT_THEME_DIR;
+      } else {
+        process.env.WORDMA_DEFAULT_THEME_DIR =
+          previousDefault;
+      }
+
+      if (previousRoot === undefined) {
+        delete process.env.WORDMA_ENGINE_ROOT;
+      } else {
+        process.env.WORDMA_ENGINE_ROOT = previousRoot;
+      }
+    }
   });
 
   it('布局、样式分组与 engine 内置解析可用', async () => {

@@ -10,6 +10,7 @@ build/
 .cache/
 coverage/
 *.tsbuildinfo
+apps/desktop/src-tauri/resources/engine/
 
 # logs
 *.log
