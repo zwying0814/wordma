@@ -21,6 +21,14 @@ content:
     fields: []
   page:
     fields: []
-  pageTypes: {}
+  pageTypes:
+    about:
+      label: 关于页
+      route: /about
+      layout: page
+    page:
+      label: 普通页面
+      route: /pages/[slug]
+      layout: page
 
 pages: []

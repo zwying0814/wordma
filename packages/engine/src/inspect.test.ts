@@ -85,7 +85,17 @@ describe('inspectWorkspace', () => {
     expect(result.themeId).toBe('wordma-theme-default');
     expect(result.theme?.id).toBe('wordma-theme-default');
     expect(result.postFields).toEqual([]);
-    expect(result.pageTypes).toEqual([]);
+    expect(result.pageTypes.map((pageType) => pageType.id)).toEqual([
+      'about',
+      'page',
+    ]);
+    expect(
+      result.pageTypes.find((pageType) => pageType.id === 'about'),
+    ).toMatchObject({
+      label: '关于页',
+      route: '/about',
+      layout: 'page',
+    });
     expect(result.settingsValues).toEqual({
       accent: '#3563d9',
       showDescription: true,

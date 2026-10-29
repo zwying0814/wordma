@@ -62,6 +62,16 @@ describe('default theme contract', () => {  it('package、manifest、版本与 s
     expect(manifest.pages).toEqual([]);
     expect(manifest.content?.post.fields).toEqual([]);
     expect(manifest.content?.page.fields).toEqual([]);
+    expect(manifest.content?.pageTypes.about).toMatchObject({
+      label: '关于页',
+      route: '/about',
+      layout: 'page',
+    });
+    expect(manifest.content?.pageTypes.page).toMatchObject({
+      label: '普通页面',
+      route: '/pages/[slug]',
+      layout: 'page',
+    });
 
     expect(
       packageJson.peerDependencies,
@@ -207,6 +217,14 @@ describe('default theme contract', () => {  it('package、manifest、版本与 s
         'content/posts/hello.mdx',
         '---\ntitle: Hello\n---\n\n# Hello',
       );
+      write(
+        'content/pages/about.mdx',
+        '---\ntitle: About\ntype: about\n---\n\n# About',
+      );
+      write(
+        'content/pages/guide.mdx',
+        '---\ntitle: Guide\ntype: page\n---\n\n# Guide',
+      );
 
       const result = await buildSite({ root, outDir });
       const html = readFileSync(
@@ -217,6 +235,22 @@ describe('default theme contract', () => {  it('package、manifest、版本与 s
       expect(result.theme.id).toBe('wordma-theme-default');
       expect(html).toContain('Default Only');
       expect(html).toContain('/assets/css/theme-');
+      expect(
+        existsSync(path.join(outDir, 'about/index.html')),
+      ).toBe(true);
+      expect(
+        existsSync(path.join(outDir, 'pages/guide/index.html')),
+      ).toBe(true);
+      expect(
+        result.manifest.routes.find(
+          (route) => route.path === '/about/',
+        )?.pageTypeId,
+      ).toBe('about');
+      expect(
+        result.manifest.routes.find(
+          (route) => route.path === '/pages/guide/',
+        )?.pageTypeId,
+      ).toBe('page');
       expect(
         readdirSync(
           path.join(outDir, 'assets/css'),
