@@ -584,7 +584,9 @@ pub async fn deps_install(
         .map_err(|error| {
             DepsError::new(
                 "BUN_NOT_FOUND",
-                format!("无法启动 Bun sidecar：{error}"),
+                format!(
+                    "Bun sidecar 不可用（请检查平台、签名或重新安装）：{error}"
+                ),
             )
         })?
         .args(args)

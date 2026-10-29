@@ -207,7 +207,11 @@ fn engine_command(
     let command = app
         .shell()
         .sidecar("bun")
-        .map_err(|error| format!("无法启动 Bun sidecar：{error}"))?
+        .map_err(|error| {
+            format!(
+                "Bun sidecar 不可用（请检查平台、签名或重新安装）：{error}"
+            )
+        })?
         .args(all)
         .set_raw_out(true)
         .set_process_group(true);

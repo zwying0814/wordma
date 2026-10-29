@@ -38,6 +38,9 @@ jobs:
       - name: Fetch Bun sidecar
         run: pnpm fetch:bun
 
+      - name: Verify Bun sidecar
+        run: pnpm --filter desktop fetch:bun -- --check
+
       - name: Typecheck
         run: pnpm typecheck
 

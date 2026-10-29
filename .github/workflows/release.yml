@@ -92,6 +92,9 @@ jobs:
       - name: Fetch Bun sidecar
         run: pnpm --filter desktop fetch:bun -- --target ${{ matrix.bun_target }}
 
+      - name: Verify Bun sidecar
+        run: pnpm --filter desktop fetch:bun -- --target ${{ matrix.bun_target }} --check
+
       - name: Build and publish
         uses: tauri-apps/tauri-action@v1
         env:

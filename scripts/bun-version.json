@@ -1,0 +1,26 @@
+{
+  "version": "1.4.4",
+  "registry": "https://registry.npmmirror.com",
+  "targets": {
+    "aarch64-apple-darwin": {
+      "package": "bun-darwin-aarch64",
+      "integrity": "sha512-zW/hxwc8sJAILGwB5eTC4i48ouGXf0V4lrxmEOk3JIE6JkYVW1TZh1E2pIempqsezgW1sckTIIDudFON8bJ2Mw=="
+    },
+    "x86_64-apple-darwin": {
+      "package": "bun-darwin-x64",
+      "integrity": "sha512-oKGcxLsvh4oHjAo28nPm8c/xN0o/OmGyj1IHYc94vprkWsW2hNg2keEZt5f40cI5Hvu4jDlSRTR0UNpv1UIAxw=="
+    },
+    "x86_64-unknown-linux-gnu": {
+      "package": "bun-linux-x64",
+      "integrity": "sha512-CHbbkmHVM28T1GFq+6GL4Ao4ujwwYwj1CxFFwEFzLanPfNsId9AhbIP0Q4reWuWBkGimUkoQygrK7Rgjtj3vog=="
+    },
+    "aarch64-unknown-linux-gnu": {
+      "package": "bun-linux-aarch64",
+      "integrity": "sha512-ZTVtpf9zmHSBVPX1sBwe5agGb/rN34yPGg/Hby8e2Ax2uCUA2URZKlZH7qLntK7qaFJCMXh9v0GWNYN2zINz1w=="
+    },
+    "x86_64-pc-windows-msvc": {
+      "package": "bun-windows-x64",
+      "integrity": "sha512-a3LNctBVO8PjePsFZfwDleF2JXYf2BfQ1u/PLRnBDLnC2Riml+4+LgJpKj4xRGhB92KweGyQI5PXaTkP9qypMQ=="
+    }
+  }
+}
