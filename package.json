@@ -23,7 +23,7 @@
     "test:contracts": "pnpm test:content && pnpm test:theme && pnpm test:engine && pnpm test:create-theme && pnpm fixtures:validate",
     "test:desktop": "pnpm --filter desktop test",
     "test:e2e": "playwright test",
-    "test:scripts": "node --test scripts/version.test.mjs scripts/fetch-bun.test.mjs",
+    "test:scripts": "node --test scripts/version.test.mjs scripts/fetch-bun.test.mjs scripts/workflow.test.mjs",
     "version:check": "node scripts/version.mjs check",
     "version:sync": "node scripts/version.mjs sync",
     "engine:stage": "node scripts/stage-engine.mjs",

@@ -10,7 +10,90 @@ permissions:
   contents: write
 
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check version consistency
+        run: pnpm version:check
+
+      - name: Check release tag matches version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          test "v$VERSION" = "$GITHUB_REF_NAME"
+
+      - name: Cache Bun sidecar
+        uses: actions/cache@v4
+        with:
+          path: apps/desktop/src-tauri/binaries
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/bun-version.json') }}
+
+      - name: Fetch Bun sidecar
+        run: pnpm fetch:bun
+
+      - name: Verify Bun sidecar
+        run: pnpm --filter desktop fetch:bun -- --check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Script and contract tests
+        run: |
+          pnpm test:scripts
+          pnpm test:contracts
+
+      - name: Desktop unit tests
+        run: pnpm --filter desktop test
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Desktop E2E
+        run: pnpm test:e2e
+
+      - name: Stage engine resources
+        run: pnpm engine:stage
+
+      - name: Smoke test staged engine
+        run: pnpm engine:smoke
+
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-playwright-results
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+
   publish-tauri:
+    needs: checks
     strategy:
       fail-fast: false
       matrix:
@@ -80,14 +163,11 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check version consistency
-        run: pnpm version:check
-
-      - name: Check release tag matches version
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          test "v$VERSION" = "$GITHUB_REF_NAME"
+      - name: Cache Bun sidecar
+        uses: actions/cache@v4
+        with:
+          path: apps/desktop/src-tauri/binaries
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ matrix.bun_target }}-${{ hashFiles('scripts/bun-version.json') }}
 
       - name: Fetch Bun sidecar
         run: pnpm --filter desktop fetch:bun -- --target ${{ matrix.bun_target }}
