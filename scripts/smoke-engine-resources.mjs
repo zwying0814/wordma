@@ -61,9 +61,9 @@ function engineEnv() {
   };
 }
 
-function createWorkspace() {
+function createWorkspace(prefix = 'wordma-engine-smoke-') {
   const workspace = mkdtempSync(
-    path.join(tmpdir(), 'wordma-engine-smoke-'),
+    path.join(tmpdir(), prefix),
   );
   mkdirSync(path.join(workspace, 'content/posts'), {
     recursive: true,
@@ -256,6 +256,9 @@ async function main() {
   const workspace = createWorkspace();
   const externalWorkspace =
     createExternalThemeWorkspace();
+  const pathWorkspace = createWorkspace(
+    'wordma engine 中文 smoke-',
+  );
 
   try {
     const inspect = run(bun, [
@@ -332,16 +335,54 @@ async function main() {
 
     await devSmoke(bun, workspace);
 
+    const pathInspect = run(bun, [
+      'inspect',
+      '--root',
+      pathWorkspace,
+      '--json',
+    ]);
+    if (pathInspect.status !== 0) {
+      throw new Error(
+        `含空格/中文路径 inspect 失败：\n${pathInspect.stderr}\n${pathInspect.stdout}`,
+      );
+    }
+
+    const pathOut = path.join(pathWorkspace, '输出 dist');
+    const pathBuild = run(bun, [
+      'build',
+      '--root',
+      pathWorkspace,
+      '--out',
+      pathOut,
+      '--json',
+      '--no-cache',
+    ]);
+    if (pathBuild.status !== 0) {
+      throw new Error(
+        `含空格/中文路径 build 失败：\n${pathBuild.stderr}\n${pathBuild.stdout}`,
+      );
+    }
+    if (
+      !readFileSync(
+        path.join(pathOut, 'index.html'),
+        'utf8',
+      ).includes('Engine Smoke')
+    ) {
+      throw new Error('含空格/中文路径产物缺少站点标题');
+    }
+
     console.log('✓ staged engine inspect');
     console.log('✓ staged engine build');
     console.log('✓ staged engine dev');
     console.log('✓ staged external theme build');
+    console.log('✓ staged paths with spaces and CJK');
   } finally {
     rmSync(workspace, { recursive: true, force: true });
     rmSync(externalWorkspace, {
       recursive: true,
       force: true,
     });
+    rmSync(pathWorkspace, { recursive: true, force: true });
   }
 }
 

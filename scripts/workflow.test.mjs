@@ -90,6 +90,43 @@ test('CI 覆盖 contracts、desktop、Rust 与 engine 资源 job', () => {
   assert.match(engine, /pnpm engine:smoke/);
 });
 
+test('CI 构建并校验 Linux deb/AppImage', () => {
+  const ci = loadWorkflow('ci.yml');
+  const job = ci.jobs['linux-bundles'];
+
+  assert.ok(job, '缺少 linux-bundles job');
+  assert.equal(job['runs-on'], 'ubuntu-22.04');
+  assert.ok(job['timeout-minutes'] > 0);
+
+  const script = runScript(job);
+  assert.match(script, /tauri build --bundles deb,appimage/);
+  assert.match(script, /verify-desktop-bundles\.mjs/);
+  assert.match(script, /--platform linux/);
+  assert.match(script, /bundle-artifacts\.mjs checksum/);
+
+  assert.ok(
+    steps(job).some((step) =>
+      /swatinem\/rust-cache/.test(step.uses ?? ''),
+    ),
+    'linux-bundles 缺少 Rust 缓存',
+  );
+  assert.ok(
+    steps(job).some((step) =>
+      /libwebkit2gtk-4\.1-dev/.test(step.run ?? ''),
+    ),
+    'linux-bundles 缺少 Linux 系统依赖',
+  );
+  const cacheSteps = steps(job).filter((step) =>
+    (step.uses ?? '').startsWith('actions/cache'),
+  );
+  assert.ok(
+    cacheSteps.some((step) =>
+      /binaries/.test(String(step.with?.path)),
+    ),
+    'linux-bundles 缺少 Bun sidecar 缓存',
+  );
+});
+
 test('CI 缓存 pnpm、Bun sidecar 与 Playwright 浏览器', () => {
   const ci = loadWorkflow('ci.yml');
 
@@ -181,6 +218,14 @@ test('release 构建矩阵使用固定 Bun target 与 draft 发布', () => {
     ],
   );
 
+  for (const entry of publish.strategy.matrix.include) {
+    assert.match(entry.bundle_dir, /release\/bundle$/);
+    assert.match(
+      entry.artifact_suffix,
+      /^(macos-aarch64|macos-x64|linux-x64|windows-x64)$/,
+    );
+  }
+
   for (const step of steps(publish)) {
     if (!/fetch:bun/.test(step.run ?? '')) continue;
     assert.match(step.run, /\$\{\{ matrix\.bun_target \}\}/);
@@ -246,4 +291,43 @@ test('release 按需注入 Apple 凭据并校验 macOS 产物', () => {
   assert.match(verify.run, /--notarized/);
   assert.match(verify.run, /--allow-unsigned/);
   assert.match(verify.run, /matrix\.bun_target/);
+});
+
+test('release 校验 Linux / Windows 安装包并上传 checksum', () => {
+  const release = loadWorkflow('release.yml');
+  const publish = release.jobs['publish-tauri'];
+
+  const verify = steps(publish).find(
+    (step) => step.name === 'Verify Linux / Windows installers',
+  );
+  assert.ok(verify, '缺少 Linux / Windows 安装包校验');
+  assert.equal(
+    verify.if,
+    "${{ !startsWith(matrix.platform, 'macos') }}",
+  );
+  assert.equal(verify.shell, 'bash');
+  assert.match(verify.run, /verify-desktop-bundles\.mjs/);
+  assert.match(verify.run, /matrix\.bundle_dir/);
+  assert.match(verify.run, /matrix\.bun_target/);
+
+  const checksum = steps(publish).find(
+    (step) => step.name === 'Generate checksums',
+  );
+  assert.ok(checksum, '缺少 checksum 生成步骤');
+  assert.equal(checksum.shell, 'bash');
+  assert.match(checksum.run, /bundle-artifacts\.mjs checksum/);
+  assert.match(checksum.run, /matrix\.bundle_dir/);
+  assert.match(checksum.run, /artifact_suffix/);
+
+  const upload = steps(publish).find(
+    (step) => step.name === 'Upload checksums',
+  );
+  assert.ok(upload, '缺少 checksum 上传步骤');
+  assert.equal(upload.shell, 'bash');
+  assert.match(upload.run, /gh release upload/);
+  assert.match(upload.run, /--clobber/);
+  assert.equal(
+    upload.env.GH_TOKEN,
+    '${{ secrets.GITHUB_TOKEN }}',
+  );
 });

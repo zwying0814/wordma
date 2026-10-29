@@ -102,15 +102,23 @@ jobs:
           - platform: macos-latest
             bun_target: aarch64-apple-darwin
             tauri_args: --target aarch64-apple-darwin
+            bundle_dir: apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle
+            artifact_suffix: macos-aarch64
           - platform: macos-latest
             bun_target: x86_64-apple-darwin
             tauri_args: --target x86_64-apple-darwin
+            bundle_dir: apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle
+            artifact_suffix: macos-x64
           - platform: ubuntu-22.04
             bun_target: x86_64-unknown-linux-gnu
             tauri_args: ''
+            bundle_dir: apps/desktop/src-tauri/target/release/bundle
+            artifact_suffix: linux-x64
           - platform: windows-latest
             bun_target: x86_64-pc-windows-msvc
             tauri_args: ''
+            bundle_dir: apps/desktop/src-tauri/target/release/bundle
+            artifact_suffix: windows-x64
 
     runs-on: ${{ matrix.platform }}
 
@@ -237,3 +245,31 @@ jobs:
           else
             node scripts/verify-macos-release.mjs --target "${{ matrix.bun_target }}" --allow-unsigned
           fi
+
+      - name: Verify Linux / Windows installers
+        if: ${{ !startsWith(matrix.platform, 'macos') }}
+        shell: bash
+        run: |
+          PLATFORM="${{ startsWith(matrix.platform, 'windows') && 'win32' || 'linux' }}"
+          node scripts/verify-desktop-bundles.mjs \
+            --bundle-dir "${{ matrix.bundle_dir }}" \
+            --platform "$PLATFORM" \
+            --target "${{ matrix.bun_target }}"
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node scripts/bundle-artifacts.mjs checksum \
+            --bundle-dir "${{ matrix.bundle_dir }}" \
+            --out "Wordma_${VERSION}_${{ matrix.artifact_suffix }}.sha256"
+
+      - name: Upload checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release upload "v$VERSION" \
+            "Wordma_${VERSION}_${{ matrix.artifact_suffix }}.sha256" \
+            --clobber

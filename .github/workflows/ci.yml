@@ -191,3 +191,82 @@ jobs:
 
       - name: Smoke test staged engine
         run: pnpm engine:smoke
+
+  linux-bundles:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Bun sidecar
+        uses: actions/cache@v4
+        with:
+          path: apps/desktop/src-tauri/binaries
+          key: bun-${{ runner.os }}-${{ runner.arch }}-x86_64-unknown-linux-gnu-${{ hashFiles('scripts/bun-version.json') }}
+
+      - name: Fetch Bun sidecar
+        run: pnpm --filter desktop fetch:bun -- --target x86_64-unknown-linux-gnu
+
+      - name: Verify Bun sidecar
+        run: pnpm --filter desktop fetch:bun -- --target x86_64-unknown-linux-gnu --check
+
+      - name: Build Linux bundles
+        run: pnpm --filter desktop tauri build --bundles deb,appimage
+
+      - name: Verify Linux bundles
+        run: |
+          node scripts/verify-desktop-bundles.mjs \
+            --bundle-dir apps/desktop/src-tauri/target/release/bundle \
+            --platform linux \
+            --target x86_64-unknown-linux-gnu
+
+      - name: Generate checksums
+        run: |
+          node scripts/bundle-artifacts.mjs checksum \
+            --bundle-dir apps/desktop/src-tauri/target/release/bundle \
+            --out SHA256SUMS-linux-x64.txt
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundles-checksums
+          path: SHA256SUMS-linux-x64.txt
+          retention-days: 7
