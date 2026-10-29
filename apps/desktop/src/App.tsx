@@ -4,8 +4,11 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Toaster } from '@/components/ui/sonner';
 import {
+  getWorkspaceStatus,
+  initializeWorkspace,
   loadWorkspaces,
   openWorkspace,
   pickWorkspaceFolder,
@@ -13,6 +16,7 @@ import {
   setAutoOpenLast as persistAutoOpenLast,
   type RecentWorkspace,
   type WorkspaceInfo,
+  type WorkspaceStatus,
 } from '@/features/workspace/api';
 import { WelcomeScreen } from '@/features/workspace/welcome-screen';
 import { WorkspaceShell } from '@/features/workspace/workspace-shell';
@@ -43,6 +47,10 @@ function App() {
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
+  const [pendingInit, setPendingInit] =
+    useState<WorkspaceStatus | null>(null);
+  const [initializing, setInitializing] = useState(false);
+  const initializingRef = useRef(false);
   const initialized = useRef(false);
 
   const applyState = useCallback((state: PersistedState) => {
@@ -54,7 +62,12 @@ function App() {
     async (path: string) => {
       setOpeningPath(path);
       try {
-        const info = await openWorkspace(path);
+        const status = await getWorkspaceStatus(path);
+        if (!status.hasSiteConfig || !status.hasContentDir) {
+          setPendingInit(status);
+          return;
+        }
+        const info = await openWorkspace(status.path);
         setWorkspace(info);
       } catch (error) {
         toast.error(errorMessage(error));
@@ -69,6 +82,39 @@ function App() {
     },
     [applyState],
   );
+
+  const confirmInitialize = useCallback(async () => {
+    if (!pendingInit || initializingRef.current) return;
+
+    initializingRef.current = true;
+    setInitializing(true);
+    setOpeningPath(pendingInit.path);
+
+    try {
+      await initializeWorkspace(pendingInit.path);
+      const info = await openWorkspace(pendingInit.path);
+      setPendingInit(null);
+      setWorkspace(info);
+      toast.success('已初始化笔记空间');
+    } catch (error) {
+      toast.error(errorMessage(error));
+      try {
+        applyState(await loadWorkspaces());
+      } catch {
+        // 初始化失败时保留当前列表
+      }
+    } finally {
+      initializingRef.current = false;
+      setInitializing(false);
+      setOpeningPath(null);
+    }
+  }, [applyState, pendingInit]);
+
+  const handleInitDialogChange = useCallback((next: boolean) => {
+    if (!next && !initializingRef.current) {
+      setPendingInit(null);
+    }
+  }, []);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -193,6 +239,22 @@ function App() {
         />
       )}
       <Toaster />
+      <ConfirmDialog
+        open={pendingInit !== null}
+        title={
+          pendingInit?.hasSiteConfig
+            ? '补全笔记空间？'
+            : '初始化笔记空间？'
+        }
+        description={
+          pendingInit?.hasSiteConfig
+            ? `「${pendingInit.name}」缺少 content 目录。初始化会补全 content/posts 与 content/pages，不会覆盖已有文件。`
+            : `「${pendingInit?.name ?? ''}」还不是 Wordma 笔记空间。初始化会创建 wordma.site.yaml、content 目录和一篇示例笔记，不会覆盖已有文件。`
+        }
+        confirmLabel={initializing ? '初始化中…' : '初始化'}
+        onConfirm={() => void confirmInitialize()}
+        onOpenChange={handleInitDialogChange}
+      />
     </>
   );
 }

@@ -18,8 +18,27 @@ export type WorkspaceInfo = {
   name: string;
 };
 
+export type WorkspaceStatus = {
+  path: string;
+  name: string;
+  hasSiteConfig: boolean;
+  hasContentDir: boolean;
+};
+
 export function loadWorkspaces(): Promise<WorkspaceState> {
   return invoke<WorkspaceState>('load_workspaces');
+}
+
+export function getWorkspaceStatus(
+  path: string,
+): Promise<WorkspaceStatus> {
+  return invoke<WorkspaceStatus>('workspace_status', { path });
+}
+
+export function initializeWorkspace(
+  path: string,
+): Promise<WorkspaceInfo> {
+  return invoke<WorkspaceInfo>('initialize_workspace', { path });
 }
 
 export function openWorkspace(path: string): Promise<WorkspaceInfo> {
@@ -38,7 +57,7 @@ export async function pickWorkspaceFolder(): Promise<string | null> {
   const selected = await open({
     directory: true,
     multiple: false,
-    title: '选择笔记空间',
+    title: '选择或新建笔记空间',
   });
 
   return typeof selected === 'string' ? selected : null;

@@ -5,6 +5,8 @@ type E2EState = {
   previewStarts: number;
   previewStops: number;
   builds: number;
+  calls: string[];
+  newWorkspaceInitialized: boolean;
 };
 
 async function state(page: import('@playwright/test').Page) {
@@ -19,6 +21,9 @@ async function state(page: import('@playwright/test').Page) {
           previewStarts: value.previewStarts,
           previewStops: value.previewStops,
           builds: value.builds,
+          calls: value.calls,
+          newWorkspaceInitialized:
+            value.newWorkspaceInitialized,
         }
       : null;
   });
@@ -92,4 +97,36 @@ Edited body from Playwright.
   await expect(page.getByText('发布完成').first()).toBeVisible();
   await expect(page.getByText('3 个路由')).toBeVisible();
   expect((await state(page))?.builds).toBe(1);
+});
+
+test('打开未初始化文件夹时确认后再初始化', async ({
+  page,
+}) => {
+  await page.goto('/?e2e=1');
+
+  await page
+    .getByRole('button', { name: /New Project/ })
+    .click();
+
+  await expect(
+    page.getByText('初始化笔记空间？'),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: '取消' }).click();
+  await expect(
+    page.getByRole('button', { name: /New Project/ }),
+  ).toBeVisible();
+  expect((await state(page))?.newWorkspaceInitialized).toBe(
+    false,
+  );
+
+  await page
+    .getByRole('button', { name: /New Project/ })
+    .click();
+  await page.getByRole('button', { name: '初始化' }).click();
+
+  await expect(page.locator('.cm-content')).toBeVisible();
+  const after = await state(page);
+  expect(after?.calls).toContain('initialize_workspace');
+  expect(after?.newWorkspaceInitialized).toBe(true);
 });

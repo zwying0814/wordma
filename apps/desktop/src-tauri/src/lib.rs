@@ -15,6 +15,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             workspace::load_workspaces,
             workspace::open_workspace,
+            workspace::workspace_status,
+            workspace::initialize_workspace,
             workspace::remove_recent_workspace,
             workspace::set_auto_open_last,
             engine::engine_start_dev,

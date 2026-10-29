@@ -33,7 +33,6 @@
     "test:engine-resources": "pnpm engine:stage && pnpm engine:smoke",
     "engine:stage": "node scripts/stage-engine.mjs",
     "engine:smoke": "node scripts/smoke-engine-resources.mjs",
-    "test:engine-resources": "pnpm engine:stage && pnpm engine:smoke",
     "fixtures:validate": "node scripts/run-bun.mjs scripts/validate-fixtures.ts",
     "build": "pnpm -r --if-present run build",
     "build:app": "pnpm --filter desktop tauri:build",

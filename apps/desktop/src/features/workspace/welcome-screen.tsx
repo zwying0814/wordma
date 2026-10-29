@@ -76,7 +76,7 @@ export function WelcomeScreen({
               <div className="space-y-1">
                 <CardTitle>笔记空间</CardTitle>
                 <CardDescription>
-                  选择一个本地文件夹，内容只保存在你的磁盘上。
+                  选择一个本地文件夹；空文件夹会先初始化站点配置。
                 </CardDescription>
               </div>
               <Button onClick={onOpenFolder} disabled={busy}>
@@ -225,7 +225,7 @@ function EmptyRecents({
       </div>
       <p className="text-sm font-medium">还没有笔记空间</p>
       <p className="max-w-xs text-xs text-muted-foreground">
-        选择一个本地文件夹作为你的写作空间。
+        选择或新建一个文件夹作为你的写作空间。
       </p>
       <Button
         variant="outline"

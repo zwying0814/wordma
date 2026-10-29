@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
@@ -32,6 +33,17 @@ pub struct WorkspaceInfo {
     pub path: String,
     pub name: String,
 }
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceStatus {
+    pub path: String,
+    pub name: String,
+    pub has_site_config: bool,
+    pub has_content_dir: bool,
+}
+
+const WELCOME_NOTE: &str = "---\ntitle: 欢迎使用 Wordma\n---\n\n# 欢迎使用 Wordma\n\n这是一个新的笔记空间。\n\n- 在左侧新建页面\n- 打开预览查看站点\n- 在属性面板调整主题与页面信息\n";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -154,6 +166,15 @@ fn load_state(config_dir: &Path) -> WorkspaceState {
     }
 }
 
+fn workspace_name(canonical: &Path, path_string: &str) -> String {
+    canonical
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned)
+        .unwrap_or_else(|| path_string.to_owned())
+}
+
 fn open_workspace_at(
     config_dir: &Path,
     path: &str,
@@ -169,12 +190,7 @@ fn open_workspace_at(
     }
 
     let path_string = canonical.to_string_lossy().into_owned();
-    let name = canonical
-        .file_name()
-        .and_then(|name| name.to_str())
-        .filter(|name| !name.is_empty())
-        .map(str::to_owned)
-        .unwrap_or_else(|| path_string.clone());
+    let name = workspace_name(&canonical, &path_string);
 
     let mut state = read_stored_state(config_dir);
     state
@@ -194,6 +210,93 @@ fn open_workspace_at(
     Ok(WorkspaceInfo {
         path: path_string,
         name,
+    })
+}
+
+fn workspace_status_at(path: &str) -> Result<WorkspaceStatus, String> {
+    let canonical = dunce::canonicalize(path)
+        .map_err(|_| format!("文件夹不存在或无法访问：{path}"))?;
+
+    let metadata =
+        fs::metadata(&canonical).map_err(|error| format!("无法访问文件夹：{error}"))?;
+    if !metadata.is_dir() {
+        return Err("请选择一个文件夹，而不是文件".to_string());
+    }
+
+    let path_string = canonical.to_string_lossy().into_owned();
+
+    Ok(WorkspaceStatus {
+        name: workspace_name(&canonical, &path_string),
+        path: path_string,
+        has_site_config: canonical.join("wordma.site.yaml").is_file(),
+        has_content_dir: canonical.join("content").is_dir(),
+    })
+}
+
+fn write_new_file(path: &Path, content: &str, label: &str) -> Result<(), String> {
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+    {
+        Ok(mut file) => file
+            .write_all(content.as_bytes())
+            .map_err(|error| format!("无法写入{label}：{error}")),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => Err(format!("无法创建{label}：{error}")),
+    }
+}
+
+fn initialize_workspace_at(path: &str) -> Result<WorkspaceInfo, String> {
+    let status = workspace_status_at(path)?;
+    let root = PathBuf::from(&status.path);
+
+    if !status.has_site_config {
+        let title = serde_json::to_string(&status.name)
+            .map_err(|error| format!("无法生成站点标题：{error}"))?;
+        let config = format!(
+            "site:\n  title: {title}\n  language: zh-CN\n\ntheme:\n  id: wordma-theme-default\n  settings: {{}}\n\nnavigation:\n  - label: 首页\n    path: /\n"
+        );
+
+        write_new_file(&root.join("wordma.site.yaml"), &config, "站点配置")?;
+    }
+
+    let content = root.join("content");
+    if content.exists() {
+        let canonical = dunce::canonicalize(&content)
+            .map_err(|error| format!("无法访问 content 目录：{error}"))?;
+        if !canonical.starts_with(&root) {
+            return Err(format!(
+                "content 目录必须位于工作区内部：{}",
+                content.display()
+            ));
+        }
+    }
+
+    let posts = content.join("posts");
+    fs::create_dir_all(&posts).map_err(|error| format!("无法创建 content/posts：{error}"))?;
+    fs::create_dir_all(content.join("pages"))
+        .map_err(|error| format!("无法创建 content/pages：{error}"))?;
+
+    let has_notes = fs::read_dir(&posts)
+        .map_err(|error| format!("无法读取 content/posts：{error}"))?
+        .filter_map(Result::ok)
+        .any(|entry| {
+            let path = entry.path();
+            path.is_file()
+                && matches!(
+                    path.extension().and_then(|value| value.to_str()),
+                    Some("md") | Some("mdx")
+                )
+        });
+
+    if !has_notes {
+        write_new_file(&posts.join("welcome.mdx"), WELCOME_NOTE, "示例笔记")?;
+    }
+
+    Ok(WorkspaceInfo {
+        path: status.path,
+        name: status.name,
     })
 }
 
@@ -234,6 +337,16 @@ pub fn load_workspaces(app: AppHandle) -> Result<WorkspaceState, String> {
 pub fn open_workspace(app: AppHandle, path: String) -> Result<WorkspaceInfo, String> {
     let config_dir = config_dir(&app)?;
     open_workspace_at(&config_dir, &path, now_ms())
+}
+
+#[tauri::command]
+pub fn workspace_status(path: String) -> Result<WorkspaceStatus, String> {
+    workspace_status_at(&path)
+}
+
+#[tauri::command]
+pub fn initialize_workspace(path: String) -> Result<WorkspaceInfo, String> {
+    initialize_workspace_at(&path)
 }
 
 #[tauri::command]
@@ -369,5 +482,69 @@ mod tests {
 
         set_auto_open_last_at(&config, false).expect("disable auto open");
         assert!(!load_state(&config).auto_open_last);
+    }
+
+    #[test]
+    fn reports_missing_site_config_and_content() {
+        let temp = tempdir().expect("tempdir");
+        let path = make_dir(temp.path(), "empty");
+
+        let status = workspace_status_at(&canonical(&path)).expect("status");
+        assert_eq!(status.name, "empty");
+        assert!(!status.has_site_config);
+        assert!(!status.has_content_dir);
+    }
+
+    #[test]
+    fn initializes_workspace_and_starter_note() {
+        let temp = tempdir().expect("tempdir");
+        let path = make_dir(temp.path(), "我的笔记 空间");
+        let path = canonical(&path);
+
+        let info = initialize_workspace_at(&path).expect("initialize");
+        assert_eq!(info.name, "我的笔记 空间");
+
+        let config = fs::read_to_string(Path::new(&path).join("wordma.site.yaml"))
+            .expect("read site config");
+        assert!(config.contains("title: \"我的笔记 空间\""));
+        assert!(config.contains("id: wordma-theme-default"));
+        assert!(Path::new(&path).join("content/posts/welcome.mdx").is_file());
+        assert!(Path::new(&path).join("content/pages").is_dir());
+
+        let status = workspace_status_at(&path).expect("status");
+        assert!(status.has_site_config);
+        assert!(status.has_content_dir);
+    }
+
+    #[test]
+    fn initialization_does_not_overwrite_existing_files() {
+        let temp = tempdir().expect("tempdir");
+        let path = make_dir(temp.path(), "notes");
+        fs::write(path.join("wordma.site.yaml"), "custom: true\n").expect("write config");
+        fs::create_dir_all(path.join("content/posts")).expect("create posts");
+        fs::write(path.join("content/posts/existing.mdx"), "keep me").expect("write note");
+
+        initialize_workspace_at(&canonical(&path)).expect("initialize");
+
+        assert_eq!(
+            fs::read_to_string(path.join("wordma.site.yaml")).expect("read config"),
+            "custom: true\n"
+        );
+        assert_eq!(
+            fs::read_to_string(path.join("content/posts/existing.mdx")).expect("read note"),
+            "keep me"
+        );
+        assert!(!path.join("content/posts/welcome.mdx").exists());
+        assert!(path.join("content/pages").is_dir());
+    }
+
+    #[test]
+    fn initialization_rejects_files() {
+        let temp = tempdir().expect("tempdir");
+        let file = temp.path().join("note.md");
+        fs::write(&file, "hello").expect("write file");
+
+        assert!(workspace_status_at(&canonical(&file)).is_err());
+        assert!(initialize_workspace_at(&canonical(&file)).is_err());
     }
 }

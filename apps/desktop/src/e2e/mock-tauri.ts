@@ -15,6 +15,7 @@ export type E2EState = {
   previewStops: number;
   builds: number;
   calls: string[];
+  newWorkspaceInitialized: boolean;
 };
 
 declare global {
@@ -26,6 +27,11 @@ declare global {
 const workspace: WorkspaceInfo = {
   path: '/e2e/workspace',
   name: 'E2E Workspace',
+};
+
+const newWorkspace: WorkspaceInfo = {
+  path: '/e2e/new',
+  name: 'New Project',
 };
 
 const initialState = `---
@@ -106,6 +112,7 @@ export function setupE2EMocks(): void {
     previewStops: 0,
     builds: 0,
     calls: [],
+    newWorkspaceInitialized: false,
   };
   window.__WORDMA_E2E__ = state;
 
@@ -126,12 +133,39 @@ export function setupE2EMocks(): void {
                 lastOpenedAt: Date.now(),
                 exists: true,
               },
+              {
+                path: newWorkspace.path,
+                name: newWorkspace.name,
+                lastOpenedAt: Date.now() - 1000,
+                exists: true,
+              },
             ],
             autoOpenLast: false,
           };
 
+        case 'workspace_status': {
+          const target = String(payload.path ?? '');
+          const isNew = target === newWorkspace.path;
+          return {
+            path: target,
+            name: isNew ? newWorkspace.name : workspace.name,
+            hasSiteConfig: isNew
+              ? state.newWorkspaceInitialized
+              : true,
+            hasContentDir: isNew
+              ? state.newWorkspaceInitialized
+              : true,
+          };
+        }
+
+        case 'initialize_workspace':
+          state.newWorkspaceInitialized = true;
+          return newWorkspace;
+
         case 'open_workspace':
-          return workspace;
+          return String(payload.path ?? '') === newWorkspace.path
+            ? newWorkspace
+            : workspace;
 
         case 'remove_recent_workspace':
           return {
