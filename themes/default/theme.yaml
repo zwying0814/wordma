@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=../../packages/theme/schema/theme.schema.json
 id: wordma-theme-default
 displayName: Default
-version: 0.0.0
+version: 0.1.0
 engines:
   wordma: ">=0.0.0"
 

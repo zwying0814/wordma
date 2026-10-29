@@ -11,6 +11,9 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+
+import { ENGINE_VERSION } from './constants';
+
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const cliPath = path.resolve(import.meta.dirname, 'cli.ts');
 
@@ -232,7 +235,9 @@ describe('wordma-engine CLI', () => {
     const result = runCli(['--version']);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('wordma-engine 0.0.0');
+    expect(result.stdout).toContain(
+      `wordma-engine ${ENGINE_VERSION}`,
+    );
   });
 
   it('inspect --json 输出合法 JSON', () => {
