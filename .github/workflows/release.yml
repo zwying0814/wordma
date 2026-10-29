@@ -175,17 +175,45 @@ jobs:
       - name: Verify Bun sidecar
         run: pnpm --filter desktop fetch:bun -- --target ${{ matrix.bun_target }} --check
 
-      - name: Build and publish
-        uses: tauri-apps/tauri-action@v1
+      - name: Configure Apple signing
+        if: startsWith(matrix.platform, 'macos')
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS 签名 / 公证：配置这些 secrets 后生效；不配置则产物未签名。
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_PATH: ${{ secrets.APPLE_API_KEY_PATH }}
+        run: |
+          # 只导出非空 secrets，避免 Tauri 把空字符串当成凭据。
+          for name in \
+            APPLE_CERTIFICATE \
+            APPLE_CERTIFICATE_PASSWORD \
+            APPLE_SIGNING_IDENTITY \
+            APPLE_ID \
+            APPLE_PASSWORD \
+            APPLE_TEAM_ID \
+            APPLE_API_KEY \
+            APPLE_API_ISSUER \
+            APPLE_API_KEY_PATH; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              {
+                echo "$name<<WORDMA_ENV_EOF"
+                printf '%s\n' "$value"
+                echo "WORDMA_ENV_EOF"
+              } >> "$GITHUB_ENV"
+            fi
+          done
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS 签名 / 公证凭据由上一步按需注入。
           # Windows 代码签名：如使用证书或 Azure Trusted Signing，在此补对应 secrets。
         with:
           projectPath: apps/desktop
@@ -196,3 +224,16 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.tauri_args }}
+
+      - name: Verify macOS artifacts
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          if [ -n "$APPLE_CERTIFICATE$APPLE_SIGNING_IDENTITY" ]; then
+            if [ -n "$APPLE_ID$APPLE_API_KEY" ]; then
+              node scripts/verify-macos-release.mjs --target "${{ matrix.bun_target }}" --notarized
+            else
+              node scripts/verify-macos-release.mjs --target "${{ matrix.bun_target }}"
+            fi
+          else
+            node scripts/verify-macos-release.mjs --target "${{ matrix.bun_target }}" --allow-unsigned
+          fi

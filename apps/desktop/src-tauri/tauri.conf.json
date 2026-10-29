@@ -34,7 +34,9 @@
     "shortDescription": "本地优先的 MDX 写作与静态站点发布工具",
     "longDescription": "Wordma 是一个本地优先的写作空间：使用 MDX 编辑内容，通过主题渲染，并在本地预览与发布静态站点。",
     "macOS": {
-      "minimumSystemVersion": "13.0"
+      "minimumSystemVersion": "13.0",
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.plist"
     },
     "resources": {
       "resources/engine": "engine"

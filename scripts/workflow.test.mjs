@@ -194,3 +194,56 @@ test('release 构建矩阵使用固定 Bun target 与 draft 发布', () => {
   assert.equal(tauri.with.tagName, 'v__VERSION__');
   assert.equal(tauri.with.projectPath, 'apps/desktop');
 });
+
+test('release 按需注入 Apple 凭据并校验 macOS 产物', () => {
+  const release = loadWorkflow('release.yml');
+  const publish = release.jobs['publish-tauri'];
+
+  const configure = steps(publish).find(
+    (step) => step.name === 'Configure Apple signing',
+  );
+  assert.ok(configure, '缺少 Apple 签名配置步骤');
+  assert.equal(
+    configure.if,
+    "startsWith(matrix.platform, 'macos')",
+  );
+
+  for (const key of [
+    'APPLE_CERTIFICATE',
+    'APPLE_CERTIFICATE_PASSWORD',
+    'APPLE_SIGNING_IDENTITY',
+    'APPLE_ID',
+    'APPLE_PASSWORD',
+    'APPLE_TEAM_ID',
+    'APPLE_API_KEY',
+    'APPLE_API_ISSUER',
+    'APPLE_API_KEY_PATH',
+  ]) {
+    assert.ok(
+      Object.hasOwn(configure.env, key),
+      `签名配置步骤缺少 ${key}`,
+    );
+  }
+
+  assert.match(configure.run, /\$\{!name\}/);
+  assert.match(configure.run, /-n "\$value"/);
+  assert.match(configure.run, /GITHUB_ENV/);
+
+  const tauri = steps(publish).find((step) =>
+    (step.uses ?? '').startsWith('tauri-apps/tauri-action'),
+  );
+  assert.deepEqual(Object.keys(tauri.env), ['GITHUB_TOKEN']);
+
+  const verify = steps(publish).find(
+    (step) => step.name === 'Verify macOS artifacts',
+  );
+  assert.ok(verify, '缺少 macOS 产物校验步骤');
+  assert.equal(
+    verify.if,
+    "startsWith(matrix.platform, 'macos')",
+  );
+  assert.match(verify.run, /verify-macos-release\.mjs/);
+  assert.match(verify.run, /--notarized/);
+  assert.match(verify.run, /--allow-unsigned/);
+  assert.match(verify.run, /matrix\.bun_target/);
+});
