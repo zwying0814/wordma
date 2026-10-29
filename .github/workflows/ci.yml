@@ -192,6 +192,12 @@ jobs:
       - name: Smoke test staged engine
         run: pnpm engine:smoke
 
+      - name: Smoke test installed engine
+        run: |
+          node scripts/smoke-installed-engine.mjs \
+            --engine-dir apps/desktop/src-tauri/resources/engine \
+            --bun apps/desktop/src-tauri/binaries/bun-x86_64-unknown-linux-gnu
+
   linux-bundles:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
@@ -257,6 +263,17 @@ jobs:
             --bundle-dir apps/desktop/src-tauri/target/release/bundle \
             --platform linux \
             --target x86_64-unknown-linux-gnu
+
+      - name: Smoke test installed deb
+        run: |
+          EXTRACT="$RUNNER_TEMP/wordma-deb"
+          rm -rf "$EXTRACT"
+          dpkg-deb -x \
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb \
+            "$EXTRACT"
+          node scripts/smoke-installed-engine.mjs \
+            --engine-dir "$EXTRACT/usr/lib/Wordma/engine" \
+            --bun "$EXTRACT/usr/bin/bun"
 
       - name: Generate checksums
         run: |

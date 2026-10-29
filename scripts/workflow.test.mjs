@@ -88,6 +88,7 @@ test('CI 覆盖 contracts、desktop、Rust 与 engine 资源 job', () => {
   const engine = runScript(ci.jobs['engine-resources']);
   assert.match(engine, /pnpm engine:stage/);
   assert.match(engine, /pnpm engine:smoke/);
+  assert.match(engine, /smoke-installed-engine\.mjs/);
 });
 
 test('CI 构建并校验 Linux deb/AppImage', () => {
@@ -103,6 +104,8 @@ test('CI 构建并校验 Linux deb/AppImage', () => {
   assert.match(script, /verify-desktop-bundles\.mjs/);
   assert.match(script, /--platform linux/);
   assert.match(script, /bundle-artifacts\.mjs checksum/);
+  assert.match(script, /smoke-installed-engine\.mjs/);
+  assert.match(script, /dpkg-deb -x/);
 
   assert.ok(
     steps(job).some((step) =>
@@ -309,6 +312,25 @@ test('release 校验 Linux / Windows 安装包并上传 checksum', () => {
   assert.match(verify.run, /verify-desktop-bundles\.mjs/);
   assert.match(verify.run, /matrix\.bundle_dir/);
   assert.match(verify.run, /matrix\.bun_target/);
+
+  const macSmoke = steps(publish).find(
+    (step) => step.name === 'Smoke test installed macOS app',
+  );
+  assert.ok(macSmoke, '缺少 macOS 安装后 smoke');
+  assert.equal(macSmoke.if, "startsWith(matrix.platform, 'macos')");
+  assert.match(macSmoke.run, /smoke-installed-engine\.mjs/);
+  assert.match(macSmoke.run, /--app/);
+
+  const linuxSmoke = steps(publish).find(
+    (step) => step.name === 'Smoke test installed Linux deb',
+  );
+  assert.ok(linuxSmoke, '缺少 Linux 安装后 smoke');
+  assert.equal(
+    linuxSmoke.if,
+    "startsWith(matrix.platform, 'ubuntu')",
+  );
+  assert.match(linuxSmoke.run, /dpkg-deb -x/);
+  assert.match(linuxSmoke.run, /--engine-dir/);
 
   const checksum = steps(publish).find(
     (step) => step.name === 'Generate checksums',

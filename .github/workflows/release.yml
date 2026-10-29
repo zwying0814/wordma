@@ -246,6 +246,12 @@ jobs:
             node scripts/verify-macos-release.mjs --target "${{ matrix.bun_target }}" --allow-unsigned
           fi
 
+      - name: Smoke test installed macOS app
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          node scripts/smoke-installed-engine.mjs \
+            --app "${{ matrix.bundle_dir }}/macos/Wordma.app"
+
       - name: Verify Linux / Windows installers
         if: ${{ !startsWith(matrix.platform, 'macos') }}
         shell: bash
@@ -255,6 +261,17 @@ jobs:
             --bundle-dir "${{ matrix.bundle_dir }}" \
             --platform "$PLATFORM" \
             --target "${{ matrix.bun_target }}"
+
+      - name: Smoke test installed Linux deb
+        if: startsWith(matrix.platform, 'ubuntu')
+        shell: bash
+        run: |
+          EXTRACT="$RUNNER_TEMP/wordma-deb"
+          rm -rf "$EXTRACT"
+          dpkg-deb -x "${{ matrix.bundle_dir }}"/deb/*.deb "$EXTRACT"
+          node scripts/smoke-installed-engine.mjs \
+            --engine-dir "$EXTRACT/usr/lib/Wordma/engine" \
+            --bun "$EXTRACT/usr/bin/bun"
 
       - name: Generate checksums
         shell: bash
