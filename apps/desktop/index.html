@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 迁移期：先固定层顺序，让 StyleX 的 priority 层排在 Tailwind 的 base 之后，
+         否则 preflight 的 margin/padding 重置会盖掉旧 StyleX 样式。
+         antd/StyleX 移除后删除本段。 -->
+    <style>
+      @layer theme, base, components, utilities, priority1, priority2, priority3,
+        priority4;
+    </style>
     <title>Tauri + React + Typescript</title>
   </head>
 

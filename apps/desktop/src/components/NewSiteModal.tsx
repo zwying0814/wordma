@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
-import { Alert, Form, Modal } from "antd";
-import SiteFormItems, { type SiteFormValues } from "./SiteFormItems";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
+import { InlineAlert } from "./common/inline-alert";
+import SiteFormItems, {
+  siteFormSchema,
+  type SiteFormValues,
+} from "./SiteFormItems";
 import { createSite, setActiveSite, type Site } from "../lib/site";
 
 interface Props {
@@ -9,32 +24,30 @@ interface Props {
   onCreated: (site: Site) => void;
 }
 
+const EMPTY_VALUES: SiteFormValues = { name: "", description: "" };
+
 export default function NewSiteModal({ open, onClose, onCreated }: Props) {
-  const [form] = Form.useForm<SiteFormValues>();
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const form = useForm<SiteFormValues>({
+    resolver: zodResolver(siteFormSchema),
+    defaultValues: EMPTY_VALUES,
+  });
+  const { isSubmitting } = form.formState;
 
   // 每次打开时重置表单
   useEffect(() => {
     if (open) {
-      form.resetFields();
+      form.reset(EMPTY_VALUES);
       setError(null);
     }
   }, [open, form]);
 
-  const handleOk = async () => {
-    let values: SiteFormValues;
-    try {
-      values = await form.validateFields();
-    } catch {
-      return; // 校验失败，错误已显示在字段上
-    }
-    setSubmitting(true);
+  const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
       const site = await createSite(
         values.name.trim(),
-        values.description?.trim() || null,
+        values.description.trim() || null,
       );
       // 新站点设为当前站点；失败不阻塞创建结果
       await setActiveSite(site.id).catch(() => {});
@@ -42,33 +55,40 @@ export default function NewSiteModal({ open, onClose, onCreated }: Props) {
       onClose();
     } catch (e) {
       setError(String(e));
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
 
   return (
-    <Modal
-      title="新建站点"
+    <Dialog
       open={open}
-      onOk={handleOk}
-      confirmLoading={submitting}
-      onCancel={onClose}
-      okText="创建"
-      cancelText="取消"
-      mask={{ closable: !submitting }}
+      onOpenChange={(next) => {
+        if (!next && !isSubmitting) onClose();
+      }}
     >
-      {error && (
-        <Alert
-          type="error"
-          showIcon
-          title={error}
-          style={{ marginBottom: 16 }}
-        />
-      )}
-      <Form form={form} layout="vertical">
-        <SiteFormItems />
-      </Form>
-    </Modal>
+      <DialogContent showCloseButton={!isSubmitting} className="sm:max-w-md">
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>新建站点</DialogTitle>
+            <DialogDescription>每个站点是一份独立的内容空间。</DialogDescription>
+          </DialogHeader>
+          {error ? <InlineAlert>{error}</InlineAlert> : null}
+          <SiteFormItems form={form} />
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={onClose}
+            >
+              取消
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? <Spinner className="size-4" /> : null}
+              创建
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
