@@ -29,6 +29,7 @@
   --color-destructive-soft: var(--destructive-soft);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
+  --color-segmented: var(--segmented);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -78,6 +79,7 @@
   --destructive-soft: #fbecec;
   --success: #1f7a4c;
   --success-soft: #e5f4ec;
+  --segmented: #ecedf0;
   --border: #e5e7eb;
   --input: #d8dce2;
   --ring: #3563d9;
@@ -111,6 +113,7 @@
   --destructive-soft: #3a2426;
   --success: #58b589;
   --success-soft: #1e3329;
+  --segmented: #262a31;
   --border: #2d323a;
   --input: #3a404a;
   --ring: #6d8ef0;

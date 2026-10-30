@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { App as AntdApp, Button, Empty, Input, Popconfirm, Segmented, Spin, Tag } from "antd";
-import { Plus, Search, Trash2 } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
-import x from "@stylexjs/atoms";
+import { FileText, Plus, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { useSite } from "../context/SiteContext";
 import {
   createArticle,
@@ -12,7 +13,20 @@ import {
   type ArticleStatus,
 } from "../lib/article";
 import { countWordsHtml, fmtDate } from "../lib/words";
-import { pageStyles } from "../styles/page.stylex";
+import { ConfirmDialog } from "../components/common/confirm-dialog";
+import { EmptyState } from "../components/common/empty-state";
+import {
+  ListCard,
+  ListRow,
+  ListRowMain,
+  ListRowMeta,
+  ListRowSide,
+  ListRowTitle,
+} from "../components/common/list-row";
+import { PageHeader } from "../components/common/page-header";
+import { PageView } from "../components/common/page-view";
+import { Segmented } from "../components/common/segmented";
+import { StatusBadge } from "../components/common/status-badge";
 
 function ArticleRow({
   article,
@@ -21,7 +35,7 @@ function ArticleRow({
 }: {
   article: Article;
   showBorder: boolean;
-  onDelete: (id: number) => void;
+  onDelete: (article: Article) => void;
 }) {
   const [, navigate] = useLocation();
   const published = article.status === "published";
@@ -36,64 +50,44 @@ function ArticleRow({
     .join(" · ");
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <ListRow
+      showBorder={showBorder}
       onClick={(e) => {
         // 点击行内按钮（删除/气泡）不触发整行跳转，与设计稿 row.onclick 守卫一致
         if ((e.target as HTMLElement).closest("button")) return;
         navigate(`/editor/${article.id}`);
       }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && e.target === e.currentTarget) {
-          navigate(`/editor/${article.id}`);
-        }
-      }}
-      {...stylex.props(
-        pageStyles.row,
-        pageStyles.rowClickable,
-        showBorder && pageStyles.rowBorder,
-      )}
     >
-      <div {...stylex.props(pageStyles.rowMain)}>
-        <span {...stylex.props(pageStyles.rowTitle)}>
-          {article.title || "（无标题）"}
-        </span>
-        <span {...stylex.props(pageStyles.rowMeta)}>{meta}</span>
-      </div>
-      <div {...stylex.props(pageStyles.rowSide)}>
-        <Tag variant="filled" color={published ? "success" : undefined}>
-          {published ? "已发布" : "草稿"}
-        </Tag>
-        <Popconfirm
-          title="删除文章"
-          description="删除后无法恢复，确定删除？"
-          okText="删除"
-          cancelText="取消"
-          okButtonProps={{ danger: true }}
-          onConfirm={() => onDelete(article.id)}
+      <ListRowMain>
+        <ListRowTitle>{article.title || "（无标题）"}</ListRowTitle>
+        <ListRowMeta>{meta}</ListRowMeta>
+      </ListRowMain>
+      <ListRowSide>
+        <StatusBadge published={published} />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-destructive hover:bg-destructive-soft hover:text-destructive"
+          aria-label={`删除「${article.title || "无标题"}」`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(article);
+          }}
         >
-          <Button
-            type="text"
-            size="small"
-            danger
-            icon={<Trash2 size={14} />}
-            aria-label={`删除「${article.title || "无标题"}」`}
-            onClick={(e) => e.stopPropagation()}
-          />
-        </Popconfirm>
-      </div>
-    </div>
+          <Trash2 className="size-3.5" />
+        </Button>
+      </ListRowSide>
+    </ListRow>
   );
 }
 
 export default function ArticlesPage() {
   const { activeSite, articles, articlesLoading, reloadArticles } = useSite();
-  const { message } = AntdApp.useApp();
   const [, navigate] = useLocation();
   const [statusFilter, setStatusFilter] = useState<"all" | ArticleStatus>("all");
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Article | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -112,99 +106,116 @@ export default function ArticlesPage() {
       reloadArticles();
       navigate(`/editor/${article.id}`);
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setCreating(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await deleteArticle(id);
+      await deleteArticle(pendingDelete.id);
       reloadArticles();
-      message.success("文章已删除");
+      toast.success("文章已删除");
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
+    } finally {
+      setPendingDelete(null);
     }
   };
 
   return (
-    <div {...stylex.props(pageStyles.view)}>
-      <div {...stylex.props(pageStyles.pageHead)}>
-        <div>
-          <div {...stylex.props(pageStyles.pageTitle)}>文章</div>
-          <div {...stylex.props(pageStyles.pageSub)}>
-            共 {articles.length} 篇 · {activeSite.name}
-          </div>
-        </div>
-        <Button
-          type="primary"
-          icon={<Plus size={14} />}
-          loading={creating}
-          onClick={handleCreate}
-        >
-          新建文章
-        </Button>
-      </div>
+    <PageView>
+      <PageHeader
+        title="文章"
+        subtitle={`共 ${articles.length} 篇 · ${activeSite.name}`}
+        actions={
+          <Button disabled={creating} onClick={handleCreate}>
+            {creating ? (
+              <Spinner className="size-3.5" />
+            ) : (
+              <Plus className="size-3.5" />
+            )}
+            新建文章
+          </Button>
+        }
+      />
 
-      <div {...stylex.props(pageStyles.filterRow)}>
+      <div className="mb-3.5 flex items-center gap-3">
         <Segmented
           value={statusFilter}
-          onChange={(v) => setStatusFilter(v as "all" | ArticleStatus)}
+          onChange={setStatusFilter}
           options={[
             { label: "全部", value: "all" },
             { label: "已发布", value: "published" },
             { label: "草稿", value: "draft" },
           ]}
         />
-        <Input
-          allowClear
-          placeholder="搜索标题…"
-          prefix={<Search size={14} />}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          {...stylex.props(pageStyles.searchBox)}
-        />
+        <div className="relative ml-auto w-[220px] max-w-[44%]">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-8"
+            placeholder="搜索标题…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="搜索标题"
+          />
+        </div>
       </div>
 
       {articlesLoading ? (
-        <div
-          {...stylex.props(
-            x.display.flex,
-            x.justifyContent.center,
-            x.padding._48px,
-          )}
-        >
-          <Spin />
+        <div className="flex justify-center p-12">
+          <Spinner className="size-5 text-muted-foreground" />
         </div>
       ) : filtered.length === 0 ? (
-        <div {...stylex.props(pageStyles.card, pageStyles.emptyBox)}>
-          <Empty
+        <ListCard>
+          <EmptyState
+            icon={FileText}
+            title={articles.length === 0 ? "还没有文章" : "没有匹配的文章"}
             description={
               articles.length === 0
-                ? "还没有文章，第一篇文章往往最难，也最重要。"
-                : "没有匹配的文章，换个关键词试试。"
+                ? "第一篇文章往往最难，也最重要。"
+                : "换个关键词试试。"
             }
-          >
-            {articles.length === 0 && (
-              <Button type="primary" icon={<Plus size={14} />} onClick={handleCreate}>
-                写一篇文章
-              </Button>
-            )}
-          </Empty>
-        </div>
+            action={
+              articles.length === 0 ? (
+                <Button disabled={creating} onClick={handleCreate}>
+                  {creating ? (
+                    <Spinner className="size-3.5" />
+                  ) : (
+                    <Plus className="size-3.5" />
+                  )}
+                  写一篇文章
+                </Button>
+              ) : null
+            }
+          />
+        </ListCard>
       ) : (
-        <div {...stylex.props(pageStyles.card)}>
+        <ListCard>
           {filtered.map((a, i) => (
             <ArticleRow
               key={a.id}
               article={a}
               showBorder={i < filtered.length - 1}
-              onDelete={handleDelete}
+              onDelete={setPendingDelete}
             />
           ))}
-        </div>
+        </ListCard>
       )}
-    </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="删除文章"
+        description="删除后无法恢复，确定删除？"
+        confirmLabel="删除"
+        destructive
+        onConfirm={handleDelete}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      />
+    </PageView>
   );
 }

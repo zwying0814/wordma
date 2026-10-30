@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { App as AntdApp, Button, Empty, Popconfirm, Upload } from "antd";
-import { Copy, Film, Trash2, Upload as UploadIcon } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
-import x from "@stylexjs/atoms";
+import { useEffect, useRef, useState } from "react";
+import { Copy, Film, Image as ImageIcon, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { useSite } from "../context/SiteContext";
 import {
   deleteMedia,
@@ -12,80 +12,20 @@ import {
   uploadMedia,
   type MediaItem,
 } from "../lib/media";
-import { pageStyles } from "../styles/page.stylex";
+import { ConfirmDialog } from "../components/common/confirm-dialog";
+import { EmptyState } from "../components/common/empty-state";
+import { PageHeader } from "../components/common/page-header";
+import { PageView } from "../components/common/page-view";
 
-const styles = stylex.create({
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-    gap: 14,
-  },
-  item: {
-    position: "relative",
-    display: "flex",
-    flexDirection: "column",
-    backgroundColor: "var(--ant-color-bg-container)",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "var(--ant-color-border-secondary)",
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  thumb: {
-    aspectRatio: "4 / 3",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    backgroundColor: "var(--ant-color-fill-tertiary)",
-  },
-  thumbMedia: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-  },
-  videoBadge: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 6,
-    color: "var(--ant-color-text-tertiary)",
-    fontSize: 12,
-    padding: 12,
-    textAlign: "center",
-    wordBreak: "break-all",
-  },
-  info: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    padding: "8px 10px",
-    borderTopWidth: 1,
-    borderTopStyle: "solid",
-    borderTopColor: "var(--ant-color-border-secondary)",
-  },
-  name: {
-    fontSize: 12,
-    color: "var(--ant-color-text-secondary)",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-    minWidth: 0,
-  },
-  size: {
-    flexShrink: 0,
-    fontSize: 11,
-    color: "var(--ant-color-text-quaternary)",
-  },
-});
+const ACCEPT =
+  "image/png,image/jpeg,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime";
 
 export default function MediaPage() {
-  const { message } = AntdApp.useApp();
   const { activeSite, media, reloadMedia } = useSite();
   const items = media;
   const [uploading, setUploading] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<MediaItem | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const reload = reloadMedia;
 
@@ -93,127 +33,170 @@ export default function MediaPage() {
     reload();
   }, [reload]);
 
-  const handleUpload = async (file: File) => {
+  const handleFiles = async (files: File[]) => {
+    if (files.length === 0) return;
     setUploading(true);
     try {
-      await uploadMedia(activeSite.id, file);
+      for (const file of files) {
+        await uploadMedia(activeSite.id, file);
+        toast.success(`「${file.name}」已上传`);
+      }
       reload();
-      message.success(`「${file.name}」已上传`);
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDelete = async (item: MediaItem) => {
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await deleteMedia(item.id);
+      await deleteMedia(pendingDelete.id);
       reload();
-      message.success("媒体文件已删除");
+      toast.success("媒体文件已删除");
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
+    } finally {
+      setPendingDelete(null);
     }
   };
 
   const copyMarkdown = (item: MediaItem) => {
-    const md = item.kind === "image"
-      ? `![${item.originalName}](${mediaPublicUrl(item)})`
-      : `[${item.originalName}](${mediaPublicUrl(item)})`;
+    const md =
+      item.kind === "image"
+        ? `![${item.originalName}](${mediaPublicUrl(item)})`
+        : `[${item.originalName}](${mediaPublicUrl(item)})`;
     navigator.clipboard
       .writeText(md)
-      .then(() => message.success("Markdown 已复制，可粘贴到文章中"))
-      .catch(() => message.error("复制失败"));
+      .then(() => toast.success("Markdown 已复制，可粘贴到文章中"))
+      .catch(() => toast.error("复制失败"));
   };
 
   return (
-    <div {...stylex.props(pageStyles.view)}>
-      <div {...stylex.props(pageStyles.pageHead)}>
-        <div>
-          <div {...stylex.props(pageStyles.pageTitle)}>媒体库</div>
-          <div {...stylex.props(pageStyles.pageSub)}>
-            共 {items?.length ?? 0} 个文件 · 上传图片和视频，在文章编辑器中插入
-          </div>
-        </div>
-        <Upload
-          multiple
-          accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime"
-          showUploadList={false}
-          customRequest={({ file }) => {
-            handleUpload(file as File);
-          }}
-        >
-          <Button type="primary" icon={<UploadIcon size={14} />} loading={uploading}>
-            上传
-          </Button>
-        </Upload>
-      </div>
+    <PageView>
+      <PageHeader
+        title="媒体库"
+        subtitle={`共 ${items.length} 个文件 · 上传图片和视频，在文章编辑器中插入`}
+        actions={
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept={ACCEPT}
+              className="hidden"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                void handleFiles(files);
+              }}
+            />
+            <Button
+              disabled={uploading}
+              onClick={() => inputRef.current?.click()}
+            >
+              {uploading ? (
+                <Spinner className="size-3.5" />
+              ) : (
+                <Upload className="size-3.5" />
+              )}
+              上传
+            </Button>
+          </>
+        }
+      />
 
       {items.length === 0 ? (
-        <div {...stylex.props(pageStyles.card, pageStyles.emptyBox)}>
-          <Empty description="媒体库还是空的，上传图片或视频后即可在文章中插入。" />
+        <div className="rounded-lg border border-border bg-card shadow-card">
+          <EmptyState
+            icon={ImageIcon}
+            title="媒体库还是空的"
+            description="上传图片或视频后即可在文章中插入。"
+            action={
+              <Button
+                disabled={uploading}
+                onClick={() => inputRef.current?.click()}
+              >
+                {uploading ? (
+                  <Spinner className="size-3.5" />
+                ) : (
+                  <Upload className="size-3.5" />
+                )}
+                上传文件
+              </Button>
+            }
+          />
         </div>
       ) : (
-        <div {...stylex.props(styles.grid)}>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3.5">
           {items.map((item) => (
-            <div key={item.id} {...stylex.props(styles.item)}>
-              <div {...stylex.props(styles.thumb)}>
+            <div
+              key={item.id}
+              className="flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-card"
+            >
+              <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-muted">
                 {item.kind === "image" ? (
                   <img
                     src={mediaItemSrc(item)}
                     alt={item.originalName}
                     loading="lazy"
-                    {...stylex.props(styles.thumbMedia)}
+                    className="block size-full object-cover"
                   />
                 ) : (
-                  <div {...stylex.props(styles.videoBadge)}>
-                    <Film size={26} />
+                  <div className="flex flex-col items-center gap-1.5 p-3 text-center text-xs break-all text-muted-foreground">
+                    <Film className="size-6" />
                     {item.originalName}
                   </div>
                 )}
               </div>
-              <div {...stylex.props(styles.info)}>
-                <span {...stylex.props(styles.name)} title={item.originalName}>
+              <div className="flex items-center justify-between gap-2 border-t border-border px-2.5 py-2">
+                <span
+                  className="min-w-0 truncate text-xs text-muted-foreground"
+                  title={item.originalName}
+                >
                   {item.originalName}
                 </span>
-                <span {...stylex.props(styles.size)}>
+                <span className="shrink-0 text-[11px] text-muted-foreground/70">
                   {formatBytes(item.size)}
                 </span>
               </div>
-              <div
-                {...stylex.props(
-                  x.display.flex,
-                  x.gap._4px,
-                  x.paddingBottom._8px,
-                  x.justifyContent.center,
-                )}
-              >
+              <div className="flex justify-center gap-1 pb-2">
                 <Button
-                  size="small"
-                  icon={<Copy size={13} />}
-                  onClick={() => copyMarkdown(item)}
+                  variant="outline"
+                  size="icon-sm"
                   title="复制 Markdown 引用"
-                />
-                <Popconfirm
-                  title="删除媒体"
-                  description="文章中的引用将失效，确定删除？"
-                  okText="删除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => handleDelete(item)}
+                  aria-label={`复制「${item.originalName}」的 Markdown 引用`}
+                  onClick={() => copyMarkdown(item)}
                 >
-                  <Button
-                    size="small"
-                    danger
-                    icon={<Trash2 size={13} />}
-                    aria-label={`删除「${item.originalName}」`}
-                  />
-                </Popconfirm>
+                  <Copy className="size-3" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="text-destructive hover:bg-destructive-soft hover:text-destructive"
+                  aria-label={`删除「${item.originalName}」`}
+                  onClick={() => setPendingDelete(item)}
+                >
+                  <Trash2 className="size-3" />
+                </Button>
               </div>
             </div>
           ))}
         </div>
       )}
-    </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="删除媒体"
+        description="文章中的引用将失效，确定删除？"
+        confirmLabel="删除"
+        destructive
+        onConfirm={handleDelete}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      />
+    </PageView>
   );
 }

@@ -10,7 +10,7 @@ export function ListCard({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-border bg-card",
+        "overflow-hidden rounded-lg border border-border bg-card shadow-card",
         className,
       )}
       {...props}
