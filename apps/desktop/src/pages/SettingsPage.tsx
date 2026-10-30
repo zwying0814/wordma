@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { App as AntdApp, Button, Input, Spin } from "antd";
-import * as stylex from "@stylexjs/stylex";
-import x from "@stylexjs/atoms";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 import { useSite } from "../context/SiteContext";
 import { updateSite } from "../lib/site";
 import {
@@ -12,7 +14,9 @@ import {
   type RoutingRules,
 } from "../lib/routing";
 import { getPreviewPort, setPreviewPort } from "../lib/theme";
-import { pageStyles } from "../styles/page.stylex";
+import { ListCard } from "../components/common/list-row";
+import { PageHeader } from "../components/common/page-header";
+import { PageView } from "../components/common/page-view";
 
 const ROUTE_LABELS: Record<string, string> = {
   index: "首页",
@@ -36,80 +40,38 @@ const DEFAULT_RULES: RoutingRules = {
   feed: "/feed.xml",
 };
 
-const styles = stylex.create({
-  section: {
-    marginBottom: 16,
-  },
-  sectionHead: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    padding: "14px 18px",
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "var(--ant-color-border-secondary)",
-    fontSize: 14,
-    fontWeight: 600,
-    color: "var(--ant-color-text)",
-  },
-  sectionBody: {
-    padding: "16px 18px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-  },
-  fieldRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-  },
-  fieldLabel: {
-    flexShrink: 0,
-    width: 64,
-    fontSize: 13,
-    color: "var(--ant-color-text-secondary)",
-  },
-  ruleRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-  },
-  ruleLabel: {
-    flexShrink: 0,
-    width: 64,
-    fontSize: 13,
-    fontWeight: 500,
-    color: "var(--ant-color-text-secondary)",
-  },
-  ruleInput: {
-    flex: 1,
-    minWidth: 0,
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
-    fontSize: 12.5,
-  },
-  ruleStatus: {
-    flexShrink: 0,
-    width: 200,
-    fontSize: 12,
-  },
-  statusOk: {
-    color: "var(--ant-color-text-tertiary)",
-  },
-  statusError: {
-    color: "var(--ant-color-error)",
-  },
-  portInput: {
-    width: 140,
-  },
-  portHint: {
-    fontSize: 12,
-    color: "var(--ant-color-text-tertiary)",
-  },
-});
+function Section({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <ListCard className="mb-4">
+      <div className="flex items-center justify-between gap-2.5 border-b border-border px-[18px] py-3.5 text-sm font-semibold text-foreground">
+        <span>{title}</span>
+        {action}
+      </div>
+      <div className="flex flex-col gap-3 px-[18px] py-4">{children}</div>
+    </ListCard>
+  );
+}
+
+function FieldRow({ label, children }: { label?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-16 shrink-0 text-[13px] text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
-  const { message } = AntdApp.useApp();
   const { activeSite } = useSite();
 
   // ===== 站点信息 =====
@@ -119,17 +81,17 @@ export default function SettingsPage() {
 
   const handleSaveSite = async () => {
     if (!name.trim()) {
-      message.error("站点名称不能为空");
+      toast.error("站点名称不能为空");
       return;
     }
     setSavingSite(true);
     try {
       await updateSite(activeSite.id, name.trim(), description.trim() || null);
-      message.success("站点信息已保存，即将刷新界面");
+      toast.success("站点信息已保存，即将刷新界面");
       // 站点名出现在侧边栏等多处，统一整页刷新
       setTimeout(() => window.location.reload(), 600);
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setSavingSite(false);
     }
@@ -143,7 +105,7 @@ export default function SettingsPage() {
   useEffect(() => {
     getRoutingRules(activeSite.id)
       .then(setRules)
-      .catch((e) => message.error(String(e)));
+      .catch((e) => toast.error(String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSite.id]);
 
@@ -179,15 +141,15 @@ export default function SettingsPage() {
   const handleSavePort = async () => {
     const value = Number(port);
     if (!Number.isInteger(value) || value < 1024 || value > 65535) {
-      message.error("端口需在 1024 - 65535 之间");
+      toast.error("端口需在 1024 - 65535 之间");
       return;
     }
     setSavingPort(true);
     try {
       await setPreviewPort(value);
-      message.success(`预览端口已固定为 ${value}`);
+      toast.success(`预览端口已固定为 ${value}`);
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setSavingPort(false);
     }
@@ -198,9 +160,9 @@ export default function SettingsPage() {
     setSavingRules(true);
     try {
       await setRoutingRules(activeSite.id, rules);
-      message.success("路由规则已保存");
+      toast.success("路由规则已保存");
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setSavingRules(false);
     }
@@ -211,142 +173,116 @@ export default function SettingsPage() {
   };
 
   return (
-    <div {...stylex.props(pageStyles.view)}>
-      <div {...stylex.props(pageStyles.pageHead)}>
-        <div>
-          <div {...stylex.props(pageStyles.pageTitle)}>设置</div>
-          <div {...stylex.props(pageStyles.pageSub)}>站点与全局配置</div>
-        </div>
-      </div>
+    <PageView>
+      <PageHeader title="设置" subtitle="站点与全局配置" />
 
       {rules === null ? (
-        <div
-          {...stylex.props(
-            x.display.flex,
-            x.justifyContent.center,
-            x.padding._48px,
-          )}
-        >
-          <Spin />
+        <div className="flex justify-center p-12">
+          <Spinner className="size-5 text-muted-foreground" />
         </div>
       ) : (
         <>
-          <div {...stylex.props(styles.section, pageStyles.card)}>
-            <div {...stylex.props(styles.sectionHead)}>站点信息</div>
-            <div {...stylex.props(styles.sectionBody)}>
-              <div {...stylex.props(styles.fieldRow)}>
-                <span {...stylex.props(styles.fieldLabel)}>站点名称</span>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="站点名称"
-                />
-              </div>
-              <div {...stylex.props(styles.fieldRow)}>
-                <span {...stylex.props(styles.fieldLabel)}>站点描述</span>
-                <Input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="一句话介绍这个站点（可选）"
-                />
-              </div>
-              <div {...stylex.props(styles.fieldRow)}>
-                <span {...stylex.props(styles.fieldLabel)} />
-                <Button
-                  type="primary"
-                  loading={savingSite}
-                  onClick={handleSaveSite}
-                >
-                  保存
-                </Button>
-              </div>
-            </div>
-          </div>
+          <Section title="站点信息">
+            <FieldRow label="站点名称">
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="站点名称"
+              />
+            </FieldRow>
+            <FieldRow label="站点描述">
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="一句话介绍这个站点（可选）"
+              />
+            </FieldRow>
+            <FieldRow>
+              <Button disabled={savingSite} onClick={handleSaveSite}>
+                {savingSite ? <Spinner className="size-4" /> : null}
+                保存
+              </Button>
+            </FieldRow>
+          </Section>
 
-          <div {...stylex.props(styles.section, pageStyles.card)}>
-            <div {...stylex.props(styles.sectionHead)}>预览</div>
-            <div {...stylex.props(styles.sectionBody)}>
-              <div {...stylex.props(styles.fieldRow)}>
-                <span {...stylex.props(styles.fieldLabel)}>预览端口</span>
-                <Input
-                  value={port}
-                  onChange={(e) => setPort(e.target.value.replace(/\D/g, ""))}
-                  placeholder="默认 12739"
-                  {...stylex.props(styles.portInput)}
-                />
-                <Button loading={savingPort} onClick={handleSavePort}>
-                  保存
-                </Button>
-              </div>
-              <div {...stylex.props(styles.portHint)}>
-                预览地址 http://127.0.0.1:端口/ ；端口被其他程序占用时保存会失败，请更换后重试。
-              </div>
-            </div>
-          </div>
-
-          <div {...stylex.props(styles.section, pageStyles.card)}>
-            <div {...stylex.props(styles.sectionHead)}>
-              路由规则
+          <Section title="预览">
+            <FieldRow label="预览端口">
+              <Input
+                className="w-[140px]"
+                value={port}
+                onChange={(e) => setPort(e.target.value.replace(/\D/g, ""))}
+                placeholder="默认 12739"
+              />
               <Button
-                size="small"
+                variant="outline"
+                disabled={savingPort}
+                onClick={handleSavePort}
+              >
+                {savingPort ? <Spinner className="size-4" /> : null}
+                保存
+              </Button>
+            </FieldRow>
+            <div className="text-xs text-muted-foreground">
+              预览地址 http://127.0.0.1:端口/ ；端口被其他程序占用时保存会失败，请更换后重试。
+            </div>
+          </Section>
+
+          <Section
+            title="路由规则"
+            action={
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setRules({ ...DEFAULT_RULES })}
               >
                 恢复默认
               </Button>
-            </div>
-            <div {...stylex.props(styles.sectionBody)}>
-              {(
-                [
-                  "index",
-                  "post",
-                  "page",
-                  "category",
-                  "tag",
-                  "archive",
-                ] as const
-              ).map((route) => {
-                const check = checkByRoute[route];
-                return (
-                  <div key={route} {...stylex.props(styles.ruleRow)}>
-                    <span {...stylex.props(styles.ruleLabel)}>
-                      {ROUTE_LABELS[route]}
-                    </span>
-                    <Input
-                      value={rules[route]}
-                      onChange={(e) => updatePattern(route, e.target.value)}
-                      status={check && !check.ok ? "error" : undefined}
-                      {...stylex.props(styles.ruleInput)}
-                    />
-                    <span
-                      {...stylex.props(
-                        styles.ruleStatus,
-                        check?.ok ? styles.statusOk : styles.statusError,
-                      )}
-                    >
-                      {!check
-                        ? ""
-                        : check.ok
-                          ? `示例 ${check.example}`
-                          : check.message}
-                    </span>
-                  </div>
-                );
-              })}
-              <div {...stylex.props(styles.fieldRow)}>
-                <span {...stylex.props(styles.fieldLabel)} />
-                <Button
-                  type="primary"
-                  disabled={!rulesValid}
-                  loading={savingRules}
-                  onClick={handleSaveRules}
-                >
-                  保存路由规则
-                </Button>
-              </div>
-            </div>
-          </div>
+            }
+          >
+            {(
+              ["index", "post", "page", "category", "tag", "archive"] as const
+            ).map((route) => {
+              const check = checkByRoute[route];
+              return (
+                <div key={route} className="flex items-center gap-3">
+                  <span className="w-16 shrink-0 text-[13px] font-medium text-muted-foreground">
+                    {ROUTE_LABELS[route]}
+                  </span>
+                  <Input
+                    className="min-w-0 flex-1 font-mono text-[12.5px]"
+                    value={rules[route]}
+                    onChange={(e) => updatePattern(route, e.target.value)}
+                    aria-invalid={Boolean(check && !check.ok)}
+                  />
+                  <span
+                    className={cn(
+                      "w-[200px] shrink-0 text-xs",
+                      check?.ok
+                        ? "text-muted-foreground"
+                        : "text-destructive",
+                    )}
+                  >
+                    {!check
+                      ? ""
+                      : check.ok
+                        ? `示例 ${check.example}`
+                        : check.message}
+                  </span>
+                </div>
+              );
+            })}
+            <FieldRow>
+              <Button
+                disabled={!rulesValid || savingRules}
+                onClick={handleSaveRules}
+              >
+                {savingRules ? <Spinner className="size-4" /> : null}
+                保存路由规则
+              </Button>
+            </FieldRow>
+          </Section>
         </>
       )}
-    </div>
+    </PageView>
   );
 }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { App as AntdApp, Button, Popconfirm, Spin } from "antd";
 import { Check, Eye, FolderOpen, RefreshCw, Settings2, Trash2 } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
-import x from "@stylexjs/atoms";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { useSite } from "../context/SiteContext";
 import {
   deleteTheme,
@@ -15,101 +15,12 @@ import {
   type ThemePreview,
 } from "../lib/theme";
 import ThemeSettingsModal from "../components/ThemeSettingsModal";
-import { pageStyles } from "../styles/page.stylex";
+import { ConfirmDialog } from "../components/common/confirm-dialog";
+import { EmptyState } from "../components/common/empty-state";
+import { PageHeader } from "../components/common/page-header";
+import { PageView } from "../components/common/page-view";
 
-// 与设计稿 .theme-grid / .theme-card / .theme-thumb 对齐
-const styles = stylex.create({
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-    gap: 18,
-  },
-  card: {
-    display: "flex",
-    flexDirection: "column",
-    backgroundColor: "var(--ant-color-bg-container)",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "var(--ant-color-border-secondary)",
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  cardActive: {
-    // 设计稿 .theme-card.active：激活卡片使用主题色描边
-    borderColor: "rgba(53, 99, 217, 0.45)",
-  },
-  thumb: {
-    position: "relative",
-    display: "block",
-    aspectRatio: "16 / 9",
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "var(--ant-color-border-secondary)",
-    overflow: "hidden",
-  },
-  body: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 5,
-    padding: "13px 16px 16px",
-    flex: 1,
-  },
-  nameRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-  },
-  name: {
-    fontSize: 14.5,
-    fontWeight: 700,
-    color: "var(--ant-color-text)",
-  },
-  activeBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
-    fontSize: 11.5,
-    fontWeight: 500,
-    color: "var(--ant-color-primary)",
-    backgroundColor: "var(--ant-color-primary-bg)",
-    borderRadius: 999,
-    padding: "1px 9px",
-  },
-  desc: {
-    fontSize: 12.5,
-    color: "var(--ant-color-text-tertiary)",
-  },
-  tagsRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 3,
-  },
-  tagChip: {
-    fontSize: 11,
-    lineHeight: "18px",
-    padding: "0 8px",
-    borderRadius: 999,
-    color: "var(--ant-color-text-secondary)",
-    backgroundColor: "var(--ant-color-fill-secondary)",
-  },
-  previewUrl: {
-    fontSize: 11.5,
-    color: "var(--ant-color-primary)",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-  foot: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    marginTop: "auto",
-    paddingTop: 12,
-  },
-});
-
-// theme.json 未声明 preview 时的兜底配色
+// theme.yaml 未声明 preview 时的兜底配色
 const FALLBACK_PREVIEW: ThemePreview = {
   bg: "#FFFFFF",
   chromeBg: "#FAFAFA",
@@ -254,7 +165,11 @@ function ThemeThumb({ theme }: { theme: ThemeMeta }) {
   }
 
   return (
-    <div {...stylex.props(styles.thumb)} style={{ background: p.bg }} aria-hidden>
+    <div
+      className="relative block aspect-[16/9] overflow-hidden border-b border-border"
+      style={{ background: p.bg }}
+      aria-hidden
+    >
       {chrome}
       <div
         style={{
@@ -283,17 +198,17 @@ function ThemeThumb({ theme }: { theme: ThemeMeta }) {
 }
 
 export default function ThemePage() {
-  const { message } = AntdApp.useApp();
   const { activeSite } = useSite();
   const [themes, setThemes] = useState<ThemeMeta[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [settingsTheme, setSettingsTheme] = useState<ThemeMeta | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ThemeMeta | null>(null);
 
   const reload = useCallback(() => {
     listThemes(activeSite.id)
       .then(setThemes)
-      .catch((e) => message.error(String(e)));
-  }, [activeSite.id, message]);
+      .catch((e) => toast.error(String(e)));
+  }, [activeSite.id]);
 
   useEffect(() => {
     reload();
@@ -304,26 +219,28 @@ export default function ThemePage() {
     try {
       await setActiveTheme(activeSite.id, theme.name);
       reload();
-      message.success(
+      toast.success(
         `站点「${activeSite.name}」已启用「${theme.displayName}」，点「生成预览」查看效果`,
       );
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setBusy(null);
     }
   };
 
-  const handleDelete = async (theme: ThemeMeta) => {
-    setBusy(theme.name);
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
+    setBusy(pendingDelete.name);
     try {
-      await deleteTheme(theme.name);
+      await deleteTheme(pendingDelete.name);
       reload();
-      message.success(`主题「${theme.displayName}」已删除`);
+      toast.success(`主题「${pendingDelete.displayName}」已删除`);
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setBusy(null);
+      setPendingDelete(null);
     }
   };
 
@@ -332,86 +249,98 @@ export default function ThemePage() {
     try {
       const report = await renderSite(activeSite.id);
       await openPreview(activeSite.id);
-      message.success(`已生成 ${report.files} 个文件，正在浏览器中打开预览`);
+      toast.success(`已生成 ${report.files} 个文件，正在浏览器中打开预览`);
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setBusy(null);
     }
   };
 
   return (
-    <div {...stylex.props(pageStyles.view)}>
-      <div {...stylex.props(pageStyles.pageHead)}>
-        <div>
-          <div {...stylex.props(pageStyles.pageTitle)}>主题</div>
-          <div {...stylex.props(pageStyles.pageSub)}>
-            当前站点「{activeSite.name}」· 已启用{" "}
-            {themes?.find((t) => t.active)?.displayName ?? "未启用"}
-          </div>
-        </div>
-        <div {...stylex.props(x.display.flex, x.gap._8px)}>
-          <Button
-            icon={<Eye size={14} />}
-            loading={busy === "__preview__"}
-            onClick={handlePreview}
-          >
-            生成预览
-          </Button>
-          <Button
-            icon={<FolderOpen size={14} />}
-            onClick={() => openThemesDir().catch((e) => message.error(String(e)))}
-          >
-            打开主题目录
-          </Button>
-          <Button icon={<RefreshCw size={14} />} onClick={reload}>
-            刷新列表
-          </Button>
-        </div>
-      </div>
+    <PageView>
+      <PageHeader
+        title="主题"
+        subtitle={`当前站点「${activeSite.name}」· 已启用 ${
+          themes?.find((t) => t.active)?.displayName ?? "未启用"
+        }`}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              disabled={busy === "__preview__"}
+              onClick={handlePreview}
+            >
+              {busy === "__preview__" ? (
+                <Spinner className="size-3.5" />
+              ) : (
+                <Eye className="size-3.5" />
+              )}
+              生成预览
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                openThemesDir().catch((e) => toast.error(String(e)))
+              }
+            >
+              <FolderOpen className="size-3.5" />
+              打开主题目录
+            </Button>
+            <Button variant="outline" onClick={reload}>
+              <RefreshCw className="size-3.5" />
+              刷新列表
+            </Button>
+          </>
+        }
+      />
 
       {themes === null ? (
-        <div
-          {...stylex.props(
-            x.display.flex,
-            x.justifyContent.center,
-            x.padding._48px,
-          )}
-        >
-          <Spin />
+        <div className="flex justify-center p-12">
+          <Spinner className="size-5 text-muted-foreground" />
+        </div>
+      ) : themes.length === 0 ? (
+        <div className="rounded-lg border border-border bg-card shadow-card">
+          <EmptyState
+            title="还没有主题"
+            description="把主题文件夹放进主题目录，或打开目录查看内置主题。"
+          />
         </div>
       ) : (
-        <div {...stylex.props(styles.grid)}>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-[18px]">
           {themes.map((theme) => {
             const usable = theme.invalidMessage === null;
             return (
               <div
                 key={theme.name}
-                {...stylex.props(
-                  styles.card,
-                  theme.active && styles.cardActive,
-                )}
+                className={
+                  "flex flex-col overflow-hidden rounded-lg border bg-card shadow-card " +
+                  (theme.active ? "border-primary/45" : "border-border")
+                }
               >
                 <ThemeThumb theme={theme} />
-                <div {...stylex.props(styles.body)}>
-                  <div {...stylex.props(styles.nameRow)}>
-                    <span {...stylex.props(styles.name)}>
+                <div className="flex flex-1 flex-col gap-[5px] px-4 pt-[13px] pb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14.5px] font-bold text-foreground">
                       {theme.displayName}
                     </span>
                     {theme.active && (
-                      <span {...stylex.props(styles.activeBadge)}>
-                        <Check size={12} />
+                      <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-px text-[11.5px] font-medium text-accent-foreground">
+                        <Check className="size-3" />
                         使用中
                       </span>
                     )}
                   </div>
-                  <span {...stylex.props(styles.desc)}>
+                  <span className="text-[12.5px] text-muted-foreground">
                     {theme.invalidMessage ?? theme.description}
                   </span>
                   {usable && theme.tags.length > 0 && (
-                    <div {...stylex.props(styles.tagsRow)}>
+                    <div className="mt-[3px] flex flex-wrap gap-1.5">
                       {theme.tags.map((tag) => (
-                        <span key={tag} {...stylex.props(styles.tagChip)}>
+                        <span
+                          key={tag}
+                          className="rounded-full bg-foreground/5 px-2 text-[11px] leading-[18px] text-muted-foreground"
+                        >
                           {tag}
                         </span>
                       ))}
@@ -419,67 +348,67 @@ export default function ThemePage() {
                   )}
                   {theme.active && theme.previewUrl && (
                     <div
-                      {...stylex.props(styles.previewUrl)}
+                      className="truncate text-[11.5px] text-primary"
                       title={theme.previewUrl}
                     >
                       预览地址：{theme.previewUrl}
                     </div>
                   )}
-                  <div {...stylex.props(styles.foot)}>
+                  <div className="mt-auto flex items-center gap-2 pt-3">
                     {theme.active && usable && theme.settings.length > 0 && (
                       <Button
-                        size="small"
-                        icon={<Settings2 size={14} />}
+                        variant="outline"
+                        size="sm"
                         onClick={() => setSettingsTheme(theme)}
                       >
+                        <Settings2 className="size-3.5" />
                         设置
                       </Button>
                     )}
                     {theme.invalidMessage ? (
-                      <Button size="small" disabled>
+                      <Button variant="outline" size="sm" disabled>
                         主题结构异常
                       </Button>
                     ) : theme.active ? (
-                      <Button size="small" disabled>
+                      <Button variant="outline" size="sm" disabled>
                         当前主题
                       </Button>
                     ) : (
                       <Button
-                        size="small"
-                        type="primary"
-                        loading={busy === theme.name}
+                        size="sm"
+                        disabled={busy === theme.name}
                         onClick={() => handleActivate(theme)}
                       >
+                        {busy === theme.name ? (
+                          <Spinner className="size-3.5" />
+                        ) : null}
                         启用此主题
                       </Button>
                     )}
                     <Button
-                      size="small"
-                      disabled={!usable}
-                      loading={busy === `preview:${theme.name}`}
+                      variant="outline"
+                      size="sm"
+                      disabled={!usable || busy === `preview:${theme.name}`}
                       onClick={async () => {
                         if (!theme.active) await handleActivate(theme);
                         await handlePreview();
                       }}
                     >
+                      {busy === `preview:${theme.name}` ? (
+                        <Spinner className="size-3.5" />
+                      ) : null}
                       预览
                     </Button>
                     {theme.name !== "default" && !theme.active && (
-                      <Popconfirm
-                        title="删除主题"
-                        description="主题文件将被移除，确定删除？"
-                        okText="删除"
-                        cancelText="取消"
-                        okButtonProps={{ danger: true }}
-                        onConfirm={() => handleDelete(theme)}
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:bg-destructive-soft hover:text-destructive"
+                        aria-label={`删除主题「${theme.displayName}」`}
+                        onClick={() => setPendingDelete(theme)}
                       >
-                        <Button
-                          size="small"
-                          danger
-                          icon={<Trash2 size={14} />}
-                          aria-label={`删除主题「${theme.displayName}」`}
-                        />
-                      </Popconfirm>
+                        <Trash2 className="size-3.5" />
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -494,6 +423,18 @@ export default function ThemePage() {
         theme={settingsTheme}
         onClose={() => setSettingsTheme(null)}
       />
-    </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="删除主题"
+        description="主题文件将被移除，确定删除？"
+        confirmLabel="删除"
+        destructive
+        onConfirm={handleDelete}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      />
+    </PageView>
   );
 }
