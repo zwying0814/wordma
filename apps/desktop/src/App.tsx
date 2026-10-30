@@ -1,5 +1,6 @@
 import { App as AntdApp, ConfigProvider } from "antd";
 import { Route, Switch } from "wouter";
+import { Toaster } from "@/components/ui/sonner";
 import HomePage from "./pages/HomePage";
 import WelcomePage from "./pages/WelcomePage";
 
@@ -41,6 +42,7 @@ function App() {
               注意 wouter/regexparam 的 ":rest*" 不匹配多段路径，兜底必须用无 path 的 Route */}
           <Route component={HomePage} />
         </Switch>
+        <Toaster />
       </AntdApp>
     </ConfigProvider>
   );

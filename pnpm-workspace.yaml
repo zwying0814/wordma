@@ -19,3 +19,4 @@ catalog:
 
 minimumReleaseAgeExclude:
   - lucide-react@1.52.0
+  - cn@0.5.1

@@ -1,0 +1,161 @@
+/* 全局主题：设计令牌来自 design/styles.css，映射到 shadcn 变量。
+   组件样式一律用 Tailwind 工具类 + 这些令牌，不写字面值。 */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* workspace 源码包不在 node_modules 的自动扫描路径里，需显式声明 */
+@source "../../../../packages/editor/src";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* base-nova 倍率 0.6 / 0.8 / 1 / 1.4；--radius 取 10px 即得设计稿的 6 / 8 / 10 */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  --font-sans: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+  --font-editor: "Noto Serif SC", "Songti SC", "SimSun", serif;
+
+  --text-page-title: 22px;
+  --text-editor: 16.5px;
+  --width-sidebar: 236px;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-pop: 0 8px 28px rgba(16, 24, 40, 0.14);
+}
+
+:root {
+  --background: #f4f5f7;
+  --foreground: #1f2328;
+  --card: #ffffff;
+  --card-foreground: #1f2328;
+  --popover: #ffffff;
+  --popover-foreground: #1f2328;
+  --primary: #3563d9;
+  --primary-foreground: #ffffff;
+  --secondary: #f6f7f9;
+  --secondary-foreground: #1f2328;
+  --muted: #f3f4f6;
+  --muted-foreground: #667085;
+  --accent: #eaf0fb;
+  --accent-foreground: #2b51b5;
+  --destructive: #d64545;
+  --destructive-foreground: #ffffff;
+  --destructive-soft: #fbecec;
+  --success: #1f7a4c;
+  --success-soft: #e5f4ec;
+  --border: #e5e7eb;
+  --input: #d8dce2;
+  --ring: #3563d9;
+  --radius: 10px;
+
+  --sidebar: #fbfbfc;
+  --sidebar-foreground: #1f2328;
+  --sidebar-accent: #eaf0fb;
+  --sidebar-accent-foreground: #2b51b5;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #3563d9;
+}
+
+.dark {
+  --background: #16181c;
+  --foreground: #e7e9ee;
+  --card: #1d2026;
+  --card-foreground: #e7e9ee;
+  --popover: #1d2026;
+  --popover-foreground: #e7e9ee;
+  --primary: #6d8ef0;
+  --primary-foreground: #0f1115;
+  --secondary: #262a31;
+  --secondary-foreground: #e7e9ee;
+  --muted: #24282f;
+  --muted-foreground: #9aa1ac;
+  --accent: #26324a;
+  --accent-foreground: #cddaf7;
+  --destructive: #e06a6a;
+  --destructive-foreground: #0f1115;
+  --destructive-soft: #3a2426;
+  --success: #58b589;
+  --success-soft: #1e3329;
+  --border: #2d323a;
+  --input: #3a404a;
+  --ring: #6d8ef0;
+  --sidebar: #191c21;
+  --sidebar-foreground: #e7e9ee;
+  --sidebar-accent: #26324a;
+  --sidebar-accent-foreground: #cddaf7;
+  --sidebar-border: #2d323a;
+  --sidebar-ring: #6d8ef0;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--foreground);
+    background: var(--background);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* 键盘焦点可见性（设计稿同款） */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* 文本编辑类元素以光标作为焦点指示，不画描边 */
+  input:focus-visible,
+  textarea:focus-visible,
+  [contenteditable]:focus,
+  [contenteditable]:focus-visible {
+    outline: none;
+  }
+}

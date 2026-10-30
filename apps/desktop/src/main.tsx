@@ -1,9 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./main.css";
+import "./styles/theme.css";
 
-// html 上的类名 = antd theme.cssVar.key（见 App.tsx），--ant-* 全局变量挂在该类下
+// 迁移期临时保留：antd 的 --ant-* 变量挂在这个类下，StyleX 旧样式仍依赖它。
+// 第 7 阶段移除 antd 时一并删除。
 document.documentElement.classList.add("ant", "css-var-my-theme-id");
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
