@@ -1,14 +1,14 @@
 /* ProseMirror 生成内容的排版样式。
    StyleX 只能作用于受控元素，无法表达 ".wm-editor h1" 这类嵌套选择器，
    因此编辑区排版用普通 CSS，统一以 .wm-editor 作用域隔离；
-   颜色一律引用 --ant-* 变量以跟随主题。 */
+   颜色一律引用设计令牌变量以跟随主题。 */
 .wm-editor {
   outline: none;
   min-height: 100%;
   font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
   font-size: 15px;
   line-height: 1.9;
-  color: var(--ant-color-text);
+  color: var(--foreground);
 }
 
 .wm-editor p {
@@ -48,14 +48,14 @@
 .wm-editor blockquote {
   margin: 0 0 0.6em;
   padding: 4px 0 4px 14px;
-  border-left: 3px solid var(--ant-color-border);
-  color: var(--ant-color-text-secondary);
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
 }
 
 .wm-editor pre {
   margin: 0 0 0.6em;
   padding: 12px 14px;
-  background: var(--ant-color-fill-tertiary);
+  background: var(--muted);
   border-radius: 8px;
   overflow-x: auto;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -66,7 +66,7 @@
 .wm-editor code {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.9em;
-  background: var(--ant-color-fill-tertiary);
+  background: var(--muted);
   border-radius: 4px;
   padding: 1px 5px;
 }
@@ -79,14 +79,14 @@
 
 .wm-editor hr {
   border: none;
-  border-top: 1px solid var(--ant-color-border-secondary);
+  border-top: 1px solid var(--border);
   margin: 1.2em 0;
 }
 
 /* Placeholder 扩展：空文档首行显示占位文字 */
 .wm-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: var(--ant-color-text-quaternary);
+  color: var(--muted-foreground);
   float: left;
   height: 0;
   pointer-events: none;

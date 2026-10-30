@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { App as AntdApp, Button, Select, Spin } from "antd";
 import { ArrowLeft, Eye } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
-import x from "@stylexjs/atoms";
-import { editorStyles } from "../styles/editor.stylex";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { useSite } from "../context/SiteContext";
 import {
   getArticle,
@@ -14,42 +13,16 @@ import {
 } from "../lib/article";
 import { openPreview, renderSite } from "../lib/theme";
 import { countWordsHtml, fmtDate } from "../lib/words";
-
-// 布局对应设计稿 .editor（顶栏 + 居中窄栏编辑区）
-const styles = stylex.create({
-  editorMeta: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "10px 0 14px",
-    marginBottom: 18,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "var(--ant-color-border-secondary)",
-  },
-  wordCount: {
-    fontSize: 12,
-    marginLeft: "auto",
-    color: "var(--ant-color-text-tertiary)",
-  },
-  slugInput: {
-    width: 120,
-    borderStyle: "none",
-    background: "var(--ant-color-fill-tertiary)",
-    borderRadius: 6,
-    padding: "3px 8px",
-    fontSize: 12,
-    color: "var(--ant-color-text-secondary)",
-    outlineStyle: "none",
-  },
-  metaSelect: {
-    minWidth: 130,
-  },
-  metaTags: {
-    minWidth: 180,
-    maxWidth: 300,
-  },
-});
+import { LoadingScreen } from "../components/common/loading";
+import {
+  EditorBody,
+  EditorColumn,
+  EditorFieldError,
+  EditorShell,
+  EditorTitleInput,
+  EditorTopBar,
+} from "../components/common/editor-shell";
+import { MultiSelect } from "../components/common/multi-select";
 
 export default function ArticleEditorPage({
   params,
@@ -57,7 +30,6 @@ export default function ArticleEditorPage({
   params: { id: string };
 }) {
   const { activeSite, reloadArticles, tags, categories } = useSite();
-  const { message } = AntdApp.useApp();
   const [, navigate] = useLocation();
   const [article, setArticle] = useState<Article | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -116,9 +88,9 @@ export default function ArticleEditorPage({
       setSavedAt(saved.updatedAt);
       setTitleError(false);
       reloadArticles();
-      message.success(next === "published" ? "已发布" : "草稿已保存");
+      toast.success(next === "published" ? "已发布" : "草稿已保存");
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setSaving(false);
     }
@@ -142,7 +114,7 @@ export default function ArticleEditorPage({
       // 跳转到当前文章的预览页（草稿也会渲染详情页）
       await openPreview(activeSite.id, article.id);
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setPreviewing(false);
     }
@@ -150,120 +122,105 @@ export default function ArticleEditorPage({
 
   if (loadError !== null) {
     return (
-      <div
-        {...stylex.props(
-          x.display.flex,
-          x.flexDirection.column,
-          x.alignItems.center,
-          x.justifyContent.center,
-          x.gap._16px,
-          x.height["100%"],
-        )}
-      >
-        <span {...stylex.props(editorStyles.saveHint)}>{loadError}</span>
+      <div className="flex h-full flex-col items-center justify-center gap-4">
+        <span className="text-xs text-muted-foreground">{loadError}</span>
         <Button onClick={() => navigate("/articles")}>返回列表</Button>
       </div>
     );
   }
 
   if (!article) {
-    return (
-      <div
-        {...stylex.props(
-          x.display.flex,
-          x.alignItems.center,
-          x.justifyContent.center,
-          x.height["100%"],
-        )}
-      >
-        <Spin />
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
-    <div {...stylex.props(editorStyles.shell)}>
-      <div {...stylex.props(editorStyles.topBar)}>
+    <EditorShell>
+      <EditorTopBar>
         <Button
-          type="text"
-          size="small"
-          icon={<ArrowLeft size={14} />}
+          variant="ghost"
+          size="sm"
           onClick={() => navigate("/articles")}
         >
+          <ArrowLeft className="size-3.5" />
           返回列表
         </Button>
-        <span {...stylex.props(editorStyles.saveHint)}>
+        <span className="text-xs text-muted-foreground">
           {status === "published" ? "已发布" : "草稿"}
           {savedAt ? ` · ${fmtDate(savedAt)}` : ""}
         </span>
-        <div {...stylex.props(x.flex[1])} />
+        <div className="flex-1" />
         <Button
-          size="small"
-          icon={<Eye size={14} />}
-          loading={previewing}
+          variant="outline"
+          size="sm"
+          disabled={previewing}
           onClick={handlePreview}
         >
+          {previewing ? (
+            <Spinner className="size-3.5" />
+          ) : (
+            <Eye className="size-3.5" />
+          )}
           预览
         </Button>
-        <Button size="small" disabled={saving || previewing} onClick={() => handleSave("draft")}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={saving || previewing}
+          onClick={() => handleSave("draft")}
+        >
           存为草稿
         </Button>
         <Button
-          type="primary"
-          size="small"
-          loading={saving}
+          size="sm"
+          disabled={saving}
           onClick={() => handleSave("published")}
         >
+          {saving ? <Spinner className="size-3.5" /> : null}
           {status === "published" ? "更新发布" : "发布"}
         </Button>
-      </div>
-      <div {...stylex.props(editorStyles.body)}>
-        <div {...stylex.props(editorStyles.col)}>
-          <input
-            {...stylex.props(editorStyles.titleInput)}
+      </EditorTopBar>
+      <EditorBody>
+        <EditorColumn>
+          <EditorTitleInput
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="标题…"
             aria-label="文章标题"
           />
           {titleError && (
-            <span {...stylex.props(editorStyles.fieldError)}>
-              发布前需要先写一个标题
-            </span>
+            <EditorFieldError>发布前需要先写一个标题</EditorFieldError>
           )}
-          <div {...stylex.props(styles.editorMeta)}>
+          <div className="mt-0 mb-[18px] flex flex-wrap items-center gap-2 border-b border-border pt-2.5 pb-3.5">
             <input
-              {...stylex.props(styles.slugInput)}
+              className="w-[120px] rounded-sm border-0 bg-muted px-2 py-[3px] text-xs text-muted-foreground outline-none"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
               placeholder="slug"
               aria-label="文章 slug"
               spellCheck={false}
             />
-            <Select
-              mode="multiple"
-              variant="borderless"
+            <MultiSelect
+              label="添加分类"
               placeholder="添加分类"
+              className="min-w-[130px]"
               value={categoryIds}
-              onChange={(v) => setCategoryIds(v)}
+              onChange={setCategoryIds}
               options={categories.map((c) => ({ value: c.id, label: c.name }))}
-              {...stylex.props(styles.metaSelect)}
             />
-            <Select
-              mode="multiple"
-              variant="borderless"
+            <MultiSelect
+              label="添加标签"
               placeholder="添加标签"
+              className="min-w-[180px] max-w-[300px]"
               value={tagIds}
-              onChange={(v) => setTagIds(v)}
+              onChange={setTagIds}
               options={tags.map((t) => ({ value: t.id, label: t.name }))}
-              {...stylex.props(styles.metaTags)}
             />
-            <span {...stylex.props(styles.wordCount)}>
+            <span className="ml-auto text-xs text-muted-foreground">
               约 {countWordsHtml(content)} 字
             </span>
           </div>
-        </div>
-      </div>
-    </div>
+        </EditorColumn>
+      </EditorBody>
+    </EditorShell>
   );
 }

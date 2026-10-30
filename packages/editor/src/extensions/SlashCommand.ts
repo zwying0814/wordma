@@ -98,7 +98,7 @@ const DEFAULT_ITEMS: SlashMenuItem[] = [
   },
 ];
 
-/** 输入 "/" 唤出的命令菜单；菜单 UI 由 antd 渲染（SlashMenu） */
+/** 输入 "/" 唤出的命令菜单；菜单 UI 由 SlashMenu 渲染 */
 export const SlashCommand = Extension.create({
   name: "slashCommand",
 

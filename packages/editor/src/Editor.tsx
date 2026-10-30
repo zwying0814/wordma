@@ -9,7 +9,6 @@ import TextAlign from "@tiptap/extension-text-align";
 import { Markdown } from "@tiptap/markdown";
 import Placeholder from "@tiptap/extension-placeholder";
 import StarterKit from "@tiptap/starter-kit";
-import * as stylex from "@stylexjs/stylex";
 import { AlignCenter, AlignLeft, AlignRight, Trash2 } from "lucide-react";
 import { Toolbar } from "./components/Toolbar";
 import { SlashCommand } from "./extensions/SlashCommand";
@@ -76,68 +75,15 @@ function fixMarkdownTables(text: string): string {
   return result.join("\n");
 }
 
-const styles = stylex.create({
-  bubble: {
-    display: "flex",
-    alignItems: "center",
-    gap: 2,
-    padding: 4,
-    backgroundColor: "var(--ant-color-bg-container)",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "var(--ant-color-border-secondary)",
-    borderRadius: 8,
-    boxShadow: "var(--ant-box-shadow-secondary)",
-  },
-  bubbleBtn: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-    borderStyle: "none",
-    borderRadius: 4,
-    padding: "2px 6px",
-    fontSize: 12,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-    color: "var(--ant-color-text)",
-    backgroundColor: {
-      default: "transparent",
-      ":hover": "var(--ant-color-fill-tertiary)",
-    },
-  },
-  bubbleBtnActive: {
-    color: "var(--ant-color-primary)",
-    backgroundColor: {
-      default: "var(--ant-color-primary-bg)",
-      ":hover": "var(--ant-color-primary-bg)",
-    },
-  },
-  bubbleBtnDanger: {
-    color: "var(--ant-color-error)",
-  },
-  divider: {
-    width: 1,
-    alignSelf: "stretch",
-    marginInline: 4,
-    backgroundColor: "var(--ant-color-border-secondary)",
-  },
-  root: {
-    display: "flex",
-    flexDirection: "column",
-    flex: 1,
-    minHeight: 0,
-    width: "100%",
-    minWidth: 0,
-  },
-  scroll: {
-    flex: 1,
-    minHeight: 0,
-    width: "100%",
-    minWidth: 0,
-    overflowY: "auto",
-  },
-});
+const bubbleClass =
+  "flex items-center gap-0.5 rounded-md border border-border bg-popover p-1 shadow-pop";
+const bubbleBtnClass =
+  "flex items-center justify-center gap-0.5 whitespace-nowrap rounded-sm px-1.5 py-0.5 text-xs text-foreground hover:bg-muted";
+const bubbleBtnActiveClass = "bg-accent text-primary hover:bg-accent";
+const bubbleBtnDangerClass = "text-destructive";
+const dividerClass = "mx-1 w-px self-stretch bg-border";
+const rootClass = "flex min-h-0 w-full min-w-0 flex-1 flex-col";
+const scrollClass = "min-h-0 w-full min-w-0 flex-1 overflow-y-auto";
 
 export function WordmaEditor({
   initialValue,
@@ -373,7 +319,7 @@ export function WordmaEditor({
   });
 
   return (
-    <div {...stylex.props(styles.root)}>
+    <div className={rootClass}>
       <Toolbar editor={editor} onPickImage={onPickImage} />
       {/* 选中图片时的气泡：对齐 + 删除 */}
       <BubbleMenu
@@ -385,7 +331,7 @@ export function WordmaEditor({
           state.selection.node.type.name === "image"
         }
       >
-        <div {...stylex.props(styles.bubble)}>
+        <div className={bubbleClass}>
           <button
             type="button"
             title="左对齐"
@@ -393,10 +339,11 @@ export function WordmaEditor({
             onClick={() =>
               editor?.chain().updateAttributes("image", { align: "left" }).run()
             }
-            {...stylex.props(
-              styles.bubbleBtn,
-              editorState?.imageAlign === "left" && styles.bubbleBtnActive,
-            )}
+            className={
+              editorState?.imageAlign === "left"
+                ? `${bubbleBtnClass} ${bubbleBtnActiveClass}`
+                : bubbleBtnClass
+            }
           >
             <AlignLeft size={14} />
           </button>
@@ -407,10 +354,11 @@ export function WordmaEditor({
             onClick={() =>
               editor?.chain().updateAttributes("image", { align: "center" }).run()
             }
-            {...stylex.props(
-              styles.bubbleBtn,
-              editorState?.imageAlign === "center" && styles.bubbleBtnActive,
-            )}
+            className={
+              editorState?.imageAlign === "center"
+                ? `${bubbleBtnClass} ${bubbleBtnActiveClass}`
+                : bubbleBtnClass
+            }
           >
             <AlignCenter size={14} />
           </button>
@@ -421,14 +369,15 @@ export function WordmaEditor({
             onClick={() =>
               editor?.chain().updateAttributes("image", { align: "right" }).run()
             }
-            {...stylex.props(
-              styles.bubbleBtn,
-              editorState?.imageAlign === "right" && styles.bubbleBtnActive,
-            )}
+            className={
+              editorState?.imageAlign === "right"
+                ? `${bubbleBtnClass} ${bubbleBtnActiveClass}`
+                : bubbleBtnClass
+            }
           >
             <AlignRight size={14} />
           </button>
-          <span {...stylex.props(styles.divider)} />
+          <span className={dividerClass} />
           {[25, 50, 75, 100].map((pct) => (
             <button
               key={pct}
@@ -442,22 +391,22 @@ export function WordmaEditor({
                   .updateAttributes("image", { width: `${pct}%` })
                   .run()
               }
-              {...stylex.props(
-                styles.bubbleBtn,
-                (editorState?.imageWidth ?? "100%") === `${pct}%` &&
-                  styles.bubbleBtnActive,
-              )}
+              className={
+                (editorState?.imageWidth ?? "100%") === `${pct}%`
+                  ? `${bubbleBtnClass} ${bubbleBtnActiveClass}`
+                  : bubbleBtnClass
+              }
             >
               {pct}%
             </button>
           ))}
-          <span {...stylex.props(styles.divider)} />
+          <span className={dividerClass} />
           <button
             type="button"
             title="删除图片"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor?.chain().focus().deleteSelection().run()}
-            {...stylex.props(styles.bubbleBtn, styles.bubbleBtnDanger)}
+            className={`${bubbleBtnClass} ${bubbleBtnDangerClass}`}
           >
             <Trash2 size={14} />
           </button>
@@ -470,7 +419,7 @@ export function WordmaEditor({
         options={{ placement: "bottom", offset: 8 }}
         shouldShow={({ editor: e }) => e.isActive("table")}
       >
-        <div {...stylex.props(styles.bubble)}>
+        <div className={bubbleClass}>
           {(
             [
               ["行↑", () => editor?.chain().focus().addRowBefore().run()],
@@ -484,12 +433,12 @@ export function WordmaEditor({
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={fn}
-              {...stylex.props(styles.bubbleBtn)}
+              className={bubbleBtnClass}
             >
               {label}
             </button>
           ))}
-          <span {...stylex.props(styles.divider)} />
+          <span className={dividerClass} />
           {(
             [
               ["删行", () => editor?.chain().focus().deleteRow().run()],
@@ -502,17 +451,17 @@ export function WordmaEditor({
               title={label}
               onMouseDown={(e) => e.preventDefault()}
               onClick={fn}
-              {...stylex.props(styles.bubbleBtn, styles.bubbleBtnDanger)}
+              className={`${bubbleBtnClass} ${bubbleBtnDangerClass}`}
             >
               {label}
             </button>
           ))}
-          <span {...stylex.props(styles.divider)} />
+          <span className={dividerClass} />
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor?.chain().focus().toggleHeaderRow().run()}
-            {...stylex.props(styles.bubbleBtn)}
+            className={bubbleBtnClass}
           >
             表头
           </button>
@@ -520,13 +469,13 @@ export function WordmaEditor({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor?.chain().focus().deleteTable().run()}
-            {...stylex.props(styles.bubbleBtn, styles.bubbleBtnDanger)}
+            className={`${bubbleBtnClass} ${bubbleBtnDangerClass}`}
           >
             删表
           </button>
         </div>
       </BubbleMenu>
-      <div {...stylex.props(styles.scroll)}>
+      <div className={scrollClass}>
         <EditorContent editor={editor} />
       </div>
     </div>
