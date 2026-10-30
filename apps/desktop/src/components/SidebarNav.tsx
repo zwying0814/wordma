@@ -1,100 +1,91 @@
-import { App as AntdApp, Menu } from "antd";
 import {
-  FileText,
   FileStack,
+  FileText,
   Folder,
   Image as ImageIcon,
   LayoutDashboard,
   Palette,
   Settings,
   Tags,
+  type LucideIcon,
 } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
 import { useLocation } from "wouter";
+import { cn } from "@/lib/utils";
 import { useSite } from "../context/SiteContext";
 
-const styles = stylex.create({
-  countPill: {
-    fontSize: 11,
-    lineHeight: "18px",
-    padding: "0 7px",
-    borderRadius: 999,
-    color: "var(--ant-color-text-tertiary)",
-    backgroundColor: "var(--ant-color-fill-secondary)",
-  },
-});
+const ITEMS: { key: string; icon: LucideIcon; label: string; count?: boolean }[] =
+  [
+    { key: "/", icon: LayoutDashboard, label: "仪表盘" },
+    { key: "/articles", icon: FileText, label: "文章", count: true },
+    { key: "/tags", icon: Tags, label: "标签", count: true },
+    { key: "/categories", icon: Folder, label: "分类", count: true },
+    { key: "/media", icon: ImageIcon, label: "媒体库", count: true },
+    { key: "/pages", icon: FileStack, label: "页面" },
+    { key: "/themes", icon: Palette, label: "主题" },
+    { key: "/settings", icon: Settings, label: "设置" },
+  ];
 
 export default function SidebarNav() {
   const { articles, tags, categories, media } = useSite();
-  const { message } = AntdApp.useApp();
   const [location, navigate] = useLocation();
 
-  const selectedKey = location.startsWith("/articles") || location.startsWith("/editor")
-    ? "/articles"
-    : location.startsWith("/media")
-      ? "/media"
-      : location.startsWith("/pages")
-      ? "/pages"
-      : location.startsWith("/themes")
-        ? "/themes"
-        : location.startsWith("/settings")
-          ? "/settings"
-          : "/";
+  const counts: Record<string, number> = {
+    "/articles": articles.length,
+    "/tags": tags.length,
+    "/categories": categories.length,
+    "/media": media.length,
+  };
 
-  const items = [
-    { key: "/", icon: <LayoutDashboard size={16} />, label: "仪表盘" },
-    {
-      key: "/articles",
-      icon: <FileText size={16} />,
-      label: "文章",
-      // antd v6 MenuItem 的 extra 槽：靠右对齐（对应设计稿 .nav-count）
-      extra: <span {...stylex.props(styles.countPill)}>{articles.length}</span>,
-    },
-    {
-      key: "/tags",
-      icon: <Tags size={16} />,
-      label: "标签",
-      extra: <span {...stylex.props(styles.countPill)}>{tags.length}</span>,
-    },
-    {
-      key: "/categories",
-      icon: <Folder size={16} />,
-      label: "分类",
-      extra: <span {...stylex.props(styles.countPill)}>{categories.length}</span>,
-    },
-    {
-      key: "/media",
-      icon: <ImageIcon size={16} />,
-      label: "媒体库",
-      extra: <span {...stylex.props(styles.countPill)}>{media.length}</span>,
-    },
-    { key: "/pages", icon: <FileStack size={16} />, label: "页面" },
-    { key: "/themes", icon: <Palette size={16} />, label: "主题" },
-    { key: "/settings", icon: <Settings size={16} />, label: "设置" },
-  ];
+  const selectedKey =
+    location.startsWith("/articles") || location.startsWith("/editor")
+      ? "/articles"
+      : location.startsWith("/media")
+        ? "/media"
+        : location.startsWith("/pages")
+          ? "/pages"
+          : location.startsWith("/themes")
+            ? "/themes"
+            : location.startsWith("/settings")
+              ? "/settings"
+              : location.startsWith("/tags")
+                ? "/tags"
+                : location.startsWith("/categories")
+                  ? "/categories"
+                  : "/";
 
   return (
-    <Menu
-      mode="inline"
-      selectedKeys={[selectedKey]}
-      items={items}
-      onClick={({ key }) => {
-        if (
-          key === "/" ||
-          key === "/articles" ||
-          key === "/tags" ||
-          key === "/categories" ||
-          key === "/media" ||
-          key === "/pages" ||
-          key === "/themes" ||
-          key === "/settings"
-        ) {
-          navigate(key);
-          return;
-        }
-        const label = items.find((i) => i.key === key)?.label;
-        message.info(`「${typeof label === "string" ? label : key}」建设中`);
-      }}
-    />
+    <nav className="flex flex-col gap-0.5" aria-label="主导航">
+      {ITEMS.map(({ key, icon: Icon, label, count }) => {
+        const active = key === selectedKey;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => navigate(key)}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex items-center gap-2.5 rounded-md px-2.5 py-[9px] text-[13.5px] font-medium text-foreground/80 transition-colors hover:bg-foreground/[0.045]",
+              active &&
+                "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+          >
+            <Icon className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+            {count ? (
+              <span
+                className={cn(
+                  "shrink-0 rounded-full px-[7px] text-[11px] leading-[18px] text-muted-foreground",
+                  active
+                    ? "bg-primary/15 text-accent-foreground"
+                    : "bg-foreground/5",
+                )}
+              >
+                {counts[key] ?? 0}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </nav>
   );
 }

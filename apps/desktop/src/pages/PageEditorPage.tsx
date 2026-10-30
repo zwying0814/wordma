@@ -1,34 +1,19 @@
 import { useEffect, useState } from "react";
-import { App as AntdApp, Button, Checkbox, Spin } from "antd";
 import { ArrowLeft } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
-import x from "@stylexjs/atoms";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Spinner } from "@/components/ui/spinner";
 import { getPage, updatePage } from "../lib/pages";
-import { editorStyles } from "../styles/editor.stylex";
-
-const styles = stylex.create({
-  metaRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "10px 0 14px",
-    marginBottom: 18,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "var(--ant-color-border-secondary)",
-  },
-  slugInput: {
-    width: 140,
-    borderStyle: "none",
-    background: "var(--ant-color-fill-tertiary)",
-    borderRadius: 6,
-    padding: "3px 8px",
-    fontSize: 12,
-    color: "var(--ant-color-text-secondary)",
-    outlineStyle: "none",
-  },
-});
+import { LoadingScreen } from "../components/common/loading";
+import {
+  EditorBody,
+  EditorColumn,
+  EditorShell,
+  EditorTitleInput,
+  EditorTopBar,
+} from "../components/common/editor-shell";
 
 /** 独立页面编辑器：标题 + slug + 内容 */
 export default function PageEditorPage({
@@ -36,7 +21,6 @@ export default function PageEditorPage({
 }: {
   params: { id: string };
 }) {
-  const { message } = AntdApp.useApp();
   const [, navigate] = useLocation();
   const [page, setPage] = useState<Awaited<ReturnType<typeof getPage>> | null>(
     null,
@@ -71,7 +55,7 @@ export default function PageEditorPage({
   const handleSave = async () => {
     if (!page) return;
     if (!title.trim()) {
-      message.error("页面标题不能为空");
+      toast.error("页面标题不能为空");
       return;
     }
     setSaving(true);
@@ -84,9 +68,9 @@ export default function PageEditorPage({
       });
       setPage(saved);
       setSlug(saved.slug);
-      message.success("页面已保存");
+      toast.success("页面已保存");
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setSaving(false);
     }
@@ -94,76 +78,48 @@ export default function PageEditorPage({
 
   if (loadError !== null) {
     return (
-      <div
-        {...stylex.props(
-          x.display.flex,
-          x.flexDirection.column,
-          x.alignItems.center,
-          x.justifyContent.center,
-          x.gap._16px,
-          x.height["100%"],
-        )}
-      >
-        <span {...stylex.props(editorStyles.saveHint)}>{loadError}</span>
+      <div className="flex h-full flex-col items-center justify-center gap-4">
+        <span className="text-xs text-muted-foreground">{loadError}</span>
         <Button onClick={() => navigate("/pages")}>返回列表</Button>
       </div>
     );
   }
 
   if (!page) {
-    return (
-      <div
-        {...stylex.props(
-          x.display.flex,
-          x.alignItems.center,
-          x.justifyContent.center,
-          x.height["100%"],
-        )}
-      >
-        <Spin />
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
-    <div {...stylex.props(editorStyles.shell)}>
-      <div {...stylex.props(editorStyles.topBar)}>
-        <Button
-          type="text"
-          size="small"
-          icon={<ArrowLeft size={14} />}
-          onClick={() => navigate("/pages")}
-        >
+    <EditorShell>
+      <EditorTopBar>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/pages")}>
+          <ArrowLeft className="size-3.5" />
           返回列表
         </Button>
-        <div {...stylex.props(x.flex[1])} />
-        <Checkbox
-          checked={showInNav}
-          onChange={(e) => setShowInNav(e.target.checked)}
-        >
+        <div className="flex-1" />
+        <label className="flex items-center gap-2 text-[13px] text-foreground">
+          <Checkbox
+            checked={showInNav}
+            onCheckedChange={(checked) => setShowInNav(checked === true)}
+          />
           显示在站点导航
-        </Checkbox>
-        <Button
-          type="primary"
-          size="small"
-          loading={saving}
-          onClick={handleSave}
-        >
+        </label>
+        <Button size="sm" disabled={saving} onClick={handleSave}>
+          {saving ? <Spinner className="size-3.5" /> : null}
           保存
         </Button>
-      </div>
-      <div {...stylex.props(editorStyles.body)}>
-        <div {...stylex.props(editorStyles.col)}>
-          <input
-            {...stylex.props(editorStyles.titleInput)}
+      </EditorTopBar>
+      <EditorBody>
+        <EditorColumn>
+          <EditorTitleInput
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="页面标题…"
             aria-label="页面标题"
           />
-          <div {...stylex.props(styles.metaRow)}>
+          <div className="mt-0 mb-[18px] flex items-center gap-2 border-b border-border pt-2.5 pb-3.5">
             <input
-              {...stylex.props(styles.slugInput)}
+              className="w-[140px] rounded-sm border-0 bg-muted px-2 py-[3px] text-xs text-muted-foreground outline-none"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
               placeholder="slug"
@@ -171,8 +127,8 @@ export default function PageEditorPage({
               spellCheck={false}
             />
           </div>
-        </div>
-      </div>
-    </div>
+        </EditorColumn>
+      </EditorBody>
+    </EditorShell>
   );
 }

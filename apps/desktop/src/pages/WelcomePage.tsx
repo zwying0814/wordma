@@ -1,16 +1,24 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Form } from "antd";
-import * as stylex from "@stylexjs/stylex";
-import x from "@stylexjs/atoms";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import { useLocation } from "wouter";
-import SiteFormItems, { type SiteFormValues } from "../components/SiteFormItems";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { InlineAlert } from "../components/common/inline-alert";
+import SiteFormItems, {
+  siteFormSchema,
+  type SiteFormValues,
+} from "../components/SiteFormItems";
 import { createSite, listSites, setActiveSite } from "../lib/site";
 
 export default function WelcomePage() {
-  const [form] = Form.useForm<SiteFormValues>();
   const [, navigate] = useLocation();
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const form = useForm<SiteFormValues>({
+    resolver: zodResolver(siteFormSchema),
+    defaultValues: { name: "", description: "" },
+  });
+  const { isSubmitting } = form.formState;
 
   // 已有站点时回到主页（处理直接访问 /welcome 的情况）
   useEffect(() => {
@@ -25,59 +33,36 @@ export default function WelcomePage() {
       });
   }, [navigate]);
 
-  const onFinish = async (values: SiteFormValues) => {
-    setSubmitting(true);
+  const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
       const site = await createSite(
         values.name.trim(),
-        values.description?.trim() || null,
+        values.description.trim() || null,
       );
       // 首个站点即当前站点；失败不阻塞跳转，HomePage 有兜底逻辑
       await setActiveSite(site.id).catch(() => {});
       navigate("/", { replace: true });
     } catch (e) {
       setError(String(e));
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
 
   return (
-    <div
-      {...stylex.props(
-        x.display.flex,
-        x.flexDirection.column,
-        x.alignItems.center,
-        x.justifyContent.center,
-        x.height["100%"],
-      )}
-    >
-      <div {...stylex.props(x.width["400px"])}>
-        <div {...stylex.props(x.fontSize._28px, x.fontWeight._700)}>
-          Wordma
-        </div>
-        <div
-          {...stylex.props(
-            x.fontSize._14px,
-            x.marginTop._8px,
-            x.marginBottom._28px,
-            x.color["var(--ant-color-text-tertiary)"],
-          )}
-        >
+    <div className="flex h-full flex-col items-center justify-center">
+      <div className="w-[400px]">
+        <div className="text-[28px] font-bold text-foreground">Wordma</div>
+        <div className="mt-2 mb-7 text-sm text-muted-foreground">
           创建你的第一个站点空间，开始写作。
         </div>
-        {error && (
-          <div {...stylex.props(x.marginBottom._16px)}>
-            <Alert type="error" showIcon message={error} />
-          </div>
-        )}
-        <Form form={form} layout="vertical" onFinish={onFinish}>
-          <SiteFormItems />
-          <Button type="primary" htmlType="submit" block loading={submitting}>
+        {error ? <InlineAlert className="mb-4">{error}</InlineAlert> : null}
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+          <SiteFormItems form={form} />
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? <Spinner className="size-4" /> : null}
             创建站点
           </Button>
-        </Form>
+        </form>
       </div>
     </div>
   );

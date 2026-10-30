@@ -1,72 +1,23 @@
 import { useMemo, useState } from "react";
-import { App as AntdApp, Button, Empty, Tag } from "antd";
-import { Plus } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
+import { FileText, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { useSite } from "../context/SiteContext";
 import { createArticle, type Article } from "../lib/article";
 import { countWordsHtml, fmtDate } from "../lib/words";
-import { pageStyles } from "../styles/page.stylex";
-
-const styles = stylex.create({
-  hello: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 24,
-  },
-  helloTitle: {
-    margin: 0,
-    fontSize: 24,
-    fontWeight: 700,
-    color: "var(--ant-color-text)",
-  },
-  helloSub: {
-    margin: "4px 0 0",
-    fontSize: 13.5,
-    color: "var(--ant-color-text-tertiary)",
-  },
-  statGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-    gap: 14,
-    marginBottom: 28,
-  },
-  statCard: {
-    backgroundColor: "var(--ant-color-bg-container)",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "var(--ant-color-border-secondary)",
-    borderRadius: 10,
-    padding: "16px 18px",
-  },
-  statNum: {
-    display: "block",
-    fontSize: 26,
-    fontWeight: 700,
-    lineHeight: 1.2,
-    color: "var(--ant-color-text)",
-    fontVariantNumeric: "tabular-nums",
-  },
-  statCap: {
-    display: "block",
-    fontSize: 12.5,
-    marginTop: 2,
-    color: "var(--ant-color-text-tertiary)",
-  },
-  cardHead: {
-    display: "flex",
-    alignItems: "center",
-    padding: "14px 18px",
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "var(--ant-color-border-secondary)",
-    fontSize: 14,
-    fontWeight: 600,
-    color: "var(--ant-color-text)",
-  },
-});
+import { EmptyState } from "../components/common/empty-state";
+import {
+  ListCard,
+  ListRow,
+  ListRowMain,
+  ListRowMeta,
+  ListRowSide,
+  ListRowTitle,
+} from "../components/common/list-row";
+import { PageView } from "../components/common/page-view";
+import { StatusBadge } from "../components/common/status-badge";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -79,15 +30,18 @@ function greeting(): string {
 /** 对应设计稿 .stat-card */
 function StatCard({ num, cap }: { num: string; cap: string }) {
   return (
-    <div {...stylex.props(styles.statCard)}>
-      <span {...stylex.props(styles.statNum)}>{num}</span>
-      <span {...stylex.props(styles.statCap)}>{cap}</span>
+    <div className="rounded-lg border border-border bg-card px-[18px] py-4 shadow-card">
+      <span className="block text-[26px] leading-[1.2] font-bold text-foreground tabular-nums">
+        {num}
+      </span>
+      <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+        {cap}
+      </span>
     </div>
   );
 }
 
 export default function DashboardPage() {
-  const { message } = AntdApp.useApp();
   const { activeSite, articles, reloadArticles } = useSite();
   const [, navigate] = useLocation();
   const [creating, setCreating] = useState(false);
@@ -112,39 +66,39 @@ export default function DashboardPage() {
       reloadArticles();
       navigate(`/editor/${article.id}`);
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setCreating(false);
     }
   };
 
   return (
-    <div {...stylex.props(pageStyles.view)}>
+    <PageView>
       {/* 问候区 */}
-      <div {...stylex.props(styles.hello)}>
+      <div className="mb-6 flex items-start justify-between gap-3">
         <div>
-          <h1 {...stylex.props(styles.helloTitle)}>
+          <h1 className="m-0 text-2xl font-bold text-foreground">
             {greeting()}，写作者
           </h1>
-          <p {...stylex.props(styles.helloSub)}>
+          <p className="mt-1 text-[13.5px] text-muted-foreground">
             「{activeSite.name}」
             {articles.length
               ? "一切井然有序，继续写吧。"
               : "还是一片空白，从第一篇开始。"}
           </p>
         </div>
-        <Button
-          type="primary"
-          icon={<Plus size={14} />}
-          loading={creating}
-          onClick={handleCreate}
-        >
+        <Button disabled={creating} onClick={handleCreate}>
+          {creating ? (
+            <Spinner className="size-3.5" />
+          ) : (
+            <Plus className="size-3.5" />
+          )}
           写一篇文章
         </Button>
       </div>
 
       {/* 统计卡 */}
-      <div {...stylex.props(styles.statGrid)}>
+      <div className="mb-7 grid grid-cols-4 gap-3.5">
         <StatCard num={String(articles.length)} cap="文章总数" />
         <StatCard num={String(published)} cap="已发布" />
         <StatCard num={String(drafts)} cap="草稿箱" />
@@ -153,58 +107,51 @@ export default function DashboardPage() {
 
       {/* 最近编辑 */}
       {recent.length === 0 ? (
-        <div {...stylex.props(pageStyles.card, pageStyles.emptyBox)}>
-          <Empty description="还没有文章，写下第一篇，从这个站点开始积累。">
-            <Button
-              type="primary"
-              icon={<Plus size={14} />}
-              onClick={handleCreate}
-            >
-              写一篇文章
-            </Button>
-          </Empty>
-        </div>
+        <ListCard>
+          <EmptyState
+            icon={FileText}
+            title="还没有文章"
+            description="写下第一篇，从这个站点开始积累。"
+            action={
+              <Button disabled={creating} onClick={handleCreate}>
+                {creating ? (
+                  <Spinner className="size-3.5" />
+                ) : (
+                  <Plus className="size-3.5" />
+                )}
+                写一篇文章
+              </Button>
+            }
+          />
+        </ListCard>
       ) : (
-        <div {...stylex.props(pageStyles.card)}>
-          <div {...stylex.props(styles.cardHead)}>最近编辑</div>
+        <ListCard>
+          <div className="flex items-center border-b border-border px-[18px] py-3.5 text-sm font-semibold text-foreground">
+            最近编辑
+          </div>
           {recent.map((a: Article, i) => (
-            <div
+            <ListRow
               key={a.id}
-              role="button"
-              tabIndex={0}
+              showBorder={i < recent.length - 1}
               onClick={() => navigate(`/editor/${a.id}`)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") navigate(`/editor/${a.id}`);
-              }}
-              {...stylex.props(
-                pageStyles.row,
-                i < recent.length - 1 && pageStyles.rowBorder,
-              )}
             >
-              <div {...stylex.props(pageStyles.rowMain)}>
-                <span {...stylex.props(pageStyles.rowTitle)}>
-                  {a.title || "（无标题）"}
-                </span>
-                <span {...stylex.props(pageStyles.rowMeta)}>
+              <ListRowMain>
+                <ListRowTitle>{a.title || "（无标题）"}</ListRowTitle>
+                <ListRowMeta>
                   {a.categories.map((c) => c.name).join("、") || null}
                   {a.categories.length > 0 && a.tags.length > 0 ? " · " : ""}
                   {a.tags.map((t) => t.name).join("、") || null}
                   {a.categories.length + a.tags.length > 0 ? " · " : ""}
                   {fmtDate(a.updatedAt)} · 约 {countWordsHtml(a.content)} 字
-                </span>
-              </div>
-              <div {...stylex.props(pageStyles.rowSide)}>
-                <Tag
-                  variant="filled"
-                  color={a.status === "published" ? "success" : undefined}
-                >
-                  {a.status === "published" ? "已发布" : "草稿"}
-                </Tag>
-              </div>
-            </div>
+                </ListRowMeta>
+              </ListRowMain>
+              <ListRowSide>
+                <StatusBadge published={a.status === "published"} />
+              </ListRowSide>
+            </ListRow>
           ))}
-        </div>
+        </ListCard>
       )}
-    </div>
+    </PageView>
   );
 }

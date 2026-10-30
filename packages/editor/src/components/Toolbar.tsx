@@ -22,50 +22,13 @@ import {
   Undo2,
   type LucideIcon,
 } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
 
-const styles = stylex.create({
-  bar: {
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 2,
-    padding: "6px 10px",
-    flexShrink: 0,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: "var(--ant-color-border-secondary)",
-  },
-  btn: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 28,
-    height: 28,
-    borderStyle: "none",
-    borderRadius: 6,
-    padding: 0,
-    cursor: "pointer",
-    color: "var(--ant-color-text-secondary)",
-    backgroundColor: {
-      default: "transparent",
-      ":hover": "var(--ant-color-fill-tertiary)",
-    },
-  },
-  btnActive: {
-    color: "var(--ant-color-primary)",
-    backgroundColor: {
-      default: "var(--ant-color-primary-bg)",
-      ":hover": "var(--ant-color-primary-bg-hover)",
-    },
-  },
-  divider: {
-    width: 1,
-    height: 18,
-    marginInline: 4,
-    backgroundColor: "var(--ant-color-border-secondary)",
-  },
-});
+const barClass =
+  "flex shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-2.5 py-1.5";
+const btnClass =
+  "flex size-7 items-center justify-center rounded-sm border-0 p-0 text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
+const btnActiveClass = "bg-accent text-primary hover:bg-accent";
+const dividerClass = "mx-1 h-[18px] w-px bg-border";
 
 function ToolButton({
   label,
@@ -88,7 +51,7 @@ function ToolButton({
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      {...stylex.props(styles.btn, active && styles.btnActive)}
+      className={active ? `${btnClass} ${btnActiveClass}` : btnClass}
     >
       <Icon size={16} />
     </button>
@@ -138,7 +101,7 @@ export function Toolbar({
   };
 
   return (
-    <div {...stylex.props(styles.bar)} role="toolbar" aria-label="编辑工具栏">
+    <div className={barClass} role="toolbar" aria-label="编辑工具栏">
       <ToolButton
         label="撤销"
         icon={Undo2}
@@ -162,7 +125,7 @@ export function Toolbar({
           });
         }}
       />
-      <span {...stylex.props(styles.divider)} />
+      <span className={dividerClass} />
       <ToolButton
         label="标题 1"
         icon={Heading1}
@@ -181,7 +144,7 @@ export function Toolbar({
         active={state.h3}
         onClick={run((c) => c.toggleHeading({ level: 3 }))}
       />
-      <span {...stylex.props(styles.divider)} />
+      <span className={dividerClass} />
       <ToolButton
         label="加粗"
         icon={Bold}
@@ -200,7 +163,7 @@ export function Toolbar({
         active={state.strike}
         onClick={run((c) => c.toggleStrike())}
       />
-      <span {...stylex.props(styles.divider)} />
+      <span className={dividerClass} />
       <ToolButton
         label="无序列表"
         icon={List}
@@ -230,7 +193,7 @@ export function Toolbar({
         icon={Minus}
         onClick={run((c) => c.setHorizontalRule())}
       />
-      <span {...stylex.props(styles.divider)} />
+      <span className={dividerClass} />
       <ToolButton
         label="左对齐"
         icon={AlignLeft}
@@ -255,7 +218,7 @@ export function Toolbar({
         active={state.alignJustify}
         onClick={run((c) => c.setTextAlign("justify"))}
       />
-      <span {...stylex.props(styles.divider)} />
+      <span className={dividerClass} />
       <ToolButton
         label="插入表格"
         icon={Table}

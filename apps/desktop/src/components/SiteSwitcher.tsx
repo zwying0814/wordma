@@ -1,8 +1,14 @@
-import { useState, type CSSProperties } from "react";
-import { Avatar, Dropdown } from "antd";
+import { useState } from "react";
 import { Check, ChevronDown, Plus } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
-import x from "@stylexjs/atoms";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import type { Site } from "../lib/site";
 
 interface Props {
@@ -12,119 +18,30 @@ interface Props {
   onCreate: () => void;
 }
 
-// 触发器带 hover/active 状态，atoms 表达不了伪类，这里用 create；
-// 也因此不套 antd Button——避免和它的内部样式打优先级。
-const styles = stylex.create({
-  trigger: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    width: "100%",
-    padding: "8px 10px",
-    borderRadius: 10,
-    borderStyle: "none",
-    cursor: "pointer",
-    textAlign: "left",
-    backgroundColor: {
-      default: "transparent",
-      ":hover": "var(--ant-color-fill-tertiary)",
-      ":active": "var(--ant-color-fill-secondary)",
-    },
-  },
-  avatar: {
-    flexShrink: 0,
-  },
-  info: {
-    display: "flex",
-    flexDirection: "column",
-    flex: 1,
-    minWidth: 0,
-  },
-  name: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: "var(--ant-color-text)",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-  sub: {
-    fontSize: 11,
-    color: "var(--ant-color-text-tertiary)",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-  chevron: {
-    flexShrink: 0,
-    color: "var(--ant-color-text-tertiary)",
-    transition: "transform 0.2s ease-out",
-  },
-  chevronOpen: {
-    transform: "rotate(180deg)",
-  },
-  itemLabel: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    minWidth: 0,
-  },
-  itemInfo: {
-    display: "flex",
-    flexDirection: "column",
-    minWidth: 0,
-  },
-  itemName: {
-    fontSize: 13,
-    fontWeight: 500,
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-  itemDesc: {
-    fontSize: 11,
-    color: "var(--ant-color-text-tertiary)",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-  itemCheck: {
-    flexShrink: 0,
-    color: "var(--ant-color-primary)",
-  },
-});
-
-interface SiteAvatarProps {
-  site: Site;
-  size: number;
-  className?: string;
-  style?: CSSProperties;
-}
-
-function SiteAvatar({ site, size, className, style }: SiteAvatarProps) {
-  const sx = stylex.props(styles.avatar);
+function SiteAvatar({ site, size }: { site: Site; size: number }) {
   return (
     <Avatar
-      shape="square"
-      size={size}
-      {...sx}
-      // antd MenuItem 经 cloneElement 把 ant-menu-item-icon 类合并进传入的
-      // className；不透传的话图标与文字的默认间距（相邻选择器）会丢失
-      className={className ?? sx.className}
-      // antd Avatar 自带背景色（未分层样式）盖过 StyleX，颜色走它的 style 入口
-      style={{
-        ...style,
-        backgroundColor: "var(--ant-color-primary-bg)",
-        color: "var(--ant-color-primary)",
-      }}
+      className="shrink-0 rounded-md after:rounded-md"
+      style={{ width: size, height: size }}
     >
-      {site.name.slice(0, 1)}
+      <AvatarFallback
+        className={cn(
+          "rounded-md bg-accent font-semibold text-accent-foreground",
+          size >= 28 ? "text-[13px]" : "text-[12px]",
+        )}
+      >
+        {site.name.slice(0, 1)}
+      </AvatarFallback>
     </Avatar>
   );
 }
 
-export default function SiteSwitcher({ sites, activeId, onSelect, onCreate }: Props) {
+export default function SiteSwitcher({
+  sites,
+  activeId,
+  onSelect,
+  onCreate,
+}: Props) {
   const [open, setOpen] = useState(false);
   const active = sites.find((s) => s.id === activeId) ?? sites[0] ?? null;
 
@@ -132,69 +49,65 @@ export default function SiteSwitcher({ sites, activeId, onSelect, onCreate }: Pr
     return null;
   }
 
-  const menuItems = [
-    ...sites.map((s) => ({
-      key: String(s.id),
-      icon: <SiteAvatar site={s} size={24} />,
-      label: (
-        <span {...stylex.props(styles.itemLabel)}>
-          <span {...stylex.props(styles.itemInfo)}>
-            <span {...stylex.props(styles.itemName)}>{s.name}</span>
-            <span {...stylex.props(styles.itemDesc)}>{s.description || "暂无介绍"}</span>
-          </span>
-          {s.id === active.id && (
-            <Check size={14} {...stylex.props(styles.itemCheck)} />
-          )}
-        </span>
-      ),
-    })),
-    { type: "divider" as const },
-    {
-      key: "create",
-      icon: <Plus size={14} />,
-      label: (
-        <span {...stylex.props(styles.itemInfo)}>
-          <span {...stylex.props(styles.itemName)}>新建站点</span>
-          <span {...stylex.props(styles.itemDesc)}>独立的内容空间</span>
-        </span>
-      ),
-    },
-  ];
-
   return (
-    <div {...stylex.props(x.marginBottom._12px)}>
-      <Dropdown
-        menu={{
-          items: menuItems,
-          selectable: false,
-          onClick: ({ key }) => {
-            if (key === "create") {
-              onCreate();
-            } else {
-              onSelect(Number(key));
-            }
-          },
-        }}
-        trigger={["click"]}
-        onOpenChange={setOpen}
-      >
-        <div
-          role="button"
-          tabIndex={0}
-          aria-haspopup="menu"
-          {...stylex.props(styles.trigger)}
+    <div className="mb-3">
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger
+          aria-label="切换站点"
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 text-left transition-colors hover:bg-foreground/[0.045]",
+            open && "bg-foreground/[0.045]",
+          )}
         >
           <SiteAvatar site={active} size={30} />
-          <span {...stylex.props(styles.info)}>
-            <span {...stylex.props(styles.name)}>{active.name}</span>
-            <span {...stylex.props(styles.sub)}>{active.description || "暂无介绍"}</span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[13px] font-semibold text-foreground">
+              {active.name}
+            </span>
+            <span className="truncate text-[11px] text-muted-foreground">
+              {active.description || "暂无介绍"}
+            </span>
           </span>
           <ChevronDown
-            size={12}
-            {...stylex.props(styles.chevron, open && styles.chevronOpen)}
+            className={cn(
+              "size-3 shrink-0 text-muted-foreground transition-transform duration-200",
+              open && "rotate-180",
+            )}
           />
-        </div>
-      </Dropdown>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-[220px]">
+          {sites.map((site) => (
+            <DropdownMenuItem
+              key={site.id}
+              onClick={() => onSelect(site.id)}
+              className="gap-2.5 py-2"
+            >
+              <SiteAvatar site={site} size={24} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[13px] font-medium">
+                  {site.name}
+                </span>
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {site.description || "暂无介绍"}
+                </span>
+              </span>
+              {site.id === active.id ? (
+                <Check className="size-3.5 shrink-0 text-primary" />
+              ) : null}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onCreate} className="gap-2.5 py-2">
+            <Plus className="size-3.5 shrink-0" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-[13px] font-medium">新建站点</span>
+              <span className="text-[11px] text-muted-foreground">
+                独立的内容空间
+              </span>
+            </span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

@@ -1,17 +1,17 @@
 import { useState } from "react";
+import { Folder, Pencil, Plus, Tags, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
-  App as AntdApp,
-  Button,
-  Empty,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Spin,
-} from "antd";
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import * as stylex from "@stylexjs/stylex";
-import x from "@stylexjs/atoms";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { useSite } from "../context/SiteContext";
 import {
   createCategory,
@@ -21,7 +21,19 @@ import {
   renameCategory,
   renameTag,
 } from "../lib/taxonomy";
-import { pageStyles } from "../styles/page.stylex";
+import { ConfirmDialog } from "../components/common/confirm-dialog";
+import { EmptyState } from "../components/common/empty-state";
+import { Field } from "../components/common/field";
+import {
+  ListCard,
+  ListRow,
+  ListRowMain,
+  ListRowMeta,
+  ListRowSide,
+  ListRowTitle,
+} from "../components/common/list-row";
+import { PageHeader } from "../components/common/page-header";
+import { PageView } from "../components/common/page-view";
 
 export type TaxonomyKind = "tag" | "category";
 
@@ -43,7 +55,6 @@ export function CategoriesPage() {
 
 /** 标签页与分类页共用：列表 + 新建/重命名弹窗 + 删除确认（布局对应设计稿 .card/.rowitem） */
 function TaxonomyPage({ kind }: { kind: TaxonomyKind }) {
-  const { message } = AntdApp.useApp();
   const {
     activeSite,
     tags,
@@ -56,183 +67,209 @@ function TaxonomyPage({ kind }: { kind: TaxonomyKind }) {
   const noun = isTag ? "标签" : "分类";
   const list: Row[] = isTag ? tags : categories;
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
+  const [name, setName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form] = Form.useForm<{ name: string }>();
+  const [pendingDelete, setPendingDelete] = useState<Row | null>(null);
 
-  const openRename = (row: Row) => {
-    setEditing(row);
-    setModalOpen(true);
+  const openCreate = () => {
+    setName("");
+    setNameError(null);
+    setEditing(null);
+    setDialogOpen(true);
   };
 
-  const handleOk = async () => {
-    let values: { name: string };
-    try {
-      values = await form.validateFields();
-    } catch {
+  const openRename = (row: Row) => {
+    setName(row.name);
+    setNameError(null);
+    setEditing(row);
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = name.trim();
+    if (!value) {
+      setNameError("名称不能为空");
       return;
     }
-    const name = values.name.trim();
+    if (value.length > NAME_MAX) {
+      setNameError(`名称不能超过 ${NAME_MAX} 个字符`);
+      return;
+    }
     setSaving(true);
     try {
       if (editing) {
-        await (isTag ? renameTag(editing.id, name) : renameCategory(editing.id, name));
-        message.success(`${noun}已重命名`);
+        await (isTag ? renameTag(editing.id, value) : renameCategory(editing.id, value));
+        toast.success(`${noun}已重命名`);
       } else {
-        await (isTag ? createTag(activeSite.id, name) : createCategory(activeSite.id, name));
-        message.success(`${noun}已创建`);
+        await (isTag
+          ? createTag(activeSite.id, value)
+          : createCategory(activeSite.id, value));
+        toast.success(`${noun}已创建`);
       }
-      setModalOpen(false);
+      setDialogOpen(false);
       // 重命名/删除会影响文章的分类名与计数
       reloadTaxonomy();
       reloadArticles();
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (row: Row) => {
+  const handleDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await (isTag ? deleteTag(row.id) : deleteCategory(row.id));
+      await (isTag
+        ? deleteTag(pendingDelete.id)
+        : deleteCategory(pendingDelete.id));
       reloadTaxonomy();
       reloadArticles();
-      message.success(`${noun}已删除`);
+      toast.success(`${noun}已删除`);
     } catch (e) {
-      message.error(String(e));
+      toast.error(String(e));
+    } finally {
+      setPendingDelete(null);
     }
   };
 
-  return (
-    <div {...stylex.props(pageStyles.view)}>
-      <div {...stylex.props(pageStyles.pageHead)}>
-        <div>
-          <div {...stylex.props(pageStyles.pageTitle)}>{noun}</div>
-          <div {...stylex.props(pageStyles.pageSub)}>共 {list.length} 个</div>
-        </div>
-        {list.length > 0 && (
-          <Button
-            type="primary"
-            icon={<Plus size={14} />}
-            onClick={() => {
-              form.resetFields();
-              setEditing(null);
-              setModalOpen(true);
-            }}
-          >
-            新建{noun}
-          </Button>
-        )}
-      </div>
+  const EmptyIcon = isTag ? Tags : Folder;
 
-      {taxonomyLoading ? (
-        <div
-          {...stylex.props(
-            x.display.flex,
-            x.justifyContent.center,
-            x.padding._48px,
-          )}
-        >
-          <Spin />
-        </div>
-      ) : list.length === 0 ? (
-        <div {...stylex.props(pageStyles.card, pageStyles.emptyBox)}>
-          <Empty
-            description={
-              isTag
-                ? "还没有标签，标签帮助读者按主题找到相关文章。"
-                : "还没有分类，分类是文章的一级归属，一篇文章只属于一个分类。"
-            }
-          >
-            <Button
-              type="primary"
-              icon={<Plus size={14} />}
-              onClick={() => {
-                form.resetFields();
-                setEditing(null);
-                setModalOpen(true);
-              }}
-            >
+  return (
+    <PageView>
+      <PageHeader
+        title={noun}
+        subtitle={`共 ${list.length} 个`}
+        actions={
+          list.length > 0 ? (
+            <Button onClick={openCreate}>
+              <Plus className="size-3.5" />
               新建{noun}
             </Button>
-          </Empty>
+          ) : null
+        }
+      />
+
+      {taxonomyLoading ? (
+        <div className="flex justify-center p-12">
+          <Spinner className="size-5 text-muted-foreground" />
         </div>
+      ) : list.length === 0 ? (
+        <ListCard>
+          <EmptyState
+            icon={EmptyIcon}
+            title={`还没有${noun}`}
+            description={
+              isTag
+                ? "标签帮助读者按主题找到相关文章。"
+                : "分类是文章的一级归属，一篇文章只属于一个分类。"
+            }
+            action={
+              <Button onClick={openCreate}>
+                <Plus className="size-3.5" />
+                新建{noun}
+              </Button>
+            }
+          />
+        </ListCard>
       ) : (
-        <div {...stylex.props(pageStyles.card)}>
+        <ListCard>
           {list.map((row, i) => (
-            <div
-              key={row.id}
-              {...stylex.props(
-                pageStyles.row,
-                i < list.length - 1 && pageStyles.rowBorder,
-              )}
-            >
-              <div {...stylex.props(pageStyles.rowMain)}>
-                <span {...stylex.props(pageStyles.rowTitle)}>{row.name}</span>
-                <span {...stylex.props(pageStyles.rowMeta)}>
-                  {row.articleCount} 篇文章
-                </span>
-              </div>
-              <div {...stylex.props(pageStyles.rowSide)}>
+            <ListRow key={row.id} showBorder={i < list.length - 1}>
+              <ListRowMain>
+                <ListRowTitle>{row.name}</ListRowTitle>
+                <ListRowMeta>{row.articleCount} 篇文章</ListRowMeta>
+              </ListRowMain>
+              <ListRowSide>
                 <Button
-                  type="text"
-                  size="small"
-                  icon={<Pencil size={14} />}
+                  variant="ghost"
+                  size="icon-sm"
                   aria-label={`重命名${noun}「${row.name}」`}
-                  onClick={() => {
-                    form.setFieldsValue({ name: row.name });
-                    openRename(row);
-                  }}
-                />
-                <Popconfirm
-                  title={`删除${noun}`}
-                  description="相关文章将解除关联，确定删除？"
-                  okText="删除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => handleDelete(row)}
+                  onClick={() => openRename(row)}
                 >
-                  <Button
-                    type="text"
-                    size="small"
-                    danger
-                    icon={<Trash2 size={14} />}
-                    aria-label={`删除${noun}「${row.name}」`}
-                  />
-                </Popconfirm>
-              </div>
-            </div>
+                  <Pencil className="size-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-destructive hover:bg-destructive-soft hover:text-destructive"
+                  aria-label={`删除${noun}「${row.name}」`}
+                  onClick={() => setPendingDelete(row)}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </ListRowSide>
+            </ListRow>
           ))}
-        </div>
+        </ListCard>
       )}
 
-      <Modal
-        title={editing ? `重命名${noun}` : `新建${noun}`}
-        open={modalOpen}
-        onOk={handleOk}
-        confirmLoading={saving}
-        onCancel={() => setModalOpen(false)}
-        okText={editing ? "保存" : "创建"}
-        cancelText="取消"
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(next) => {
+          if (!next && !saving) setDialogOpen(false);
+        }}
       >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label="名称"
-            rules={[
-              { required: true, whitespace: true, message: "名称不能为空" },
-              { max: NAME_MAX, message: `名称不能超过 ${NAME_MAX} 个字符` },
-            ]}
-          >
-            <Input
-              placeholder={isTag ? "例如：旅行" : "例如：户外"}
-              onPressEnter={handleOk}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+        <DialogContent showCloseButton={!saving} className="sm:max-w-sm">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <DialogHeader>
+              <DialogTitle>
+                {editing ? `重命名${noun}` : `新建${noun}`}
+              </DialogTitle>
+              <DialogDescription>
+                {isTag ? "标签用于横向组织文章。" : "分类是文章的一级归属。"}
+              </DialogDescription>
+            </DialogHeader>
+            <Field
+              label="名称"
+              htmlFor="taxonomy-name"
+              error={nameError}
+            >
+              <Input
+                id="taxonomy-name"
+                autoFocus
+                value={name}
+                placeholder={isTag ? "例如：旅行" : "例如：户外"}
+                aria-invalid={Boolean(nameError)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameError(null);
+                }}
+              />
+            </Field>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => setDialogOpen(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? <Spinner className="size-4" /> : null}
+                {editing ? "保存" : "创建"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`删除${noun}`}
+        description="相关文章将解除关联，确定删除？"
+        confirmLabel="删除"
+        destructive
+        onConfirm={handleDelete}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      />
+    </PageView>
   );
 }
