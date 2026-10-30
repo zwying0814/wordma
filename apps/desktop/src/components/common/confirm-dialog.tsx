@@ -20,7 +20,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
-/** 二次确认弹窗（替代 antd Popconfirm）：默认取消按钮聚焦 */
+/** 二次确认弹窗：默认聚焦取消按钮 */
 export function ConfirmDialog({
   open,
   title,

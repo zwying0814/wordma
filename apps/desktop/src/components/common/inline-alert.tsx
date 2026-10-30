@@ -8,7 +8,7 @@ interface Props {
   className?: string;
 }
 
-/** 行内提示（替代 antd Alert）：可恢复错误留在原位展示 */
+/** 行内提示：可恢复错误留在原位展示 */
 export function InlineAlert({ type = "error", children, className }: Props) {
   const isError = type === "error";
   const Icon = isError ? CircleAlert : Info;

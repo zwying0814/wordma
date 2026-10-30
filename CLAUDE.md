@@ -6,10 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Wordma —— 类 Gridea 的静态博客平台（桌面端）。pnpm monorepo：`apps/desktop` 是 Tauri 2 + React 19 + TypeScript + Vite 应用（Rust 后端 + SQLite），`packages/*` 为 workspace 源码包：
 
-- `@wordma/ui` —— 共享设计 token（`defineVars` 别名层，指向 `--ant-*` 变量）
-- `@wordma/editor` —— Tiptap 编辑器组件（markdown 存取 + `/` 斜杠命令菜单），对外仅导出 `<WordmaEditor initialValue onChange placeholder />`
+- `@wordma/editor` —— Tiptap 编辑器组件（HTML 存取 + `/` 斜杠命令菜单），对外仅导出 `<WordmaEditor initialValue onChange placeholder />`
 
-workspace 包是**源码包**（`exports` 直接指向 `./src/index.ts`，无构建产物）：StyleX 必须由消费方构建管线编译，app 的 unplugin 会自动处理它们（已验证 `transformInclude` 不排除 node_modules 符号链接）。UI 上 antd + StyleX 的用法约定对所有包一致。
+workspace 包是**源码包**（`exports` 直接指向 `./src/index.ts`，无构建产物）。UI 栈为 **Tailwind CSS 4 + shadcn/ui v4（`base-nova`，Base UI 内核）+ lucide-react**，设计令牌在 `apps/desktop/src/styles/theme.css`（取值以 `design/styles.css` 为准）。
 
 依赖版本用 **pnpm catalog** 管理（`pnpm-workspace.yaml`）：跨包共享的依赖用 `"catalog:"` 引用；单包内部的版本联动（如 editor 的 `@tiptap/*` 全家桶）在该包 package.json 里用精确版本锁定，不进 catalog。
 
@@ -24,6 +23,14 @@ pnpm desktop:build          # Tauri release 打包
 cd apps/desktop/src-tauri
 cargo test                  # Rust 单测（首次编译较久）
 cargo test <test_name>      # 单个测试，如 cargo test active_site_roundtrip
+```
+
+`@wordma/editor` 当前未被应用引用，应用构建不会类型检查它；改动该包后单独跑：
+
+```bash
+apps/desktop/node_modules/.bin/tsc --noEmit --ignoreConfig --jsx react-jsx \
+  --module esnext --moduleResolution bundler --target es2020 --lib es2020,dom \
+  --strict --skipLibCheck --allowImportingTsExtensions packages/editor/src/index.ts
 ```
 
 ## 前后端边界
@@ -42,24 +49,26 @@ cargo test <test_name>      # 单个测试，如 cargo test active_site_roundtri
 
 ## 路由与启动流
 
-wouter（`App.tsx` 中 `Switch`）：`/welcome` 为首次创建页（已有站点则跳回 `/`），其余路径由 HomePage 布局壳承接并在内部按 `/articles`、`/editor/:id` 等分流。两页互为守卫，改动任一页的加载逻辑时保持这个闭环。
+wouter（`App.tsx` 中 `Switch`）：`/welcome` 为首次创建页（已有站点则跳回 `/`），其余路径由 HomePage 布局壳（侧栏 + 主区）承接并在内部按 `/articles`、`/editor/:id` 等分流。两页互为守卫，改动任一页的加载逻辑时保持这个闭环。
 
 **wouter 匹配陷阱**：底层 regexparam 的 `:param*` 只匹配"零或一个路径段"，不是多段通配（`/:rest*` 匹配不上 `/editor/3`）；布局壳等"承接一切"的路由要用显式路径 + 无 `path` 的 `<Route>` 兜底（其内部默认 `pattern = "*"`）。若顶层 Switch 无路由命中，页面会白屏且无报错。
 
-## StyleX 体系（本项目最容易踩坑的部分）
+## UI 体系（Tailwind + shadcn）
 
-写法规范见 `docs/styleX.md`（项目内权威指南），要点：
-
-- 习惯用法：`@stylexjs/atoms` 行内原子（`x.display.flex`；数字开头的值加 `_` 前缀如 `x.padding._16px`；复杂值用计算属性如 `x.height["100%"]`），经 `{...stylex.props(...)}` 展开。`stylex.create` 块只用于伪类/状态（atoms 表达不了 `:hover`）。
-- **级联规则（关键）**：`vite.config.ts` 开了 `useCSSLayers: true`，StyleX 输出在 `@layer` 里，而 antd 注入的是未分层样式 —— 同元素同属性冲突时 antd 必胜。因此**永远不要用 StyleX 覆盖 antd 组件的内部样式**（Button 的 padding/高度、Avatar 底色等）；改 antd 组件观感走 `ConfigProvider` 的 `theme.token` / `theme.components`。StyleX 用在自有元素、或 antd 未设置的属性上是安全的。
-- 主题对接：antd v6 CSS 变量模式默认开启，`--ant-*` 变量挂在 `.{cssVar.key}` 类下 —— `App.tsx` 的 `theme.cssVar.key` 必须与 `main.tsx` 挂到 `<html>` 的类名一致（当前都是 `css-var-my-theme-id`），改任一边必须同步。
-- `@wordma/ui`（`packages/ui`）是语义别名层（`defineVars` 指向 `var(--ant-*)`）：`stylex.create` 里引用 `tokens.*`；atoms 里用原始字符串 `x.color["var(--ant-color-text)"]`（`StyleXVar` 类型进不了 atoms 的 `(value: string | number)` 签名）。
-- 高度链：`main.css` 设 `html/body/#root` 100%，页面根节点 `height: "100%"`。antd `App` 组件必须写成 `<AntdApp component={false}>` —— 它默认渲染的 `.ant-app` div 无高度，会断掉整条链。
+- **组件分两层**：
+  - `src/components/ui/*` —— shadcn CLI 生成（`apps/desktop/components.json`：style `base-nova`、css 指向 `src/styles/theme.css`）。新增组件用 `pnpm -F desktop exec shadcn add <name>`，不要手工重写生成文件；本地只允许扩展变体（如 Badge 的 `success`）。
+  - `src/components/common/*` —— 业务基础件：`PageView`、`PageHeader`、`ListCard/ListRow`、`EmptyState`、`ConfirmDialog`、`Field`、`InlineAlert`、`LoadingBlock/LoadingScreen`、`Segmented`、`MultiSelect`、`StatusBadge`、`EditorShell`。新页面优先复用，不要重复拼装。
+- **设计令牌**只在 `src/styles/theme.css`：`:root` 放 hex，`@theme inline` 暴露工具类（`bg-card`、`text-muted-foreground`、`shadow-card`、`text-page-title`、`w-sidebar`…），`.dark` 同步维护。`--radius: 10px` 经 base-nova 倍率得到设计稿的 6/8/10 圆角。
+- **只用 token**：不要写 `text-gray-500`、`bg-[#fff]` 这类字面值；要新颜色先在 `theme.css` 加 token，再在组件里用工具类。设计稿 hex 也只钉在 `theme.css`。
+- `cn` 从 `@/lib/utils` 引入（底层是 `cn` 包，支持条件类名）。
+- **Tailwind 扫描范围**：workspace 源码包不在 node_modules 自动扫描内，`theme.css` 中的 `@source "../../../../packages/editor/src"` 不能删，否则编辑器包里的类名不会生成。
+- **反馈约定**：一次性动作结果用 sonner 的 `toast()`（`App.tsx` 已挂一次 `<Toaster />`）；二次确认用 `ConfirmDialog`（AlertDialog）；可恢复错误用 `InlineAlert` 或表单内 `Field error`。
+- **Base UI 约定**：`DropdownMenuTrigger` / `Dialog` 默认渲染按钮；`Select` 用 `value` / `onValueChange`；多选用 `DropdownMenuCheckboxItem` + `closeOnClick={false}`。
+- **布局高度链**：`html/body/#root` 保持 100%，页面根节点 `h-full`。普通页面用 `PageView`（28/36/48 内边距 + 滚动），编辑器用 `EditorShell`。
+- **编辑器正文样式**作用域是 `.wm-editor`（`packages/editor/src/editor.css`）；接入编辑器时必须传 `contentClassName="wm-editor"`，否则标题/列表/代码块排版不生效。
 
 ## 其他约定
 
-- antd 参考：读 https://ant.design/llms-full.txt 了解 Ant Design 组件，编写 antd 相关代码时直接运用这些知识（组件 props、语义化 `styles`/`classNames`、v6 变更等），避免凭旧版本记忆使用 API。
-
-- pnpm 严格 node_modules：antd 的传递依赖（如 `@ant-design/icons`）不能直接 import，需先声明进 `apps/desktop/package.json`。
-- 设计稿的 hex 值（如 `#3563D9`、`#FBFBFC`）应钉在 `ConfigProvider` 的 theme 里，组件层只引用变量；把设计值补进 theme 即可让全站跟随。
-- 图标来自 `@ant-design/icons`，复用 antd 组件优先于自绘（用户明确要求：组件库有的就复用，样式允许不一致）。
+- pnpm 严格 node_modules：新增库要先声明进对应包的 `package.json`，不能依赖传递安装。
+- 图标统一来自 `lucide-react`，尺寸用 `size-*`（shadcn 组件的 `[&_svg]` 规则会尊重显式尺寸）。
+- 组件库已有的组件优先复用（用户明确要求），样式不一致时通过 className / token 调整，不另起炉灶。

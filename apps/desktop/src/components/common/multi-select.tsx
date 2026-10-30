@@ -21,7 +21,7 @@ interface Props {
   className?: string;
 }
 
-/** 多选下拉（替代 antd Select mode="multiple"），用于文章分类/标签 */
+/** 多选下拉，用于文章分类/标签 */
 export function MultiSelect({
   value,
   options,

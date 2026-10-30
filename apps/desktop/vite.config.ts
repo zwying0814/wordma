@@ -2,22 +2,12 @@ import path from "node:path";
 import process from "node:process";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import stylex from '@stylexjs/unplugin';
 import tailwindcss from "@tailwindcss/vite";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [
-      // 迁移期临时共存：StyleX 处理旧样式文件，Tailwind 处理新组件。
-      // 迁移完成后移除 stylex 插件（见 docs/ 迁移方案第 7 阶段）。
-      stylex.vite({
-          useCSSLayers: true,
-          // ... other StyleX configuration options
-      }),
-      tailwindcss(),
-      react()
-  ],
+  plugins: [tailwindcss(), react()],
 
   resolve: {
     alias: {

@@ -12,13 +12,9 @@
   "dependencies": {
     "@base-ui/react": "^1.9.0",
     "@hookform/resolvers": "^6.0.2",
-    "@stylexjs/atoms": "catalog:",
-    "@stylexjs/stylex": "catalog:",
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
-    "@wordma/ui": "workspace:*",
-    "antd": "catalog:",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.1",
     "lucide-react": "catalog:",
@@ -33,7 +29,6 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@stylexjs/unplugin": "catalog:",
     "@tauri-apps/cli": "^2",
     "@types/node": "^26.6.5",
     "@types/react": "catalog:",

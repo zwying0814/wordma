@@ -1,7 +1,7 @@
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
-/** 页面级加载态：居中转圈（替代 antd Spin 的常规用法） */
+/** 页面级加载态：居中转圈 */
 export function LoadingBlock({ className }: { className?: string }) {
   return (
     <div className={cn("flex justify-center p-12", className)}>
