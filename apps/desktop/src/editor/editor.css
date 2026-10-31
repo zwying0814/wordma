@@ -281,3 +281,9 @@
   border-right: 1px solid var(--border);
   color: var(--muted-foreground);
 }
+
+/* 块拖拽手柄：鼠标移向手柄时不要因编辑器 mouseleave 而消失 */
+.wordma-drag-handle-visible {
+  visibility: visible !important;
+  pointer-events: auto !important;
+}

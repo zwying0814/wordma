@@ -1,6 +1,13 @@
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import type { Editor } from "@tiptap/react";
 import type { Node as PMNode, NodeType } from "@tiptap/pm/model";
 import { Fragment } from "@tiptap/pm/model";
+import { NodeSelection } from "@tiptap/pm/state";
 import { createMdxBlockId } from "@wordma/editor-schema";
 import {
   ArrowDown,
@@ -20,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 const NODE_LABELS: Record<string, string> = {
   paragraph: "正文",
@@ -65,14 +73,47 @@ function attrsFor(type: NodeType, source: PMNode): Record<string, unknown> {
   return attrs;
 }
 
+interface DragBlock {
+  index: number;
+  pos: number;
+  node: PMNode;
+  rect: DOMRect;
+  element: HTMLElement;
+}
+
+/** 顶层块及其屏幕位置；拖动只调整顶层顺序，与 DragHandle 的 targeting 一致 */
+function topLevelBlocks(editor: Editor): DragBlock[] {
+  const blocks: DragBlock[] = [];
+  editor.state.doc.forEach((node, offset, index) => {
+    const dom = editor.view.nodeDOM(offset);
+    const element =
+      dom instanceof HTMLElement
+        ? dom
+        : dom?.parentElement instanceof HTMLElement
+          ? dom.parentElement
+          : null;
+    if (!element) return;
+    blocks.push({
+      index,
+      pos: offset,
+      node,
+      rect: element.getBoundingClientRect(),
+      element,
+    });
+  });
+  return blocks;
+}
+
 export function BlockMenu({
   editor,
   target,
   onOpenChange,
+  onHandleHoverChange,
 }: {
   editor: Editor;
   target: { node: PMNode; pos: number } | null;
   onOpenChange: (open: boolean) => void;
+  onHandleHoverChange?: (hovered: boolean) => void;
 }) {
   const range = target ? rangeAt(editor, target.pos) : null;
   const node = range?.node ?? target?.node ?? null;
@@ -148,12 +189,145 @@ export function BlockMenu({
     });
   };
 
+  const [dragging, setDragging] = useState(false);
+  const cleanupDragRef = useRef<(() => void) | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // 关闭浏览器原生 HTML5 拖拽，统一走自定义 pointer 重排
+  useEffect(() => {
+    const handle = rootRef.current?.closest("[draggable]");
+    if (!handle) return;
+    const preventNativeDrag = (event: Event) => event.preventDefault();
+    handle.addEventListener("dragstart", preventNativeDrag);
+    return () => handle.removeEventListener("dragstart", preventNativeDrag);
+  }, []);
+
+  useEffect(
+    () => () => {
+      cleanupDragRef.current?.();
+    },
+    [],
+  );
+
+  /** 顶层块拖动：不依赖浏览器 HTML5 DnD，pointer 移动后直接重排事务 */
+  const startDrag = (event: ReactMouseEvent<HTMLElement>) => {
+    if (event.button !== 0 || !target) return;
+    const blocks = topLevelBlocks(editor);
+    const sourceIndex = blocks.findIndex((block) => block.pos === target.pos);
+    if (sourceIndex < 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const source = blocks[sourceIndex];
+    const indicator = document.createElement("div");
+    Object.assign(indicator.style, {
+      position: "fixed",
+      height: "2px",
+      borderRadius: "999px",
+      background: "var(--primary)",
+      boxShadow: "0 0 0 2px var(--background)",
+      zIndex: "9999",
+      pointerEvents: "none",
+      display: "none",
+    });
+    document.body.appendChild(indicator);
+
+    const previousOpacity = source.element.style.opacity;
+    const previousCursor = document.body.style.cursor;
+    source.element.style.opacity = "0.45";
+    document.body.style.cursor = "grabbing";
+    setDragging(true);
+
+    let insertion = sourceIndex;
+    let canDrop = false;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      let next = blocks.length;
+      for (const block of blocks) {
+        if (moveEvent.clientY < block.rect.top + block.rect.height / 2) {
+          next = block.index;
+          break;
+        }
+      }
+      insertion = next;
+      canDrop = next !== sourceIndex && next !== sourceIndex + 1;
+      if (!canDrop) {
+        indicator.style.display = "none";
+        return;
+      }
+      const targetBlock =
+        next < blocks.length ? blocks[next] : blocks[blocks.length - 1];
+      const left = Math.min(source.rect.left, targetBlock.rect.left);
+      const right = Math.max(source.rect.right, targetBlock.rect.right);
+      indicator.style.display = "block";
+      indicator.style.left = `${left}px`;
+      indicator.style.top = `${
+        next < blocks.length
+          ? targetBlock.rect.top - 2
+          : targetBlock.rect.bottom + 1
+      }px`;
+      indicator.style.width = `${right - left}px`;
+    };
+
+    const onFinish = () => {
+      const shouldMove = canDrop;
+      const targetPos =
+        insertion < blocks.length
+          ? blocks[insertion].pos
+          : editor.state.doc.content.size;
+      finish();
+      if (!shouldMove) return;
+
+      const tr = editor.state.tr.delete(
+        source.pos,
+        source.pos + source.node.nodeSize,
+      );
+      const mapped = tr.mapping.map(targetPos);
+      tr.insert(mapped, source.node);
+      tr.setSelection(NodeSelection.create(tr.doc, mapped));
+      editor.view.dispatch(tr.scrollIntoView());
+    };
+
+    const finish = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onFinish);
+      indicator.remove();
+      source.element.style.opacity = previousOpacity;
+      document.body.style.cursor = previousCursor;
+      setDragging(false);
+      cleanupDragRef.current = null;
+    };
+
+    cleanupDragRef.current = finish;
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onFinish);
+  };
+
   return (
-    <div className="flex items-center gap-0">
+    <div
+      ref={rootRef}
+      className="flex items-center gap-0"
+      onMouseEnter={() => onHandleHoverChange?.(true)}
+      onMouseLeave={() => onHandleHoverChange?.(false)}
+      onMouseDown={(event) => {
+        const target = event.target;
+        if (
+          target instanceof Element &&
+          target.closest("[data-block-menu-trigger]")
+        ) {
+          return;
+        }
+        startDrag(event);
+      }}
+    >
       <span
         title="拖动排序"
         aria-hidden
-        className="flex h-6 w-4 cursor-grab items-center justify-center text-muted-foreground/50 active:cursor-grabbing"
+        className={cn(
+          "flex h-6 w-5 cursor-grab items-center justify-center text-muted-foreground/50 active:cursor-grabbing",
+          dragging && "cursor-grabbing text-primary",
+        )}
       >
         <GripVertical className="size-3.5" />
       </span>
@@ -161,6 +335,7 @@ export function BlockMenu({
         <DropdownMenuTrigger
           title="块操作"
           aria-label="块操作"
+          data-block-menu-trigger
           className="flex h-6 w-4 items-center justify-center rounded-sm text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground data-[popup-open]:bg-muted data-[popup-open]:text-muted-foreground"
         >
           <MoreHorizontal className="size-3.5" />

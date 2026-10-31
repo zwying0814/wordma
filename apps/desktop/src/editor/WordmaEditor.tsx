@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -22,6 +23,7 @@ import { TextBubbleMenu } from "./components/TextBubbleMenu";
 import { SlashCommand } from "./extensions/SlashCommand";
 import { createImageNodeView } from "./extensions/image-node-view";
 import { MdxBlockView } from "./extensions/mdx-node-view";
+import { cn } from "@/lib/utils";
 import {
   fixMarkdownTables,
   looksLikeMarkdown,
@@ -72,6 +74,38 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
       pos: number;
     } | null>(null);
     const blockMenuOpenRef = useRef(false);
+    const blockHandleHoveredRef = useRef(false);
+    const clearBlockTimerRef = useRef<number | null>(null);
+
+    useEffect(
+      () => () => {
+        if (clearBlockTimerRef.current) {
+          window.clearTimeout(clearBlockTimerRef.current);
+        }
+      },
+      [],
+    );
+
+    const setHandleHovered = (hovered: boolean) => {
+      blockHandleHoveredRef.current = hovered;
+      if (hovered) {
+        if (clearBlockTimerRef.current) {
+          window.clearTimeout(clearBlockTimerRef.current);
+          clearBlockTimerRef.current = null;
+        }
+        return;
+      }
+      if (blockMenuOpenRef.current) return;
+      if (clearBlockTimerRef.current) {
+        window.clearTimeout(clearBlockTimerRef.current);
+      }
+      clearBlockTimerRef.current = window.setTimeout(() => {
+        clearBlockTimerRef.current = null;
+        if (!blockHandleHoveredRef.current && !blockMenuOpenRef.current) {
+          setBlockTarget(null);
+        }
+      }, 250);
+    };
 
     const extensions = useMemo(
       () => [
@@ -196,13 +230,37 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
             editor={editor}
             onNodeChange={({ node, pos }) => {
               if (blockMenuOpenRef.current) return;
-              setBlockTarget(node ? { node, pos } : null);
+              if (node) {
+                if (clearBlockTimerRef.current) {
+                  window.clearTimeout(clearBlockTimerRef.current);
+                  clearBlockTimerRef.current = null;
+                }
+                setBlockTarget({ node, pos });
+                return;
+              }
+              if (blockHandleHoveredRef.current) return;
+              if (clearBlockTimerRef.current) {
+                window.clearTimeout(clearBlockTimerRef.current);
+              }
+              clearBlockTimerRef.current = window.setTimeout(() => {
+                clearBlockTimerRef.current = null;
+                if (
+                  !blockHandleHoveredRef.current &&
+                  !blockMenuOpenRef.current
+                ) {
+                  setBlockTarget(null);
+                }
+              }, 250);
             }}
-            className="flex h-6 items-center rounded-sm text-muted-foreground/50"
+            className={cn(
+              "wordma-drag-handle flex h-6 items-center rounded-sm text-muted-foreground/50",
+              blockTarget && "wordma-drag-handle-visible",
+            )}
           >
             <BlockMenu
               editor={editor}
               target={blockTarget}
+              onHandleHoverChange={setHandleHovered}
               onOpenChange={(open) => {
                 blockMenuOpenRef.current = open;
                 if (!open) setBlockTarget(null);
