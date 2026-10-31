@@ -175,24 +175,6 @@ pub fn extract_builtin_theme(themes_dir: &Path) -> Result<(), String> {
 
 // ===== 主题元信息 =====
 
-/// 主题卡片缩略图的预览配色（theme.yaml 可选声明）
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ThemePreview {
-    #[serde(default)]
-    pub bg: String,
-    #[serde(default)]
-    pub chrome_bg: String,
-    #[serde(default)]
-    pub ink: String,
-    #[serde(default)]
-    pub muted: String,
-    #[serde(default)]
-    pub line: String,
-    #[serde(default)]
-    pub accent: String,
-}
-
 /// 设置项类型；未知字符串兜底为 Text（serde(other)，前向兼容）
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -246,8 +228,6 @@ pub struct ThemeMeta {
     pub layout: String,
     #[serde(default)]
     pub tags: Vec<String>,
-    #[serde(default)]
-    pub preview: Option<ThemePreview>,
     /// 主题设置项 schema；缺省即该主题无设置界面
     #[serde(default)]
     pub settings: Vec<ThemeSetting>,
@@ -493,7 +473,6 @@ pub fn list_themes(
                     description: message.clone(),
                     layout: String::new(),
                     tags: Vec::new(),
-                    preview: None,
                     settings: Vec::new(),
                     active: name == active,
                     invalid_message: Some(message),

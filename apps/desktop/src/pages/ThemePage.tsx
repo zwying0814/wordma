@@ -12,7 +12,6 @@ import {
   renderSite,
   setActiveTheme,
   type ThemeMeta,
-  type ThemePreview,
 } from "../lib/theme";
 import ThemeSettingsModal from "../components/ThemeSettingsModal";
 import { ConfirmDialog } from "../components/common/confirm-dialog";
@@ -20,15 +19,14 @@ import { EmptyState } from "../components/common/empty-state";
 import { PageHeader } from "../components/common/page-header";
 import { PageView } from "../components/common/page-view";
 
-// theme.yaml 未声明 preview 时的兜底配色
-const FALLBACK_PREVIEW: ThemePreview = {
-  bg: "#FFFFFF",
-  chromeBg: "#FAFAFA",
-  ink: "#1F2328",
-  muted: "#6B7280",
-  line: "#E5E7EB",
-  accent: "#3563D9",
-};
+// 缩略图使用应用设计令牌，不再从 theme.yaml 读取配色
+const THUMB = {
+  bg: "var(--card)",
+  chromeBg: "var(--muted)",
+  ink: "var(--foreground)",
+  line: "var(--border)",
+  accent: "var(--primary)",
+} as const;
 
 function Line({
   color,
@@ -61,7 +59,7 @@ function IconDot({ color }: { color: string }) {
 
 /** 按设计稿 themeThumb 画的迷你站点示意图（纯 CSS 绘制，无截图） */
 function ThemeThumb({ theme }: { theme: ThemeMeta }) {
-  const p = theme.preview ?? FALLBACK_PREVIEW;
+  const p = THUMB;
   const chrome = (
     <div
       style={{

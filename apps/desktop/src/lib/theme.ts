@@ -1,15 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 
-/** 主题卡片缩略图的预览配色（theme.json 可选声明） */
-export interface ThemePreview {
-  bg: string;
-  chromeBg: string;
-  ink: string;
-  muted: string;
-  line: string;
-  accent: string;
-}
-
 export type ThemeSettingType =
   | "text"
   | "textarea"
@@ -40,7 +30,6 @@ export interface ThemeMeta {
   /** 卡片布局变体：single | cards | magazine */
   layout: string;
   tags: string[];
-  preview: ThemePreview | null;
   active: boolean;
   /** 非空表示主题结构损坏，卡片只读展示原因 */
   invalidMessage: string | null;
