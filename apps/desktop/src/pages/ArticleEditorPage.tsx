@@ -173,7 +173,13 @@ export default function ArticleEditorPage({
     setPreviewing(true);
     try {
       if (!(await persist(true))) return;
-      await renderSite(activeSite.id);
+      const report = await renderSite(activeSite.id);
+      if (report.warnings.length > 0) {
+        toast.warning(
+          `${report.warnings.length} 个 MDX 块渲染失败，已用占位内容`,
+          { description: report.warnings[0].message },
+        );
+      }
       // 跳转到当前文章的预览页（草稿也会渲染详情页）
       await openPreview(activeSite.id, article.id);
     } catch (e) {

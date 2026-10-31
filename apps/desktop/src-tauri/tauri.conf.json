@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "life.zwy.wordma",
   "build": {
-    "beforeDevCommand": "pnpm fetch:bun && pnpm dev",
+    "beforeDevCommand": "pnpm fetch:bun && pnpm stage:renderer && pnpm dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "pnpm fetch:bun && pnpm stage:renderer && pnpm build",
     "frontendDist": "../dist"

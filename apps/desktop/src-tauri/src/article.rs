@@ -43,6 +43,45 @@ pub(crate) fn validate_json_doc(content: &str) -> Result<(), String> {
     if doc.get("type").and_then(|t| t.as_str()) != Some("doc") {
         return Err("正文 JSON 缺少 doc 根节点".into());
     }
+    validate_mdx_blocks(&doc, &mut 0)
+}
+
+/// 单块 MDX 源码上限（UTF-8 字节），与前端 `MDX_SOURCE_LIMIT` 一致
+pub const MDX_SOURCE_LIMIT: usize = 128 * 1024;
+/// 单篇文档 MDX 块数上限，与前端 `MDX_BLOCK_LIMIT` 一致
+pub const MDX_BLOCK_LIMIT: usize = 50;
+
+fn validate_mdx_blocks(node: &serde_json::Value, count: &mut usize) -> Result<(), String> {
+    if node.get("type").and_then(|t| t.as_str()) == Some("mdxBlock") {
+        *count += 1;
+        if *count > MDX_BLOCK_LIMIT {
+            return Err(format!("正文中的 MDX 块不能超过 {MDX_BLOCK_LIMIT} 个"));
+        }
+        let attrs = node
+            .get("attrs")
+            .and_then(|a| a.as_object())
+            .ok_or_else(|| "MDX 块缺少 attrs".to_string())?;
+        let source = attrs
+            .get("source")
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| "MDX 块的 source 必须是字符串".to_string())?;
+        if source.len() > MDX_SOURCE_LIMIT {
+            return Err(format!(
+                "MDX 块源码超过 {} KB 上限",
+                MDX_SOURCE_LIMIT / 1024
+            ));
+        }
+        if let Some(block_id) = attrs.get("blockId") {
+            if !block_id.is_string() {
+                return Err("MDX 块的 blockId 必须是字符串".into());
+            }
+        }
+    }
+    if let Some(children) = node.get("content").and_then(|c| c.as_array()) {
+        for child in children {
+            validate_mdx_blocks(child, count)?;
+        }
+    }
     Ok(())
 }
 
@@ -549,6 +588,59 @@ mod tests {
             {"type":"heading","attrs":{"level":1},"content":[{"type":"text","text":"标题"}]}
         ]}"#;
         assert_eq!(json_text_len(json), 6);
+    }
+
+    #[test]
+    fn validate_json_doc_checks_mdx_blocks() {
+        let ok = serde_json::json!({
+            "type": "doc",
+            "content": [
+                { "type": "paragraph", "content": [{ "type": "text", "text": "正文" }] },
+                { "type": "mdxBlock", "attrs": { "blockId": "mdx_1", "source": "## Hi" } }
+            ]
+        })
+        .to_string();
+        assert!(validate_json_doc(&ok).is_ok());
+
+        let missing_attrs =
+            serde_json::json!({ "type": "doc", "content": [{ "type": "mdxBlock" }] })
+                .to_string();
+        assert!(validate_json_doc(&missing_attrs)
+            .unwrap_err()
+            .contains("attrs"));
+
+        let bad_source = serde_json::json!({
+            "type": "doc",
+            "content": [{ "type": "mdxBlock", "attrs": { "blockId": "x", "source": 1 } }]
+        })
+        .to_string();
+        assert!(validate_json_doc(&bad_source)
+            .unwrap_err()
+            .contains("source"));
+
+        let long_source = "a".repeat(MDX_SOURCE_LIMIT + 1);
+        let too_long = serde_json::json!({
+            "type": "doc",
+            "content": [{
+                "type": "mdxBlock",
+                "attrs": { "blockId": "x", "source": long_source }
+            }]
+        })
+        .to_string();
+        assert!(validate_json_doc(&too_long).unwrap_err().contains("上限"));
+
+        let blocks: Vec<_> = (0..=MDX_BLOCK_LIMIT)
+            .map(|i| {
+                serde_json::json!({
+                    "type": "mdxBlock",
+                    "attrs": { "blockId": format!("mdx_{i}"), "source": "" }
+                })
+            })
+            .collect();
+        let too_many = serde_json::json!({ "type": "doc", "content": blocks }).to_string();
+        assert!(validate_json_doc(&too_many)
+            .unwrap_err()
+            .contains("不能超过"));
     }
 
     #[test]

@@ -235,3 +235,49 @@
   padding: 0 2px;
   color: inherit;
 }
+
+/* MDX 块 */
+.mdx-block {
+  container-type: inline-size;
+}
+
+.mdx-block-split {
+  display: grid;
+  gap: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mdx-block-split > :not(:first-child) {
+  border-top: 1px solid var(--border);
+}
+
+@container (min-width: 640px) {
+  .mdx-block-split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .mdx-block-split > :not(:first-child) {
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+}
+
+.mdx-cm .cm-editor {
+  height: 100%;
+  background: transparent;
+  font-size: 12px;
+}
+
+.mdx-cm .cm-scroller {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1.6;
+}
+
+.mdx-cm .cm-content {
+  padding: 8px 0;
+}
+
+.mdx-cm .cm-gutters {
+  background: transparent;
+  border-right: 1px solid var(--border);
+  color: var(--muted-foreground);
+}

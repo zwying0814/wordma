@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "test": "bun test"
+  },
   "dependencies": {
     "@tiptap/core": "3.31.4",
     "@tiptap/extension-code-block-lowlight": "3.31.4",

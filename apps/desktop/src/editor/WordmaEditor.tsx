@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, ReactNodeViewRenderer, useEditor } from "@tiptap/react";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { JSONContent } from "@wordma/editor-schema";
 import {
@@ -21,6 +21,7 @@ import { TableBubbleMenu } from "./components/TableBubbleMenu";
 import { TextBubbleMenu } from "./components/TextBubbleMenu";
 import { SlashCommand } from "./extensions/SlashCommand";
 import { createImageNodeView } from "./extensions/image-node-view";
+import { MdxBlockView } from "./extensions/mdx-node-view";
 import {
   fixMarkdownTables,
   looksLikeMarkdown,
@@ -82,6 +83,17 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
               editor: props.editor,
               getPos: props.getPos,
               resolveSrc: (src) => resolveRef.current?.(src) ?? src,
+            }),
+          mdxNodeView: () =>
+            ReactNodeViewRenderer(MdxBlockView, {
+              stopEvent: ({ event }) => {
+                const target = event.target;
+                return (
+                  target instanceof Element &&
+                  Boolean(target.closest("[data-mdx-ui]"))
+                );
+              },
+              ignoreMutation: () => true,
             }),
         }),
         Markdown,

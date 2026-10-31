@@ -1,6 +1,7 @@
 import type { Editor } from "@tiptap/react";
 import type { Node as PMNode, NodeType } from "@tiptap/pm/model";
 import { Fragment } from "@tiptap/pm/model";
+import { createMdxBlockId } from "@wordma/editor-schema";
 import {
   ArrowDown,
   ArrowUp,
@@ -29,6 +30,7 @@ const NODE_LABELS: Record<string, string> = {
   codeBlock: "代码块",
   image: "图片",
   table: "表格",
+  mdxBlock: "MDX",
   horizontalRule: "分割线",
 };
 
@@ -108,7 +110,15 @@ export function BlockMenu({
 
   const duplicate = () => {
     run(({ node: current, start }) => {
-      const tr = editor.state.tr.insert(start + current.nodeSize, current);
+      const clone =
+        current.type.name === "mdxBlock"
+          ? current.type.create(
+              { ...current.attrs, blockId: createMdxBlockId() },
+              current.content,
+              current.marks,
+            )
+          : current;
+      const tr = editor.state.tr.insert(start + current.nodeSize, clone);
       editor.view.dispatch(tr.scrollIntoView());
     });
   };

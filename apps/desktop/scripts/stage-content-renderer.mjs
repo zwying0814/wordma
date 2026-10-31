@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 用仓库内或系统 Bun 把 packages/content-renderer 打成单文件 CLI，
- * 供 Tauri resources 随应用分发。
+ * 供 Tauri resources 随应用分发（正文渲染 + MDX 单块预览编译）。
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
@@ -20,13 +20,19 @@ const entry = path.join(
   "src",
   "cli.ts",
 );
+const previewEntry = path.join(
+  repoRoot,
+  "packages",
+  "content-renderer",
+  "src",
+  "mdx-preview.ts",
+);
 const outDir = path.join(
   appRoot,
   "src-tauri",
   "resources",
   "content-renderer",
 );
-const outFile = path.join(outDir, "cli.js");
 
 const HOST_TRIPLES = {
   "darwin-arm64": "aarch64-apple-darwin",
@@ -54,9 +60,28 @@ function resolveBun() {
 }
 
 mkdirSync(outDir, { recursive: true });
+for (const [input, name] of [
+  [entry, "cli"],
+  [previewEntry, "mdx-preview"],
+]) {
+  const outFile = path.join(outDir, `${name}.js`);
+  execFileSync(
+    resolveBun(),
+    ["build", input, "--target=bun", "--format=esm", "--outfile", outFile],
+    { stdio: "inherit" },
+  );
+  console.log(`内容渲染器已生成：${path.relative(process.cwd(), outFile)}`);
+}
+
+const runtimeScript = path.join(
+  repoRoot,
+  "packages",
+  "content-renderer",
+  "scripts",
+  "build-mdx-runtime.mjs",
+);
 execFileSync(
   resolveBun(),
-  ["build", entry, "--target=bun", "--format=esm", "--outfile", outFile],
+  [runtimeScript, path.join(outDir, "mdx-runtime.js")],
   { stdio: "inherit" },
 );
-console.log(`内容渲染器已生成：${path.relative(process.cwd(), outFile)}`);

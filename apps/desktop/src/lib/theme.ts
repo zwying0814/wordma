@@ -39,10 +39,18 @@ export interface ThemeMeta {
   settings: ThemeSetting[];
 }
 
+export interface RenderWarning {
+  kind: string;
+  id: number;
+  blockId?: string | null;
+  message: string;
+}
+
 export interface RenderReport {
   theme: string;
   outputDir: string;
   files: number;
+  warnings: RenderWarning[];
 }
 
 export const listThemes = (siteId: number): Promise<ThemeMeta[]> =>

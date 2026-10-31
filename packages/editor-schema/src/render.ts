@@ -57,15 +57,28 @@ function renderCodeBlock(node: PMNode): string {
   return `<pre><code class="language-${escapeAttr(language)} hljs">${highlighted}</code></pre>`;
 }
 
+export interface RenderOptions {
+  /** 发布时注入 MDX 块的 HTML（占位 + 脚本）；不传时用节点自身的 renderHTML */
+  mdx?: (node: PMNode) => string;
+}
+
 /** Tiptap JSON → 发布用 HTML（与编辑器同一套扩展定义） */
-export function renderToHTML(doc: JSONContent): string {
+export function renderToHTML(
+  doc: JSONContent,
+  options: RenderOptions = {},
+): string {
+  const nodeMapping: Record<string, (props: { node: PMNode }) => string> = {
+    codeBlock: ({ node }) => renderCodeBlock(node),
+  };
+  const renderMdx = options.mdx;
+  if (renderMdx) {
+    nodeMapping.mdxBlock = ({ node }) => renderMdx(node);
+  }
   return renderToHTMLString({
     content: doc,
     extensions,
     options: {
-      nodeMapping: {
-        codeBlock: ({ node }) => renderCodeBlock(node),
-      },
+      nodeMapping,
     },
   });
 }

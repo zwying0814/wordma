@@ -3,6 +3,7 @@ import type { Editor, Range } from "@tiptap/core";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion from "@tiptap/suggestion";
 import {
+  Braces,
   Heading1,
   Heading2,
   Heading3,
@@ -95,6 +96,13 @@ const DEFAULT_ITEMS: SlashMenuItem[] = [
     desc: "3×3 带表头",
     icon: Table,
     command: chain((c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true })),
+  },
+  {
+    key: "mdx",
+    label: "MDX 块",
+    desc: "Markdown + JSX",
+    icon: Braces,
+    command: chain((c) => c.insertMdxBlock()),
   },
 ];
 

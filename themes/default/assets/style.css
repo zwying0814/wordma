@@ -196,3 +196,23 @@ main.wrap { padding-top: 32px; padding-bottom: 56px; }
   padding: 0 2px;
   color: inherit;
 }
+
+/* MDX 块：脚本未加载时保留可读占位 */
+.post-content .wordma-mdx {
+  margin: 1.4em 0;
+}
+
+.post-content .wordma-mdx-error {
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fbfbfc;
+  color: #667085;
+  font-size: 14px;
+}
+
+.post-content .wordma-mdx-error strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #b42318;
+}

@@ -33,6 +33,8 @@ const PREVIEW_PORT_DEFAULT: u16 = 12739;
 
 /// 预览服务的当前根目录（render 后切换，服务按请求读取，无需重启）
 static PREVIEW_DIR: RwLock<Option<PathBuf>> = RwLock::new(None);
+/// 预览服务兜底媒体目录（站点尚未渲染时可访问 /media/*）
+static PREVIEW_MEDIA_DIR: RwLock<Option<PathBuf>> = RwLock::new(None);
 /// 当前监听的 (listener, 停止标志)；更换端口时替换（旧 listener 随 drop 关闭）
 static PREVIEW_LISTENER: Mutex<Option<(TcpListener, Arc<AtomicBool>)>> =
     Mutex::new(None);
@@ -490,6 +492,7 @@ pub struct RenderReport {
     pub theme: String,
     pub output_dir: String,
     pub files: usize,
+    pub warnings: Vec<crate::content_render::RenderWarning>,
 }
 
 /// 文章的路由变量（日期取自创建时间）
@@ -1007,13 +1010,18 @@ pub fn render_site_to(
     for a in &published {
         let url = post_urls.get(&a.id).cloned().unwrap_or_default();
         let link = format!("{base_url}{url}");
+        let feed_html = crate::content_render::rendered_feed_html(
+            rendered,
+            crate::content_render::ContentKind::Article,
+            a.id,
+        );
         feed.push_str(&format!(
             "<item><title>{}</title><link>{}</link><guid>{}</guid><pubDate>{}</pubDate><description><![CDATA[{}]]></description></item>",
             xml_escape(&a.title),
             xml_escape(&link),
             xml_escape(&link),
             rfc2822_date(&a.created_at),
-            article_html.get(&a.id).cloned().unwrap_or_default(),
+            feed_html,
         ));
     }
     feed.push_str("</channel></rss>");
@@ -1113,11 +1121,54 @@ pub fn render_site_to(
         }
     }
 
+    // MDX 资源（entry / CSS / 共享运行时），放在主题资源之后写入
+    if let Some(rendered) = rendered {
+        files += write_mdx_assets(dist, &rendered.assets)?;
+    }
+
     Ok(RenderReport {
         theme: theme_name.to_string(),
         output_dir: dist.display().to_string(),
         files,
+        warnings: rendered.map(|r| r.warnings.clone()).unwrap_or_default(),
     })
+}
+
+/// 写入 MDX 产物；只允许 assets/mdx/ 下的平铺文件名
+fn write_mdx_assets(
+    dist: &Path,
+    assets: &[crate::content_render::RenderAsset],
+) -> Result<usize, String> {
+    let dir = dist.join("assets").join("mdx");
+    if dir.exists() {
+        fs::remove_dir_all(&dir).map_err(|e| format!("清理旧 MDX 资源失败: {e}"))?;
+    }
+    if assets.is_empty() {
+        return Ok(0);
+    }
+    fs::create_dir_all(&dir).map_err(|e| format!("创建 MDX 资源目录失败: {e}"))?;
+    let mut files = 0usize;
+    for asset in assets {
+        let name = asset
+            .path
+            .strip_prefix("assets/mdx/")
+            .ok_or_else(|| format!("非法 MDX 资源路径: {}", asset.path))?;
+        if name.is_empty()
+            || name.contains('/')
+            || name.contains('\\')
+            || name.contains("..")
+            || Path::new(name).is_absolute()
+        {
+            return Err(format!("非法 MDX 资源路径: {}", asset.path));
+        }
+        if asset.contents.len() > 8 * 1024 * 1024 {
+            return Err(format!("MDX 资源过大: {}", asset.path));
+        }
+        fs::write(dir.join(name), &asset.contents)
+            .map_err(|e| format!("写入 MDX 资源失败（{}）: {e}", asset.path))?;
+        files += 1;
+    }
+    Ok(files)
 }
 
 // ===== 预览服务（单端口本地静态服务，仅 127.0.0.1） =====
@@ -1167,7 +1218,22 @@ fn handle_preview_conn(mut stream: TcpStream) {
     } else {
         full
     };
-    let ok = full.is_file();
+    let mut full = full;
+    let mut ok = full.is_file();
+    // 站点尚未渲染时也能加载 /media/*：回退到站点媒体目录
+    if !ok {
+        if let Some(media_rel) = rel.strip_prefix("media/") {
+            if let Ok(dir) = PREVIEW_MEDIA_DIR.read() {
+                if let Some(media_dir) = dir.as_ref() {
+                    let candidate = media_dir.join(media_rel);
+                    if candidate.is_file() {
+                        full = candidate;
+                        ok = true;
+                    }
+                }
+            }
+        }
+    }
     let mut body = Vec::new();
     if ok {
         if let Ok(mut f) = fs::File::open(&full) {
@@ -1186,6 +1252,27 @@ fn handle_preview_conn(mut stream: TcpStream) {
     let _ = stream.write_all(head.as_bytes());
     let _ = stream.write_all(&body);
     let _ = stream.flush();
+}
+
+/// 确保预览服务指向指定站点，并返回端口与站点预览根目录。
+/// 供 MDX 单块预览复用同一个静态服务。
+pub(crate) fn prepare_preview_site(
+    app: &AppHandle,
+    conn: &Connection,
+    site_id: i64,
+) -> Result<(u16, PathBuf), String> {
+    let port = get_preview_port(conn)?;
+    let dist = preview_root(app)?.join(site_id.to_string());
+    fs::create_dir_all(dist.join("assets").join("mdx"))
+        .map_err(|e| format!("创建 MDX 预览目录失败: {e}"))?;
+    if let Ok(mut dir) = PREVIEW_DIR.write() {
+        *dir = Some(dist.clone());
+    }
+    if let Ok(mut dir) = PREVIEW_MEDIA_DIR.write() {
+        *dir = media_root(app).ok();
+    }
+    ensure_preview_listener(port)?;
+    Ok((port, dist))
 }
 
 /// 确保监听在指定端口；端口变更时先停旧监听（释放端口）再绑定新端口。
@@ -1337,6 +1424,9 @@ pub fn open_preview_cmd(
     if let Ok(mut dir) = PREVIEW_DIR.write() {
         *dir = Some(dist);
     }
+    if let Ok(mut dir) = PREVIEW_MEDIA_DIR.write() {
+        *dir = media_root(&app).ok();
+    }
     let path = if target.starts_with('/') {
         target.clone()
     } else {
@@ -1429,7 +1519,7 @@ pub fn render_site_cmd(
     let media_dir = media_root(&app)?.join(site_id.to_string());
     let articles = get_articles_by_site(&conn, site_id)?;
     let pages = get_pages_by_site(&conn, site_id)?;
-    let rendered = crate::content_render::render_site_content(&app, &articles, &pages)?;
+    let rendered = crate::content_render::render_site_content(&app, site_id, &articles, &pages)?;
     let report = render_site_to(
         &conn,
         &dist,
@@ -1461,6 +1551,43 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         run_migrations(&conn).unwrap();
         conn
+    }
+
+    #[test]
+    fn mdx_assets_are_written_and_validated() {
+        let dist = std::env::temp_dir().join(format!(
+            "wordma-mdx-assets-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dist);
+        fs::create_dir_all(dist.join("assets/mdx")).unwrap();
+        fs::write(dist.join("assets/mdx/stale.js"), "stale").unwrap();
+
+        let assets = vec![
+            crate::content_render::RenderAsset {
+                path: "assets/mdx/react.js".to_string(),
+                contents: "runtime".to_string(),
+            },
+            crate::content_render::RenderAsset {
+                path: "assets/mdx/entry-a.js".to_string(),
+                contents: "entry".to_string(),
+            },
+        ];
+        assert_eq!(write_mdx_assets(&dist, &assets).unwrap(), 2);
+        assert!(dist.join("assets/mdx/react.js").is_file());
+        assert!(dist.join("assets/mdx/entry-a.js").is_file());
+        assert!(!dist.join("assets/mdx/stale.js").exists());
+
+        assert_eq!(write_mdx_assets(&dist, &[]).unwrap(), 0);
+        assert!(!dist.join("assets/mdx").exists());
+
+        let bad = vec![crate::content_render::RenderAsset {
+            path: "assets/mdx/../evil.js".to_string(),
+            contents: "x".to_string(),
+        }];
+        assert!(write_mdx_assets(&dist, &bad).is_err());
+
+        let _ = fs::remove_dir_all(&dist);
     }
 
     #[test]
@@ -1862,6 +1989,74 @@ mod tests {
             fs::read_to_string(dist.join("post").join(format!("{}.html", a.slug))).unwrap();
         assert!(post.contains("<p>来自 Bun</p>"));
         assert!(!post.contains("{\"type\":\"doc\""));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn render_uses_feed_html_and_writes_mdx_assets() {
+        let conn = mem_db();
+        let site = insert_site(&conn, "MDX 站", None).unwrap();
+        let a = insert_article(&conn, site.id, "MDX 文章").unwrap();
+        update_article(
+            &conn,
+            a.id,
+            None,
+            Some(r#"{"type":"doc","content":[{"type":"paragraph"}]}"#),
+            Some(STATUS_PUBLISHED),
+            None,
+            &[],
+            &[],
+        )
+        .unwrap();
+
+        let tmp = std::env::temp_dir().join(format!(
+            "wordma-feed-render-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        let themes_dir = tmp.join("themes");
+        extract_builtin_theme(&themes_dir).unwrap();
+        let dist = tmp.join("preview").join(site.id.to_string());
+
+        let mut rendered = crate::content_render::RenderedContent::default();
+        rendered
+            .articles
+            .insert(a.id, "<p>正文</p><script>bad()</script>".to_string());
+        rendered.feed_articles.insert(
+            a.id,
+            "<p>正文</p><div class=\"wordma-mdx\">MDX 内容需要 JavaScript</div>".to_string(),
+        );
+        rendered.assets.push(crate::content_render::RenderAsset {
+            path: "assets/mdx/react.js".to_string(),
+            contents: "runtime".to_string(),
+        });
+        rendered.warnings.push(crate::content_render::RenderWarning {
+            kind: "article".to_string(),
+            id: a.id,
+            block_id: Some("mdx_1".to_string()),
+            message: "示例警告".to_string(),
+        });
+
+        let report = render_site_to(
+            &conn,
+            &dist,
+            &themes_dir,
+            "default",
+            site.id,
+            false,
+            "http://127.0.0.1:12739",
+            None,
+            Some(&rendered),
+        )
+        .unwrap();
+
+        let feed = fs::read_to_string(dist.join("feed.xml")).unwrap();
+        assert!(!feed.contains("<script"));
+        assert!(feed.contains("MDX 内容需要 JavaScript"));
+        assert!(dist.join("assets/mdx/react.js").is_file());
+        assert_eq!(report.warnings.len(), 1);
+        assert_eq!(report.warnings[0].block_id.as_deref(), Some("mdx_1"));
 
         let _ = fs::remove_dir_all(&tmp);
     }

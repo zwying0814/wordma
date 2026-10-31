@@ -1,6 +1,7 @@
 mod article;
 mod content_render;
 mod db;
+mod mdx;
 mod media;
 mod pages;
 mod routing;
@@ -55,6 +56,11 @@ pub fn run() {
             media::list_media,
             media::upload_media,
             media::delete_media_cmd,
+            mdx::compile_mdx_cmd,
+            mdx::list_mdx_deps_cmd,
+            mdx::install_mdx_deps_cmd,
+            mdx::add_mdx_dependency_cmd,
+            mdx::remove_mdx_dependency_cmd,
             theme::open_preview_cmd,
             theme::open_themes_dir_cmd,
             theme::delete_theme_cmd,

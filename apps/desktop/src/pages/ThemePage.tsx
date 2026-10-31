@@ -247,6 +247,12 @@ export default function ThemePage() {
     try {
       const report = await renderSite(activeSite.id);
       await openPreview(activeSite.id);
+      if (report.warnings.length > 0) {
+        toast.warning(
+          `${report.warnings.length} 个 MDX 块渲染失败，已用占位内容`,
+          { description: report.warnings[0].message },
+        );
+      }
       toast.success(`已生成 ${report.files} 个文件，正在浏览器中打开预览`);
     } catch (e) {
       toast.error(String(e));

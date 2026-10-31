@@ -11,6 +11,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import { TextStyle } from "@tiptap/extension-text-style";
 import StarterKit from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
+import { MdxBlock } from "./mdx";
 
 const lowlight = createLowlight(common);
 
@@ -35,6 +36,8 @@ export interface SchemaOptions {
   placeholder?: string;
   /** 应用侧注入图片 NodeView（缩放手柄/媒体 URL 解析）；静态渲染不传 */
   imageNodeView?: () => NodeViewRenderer | null;
+  /** 应用侧注入 MDX NodeView（源码/预览/分栏）；静态渲染不传 */
+  mdxNodeView?: () => NodeViewRenderer | null;
 }
 
 /**
@@ -83,6 +86,7 @@ export function createSchemaExtensions(options: SchemaOptions = {}) {
     Highlight.configure({ multicolor: true }),
     Subscript,
     Superscript,
+    MdxBlock.configure({ nodeView: options.mdxNodeView }),
     Placeholder.configure({ placeholder: options.placeholder ?? "" }),
   ];
 }
