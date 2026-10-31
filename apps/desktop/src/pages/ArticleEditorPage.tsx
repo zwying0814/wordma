@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -27,6 +27,7 @@ import {
 import { MultiSelect } from "../components/common/multi-select";
 import MediaPickerModal from "../components/MediaPickerModal";
 import { WordmaEditor, type WordmaEditorHandle } from "../editor/WordmaEditor";
+import { useDocumentAutosave } from "../editor/lib/use-document-autosave";
 import { useEditorMedia } from "../editor/lib/use-editor-media";
 import { parseInitialContent } from "../editor/lib/initial-content";
 import type { EditorSnapshot } from "../editor/types";
@@ -39,6 +40,7 @@ export default function ArticleEditorPage({
   const { activeSite, reloadArticles, tags, categories } = useSite();
   const [, navigate] = useLocation();
   const editorRef = useRef<WordmaEditorHandle>(null);
+  const pendingStatusRef = useRef<ArticleStatus | null>(null);
   const { imageUrls, pickerOpen, handlePasteImage, handlePickImage, closePicker } =
     useEditorMedia();
 
@@ -55,9 +57,60 @@ export default function ArticleEditorPage({
   const [tagIds, setTagIds] = useState<number[]>([]);
   const [slug, setSlug] = useState("");
   const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [titleError, setTitleError] = useState(false);
+
+  const persistDocument = useCallback(
+    async (silent: boolean) => {
+      if (!article || contentError) return false;
+      const latest = editorRef.current?.getSnapshot();
+      if (!latest) return false;
+      const targetStatus = pendingStatusRef.current ?? status;
+      try {
+        const saved = await updateArticle(article.id, {
+          title: title.trim(),
+          content: JSON.stringify(latest.json),
+          status: targetStatus,
+          slug: slug.trim(),
+          categoryIds,
+          tagIds,
+        });
+        setArticle(saved);
+        setStatus(saved.status);
+        setSavedAt(saved.updatedAt);
+        reloadArticles();
+        if (!silent) {
+          toast.success(targetStatus === "published" ? "已发布" : "草稿已保存");
+        }
+        return true;
+      } catch (e) {
+        toast.error(String(e));
+        return false;
+      }
+    },
+    [
+      article,
+      contentError,
+      status,
+      title,
+      slug,
+      categoryIds,
+      tagIds,
+      reloadArticles,
+    ],
+  );
+
+  const {
+    markDirty,
+    persist,
+    reset,
+    dirty,
+    state: saveState,
+  } = useDocumentAutosave({
+    enabled:
+      article !== null && initialContent !== null && contentError === null,
+    save: persistDocument,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +128,7 @@ export default function ArticleEditorPage({
         setTagIds(a.tags.map((t) => t.id));
         setSlug(a.slug);
         setSavedAt(a.updatedAt);
+        reset();
       })
       .catch((e) => {
         if (cancelled) return;
@@ -83,13 +137,15 @@ export default function ArticleEditorPage({
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [params.id, reset]);
 
-  const currentContent = () => {
-    const latest = editorRef.current?.getSnapshot();
-    if (!latest) return null;
-    return JSON.stringify(latest.json);
-  };
+  const handleEditorChange = useCallback(
+    (next: EditorSnapshot) => {
+      setSnapshot(next);
+      markDirty();
+    },
+    [markDirty],
+  );
 
   const handleSave = async (next: ArticleStatus) => {
     if (!article) return;
@@ -101,32 +157,10 @@ export default function ArticleEditorPage({
       setTitleError(true);
       return;
     }
-    const content = currentContent();
-    if (content === null) {
-      toast.error("编辑器尚未就绪");
-      return;
-    }
-    setSaving(true);
-    try {
-      const saved = await updateArticle(article.id, {
-        title: title.trim(),
-        content,
-        status: next,
-        slug: slug.trim(),
-        categoryIds,
-        tagIds,
-      });
-      setArticle(saved);
-      setStatus(saved.status);
-      setSavedAt(saved.updatedAt);
-      setTitleError(false);
-      reloadArticles();
-      toast.success(next === "published" ? "已发布" : "草稿已保存");
-    } catch (e) {
-      toast.error(String(e));
-    } finally {
-      setSaving(false);
-    }
+    pendingStatusRef.current = next;
+    const ok = await persist(false);
+    pendingStatusRef.current = null;
+    if (ok) setTitleError(false);
   };
 
   // 保存当前状态 → 渲染站点 → 打开浏览器预览
@@ -136,22 +170,9 @@ export default function ArticleEditorPage({
       toast.error("正文 JSON 损坏，已阻止保存以免覆盖；请先备份并修复数据");
       return;
     }
-    const content = currentContent();
-    if (content === null) {
-      toast.error("编辑器尚未就绪");
-      return;
-    }
     setPreviewing(true);
     try {
-      await updateArticle(article.id, {
-        title: title.trim(),
-        content,
-        status,
-        slug: slug.trim(),
-        categoryIds,
-        tagIds,
-      });
-      reloadArticles();
+      if (!(await persist(true))) return;
       await renderSite(activeSite.id);
       // 跳转到当前文章的预览页（草稿也会渲染详情页）
       await openPreview(activeSite.id, article.id);
@@ -160,6 +181,11 @@ export default function ArticleEditorPage({
     } finally {
       setPreviewing(false);
     }
+  };
+
+  const handleBack = async () => {
+    if (dirty && !(await persist(false))) return;
+    navigate("/articles");
   };
 
   if (loadError !== null) {
@@ -175,13 +201,25 @@ export default function ArticleEditorPage({
     return <LoadingScreen />;
   }
 
+  const saving = saveState === "saving";
+  const saveLabel =
+    saveState === "saving"
+      ? "保存中…"
+      : saveState === "error"
+        ? "保存失败"
+        : dirty
+          ? "未保存"
+          : saveState === "saved"
+            ? "已保存"
+            : "";
+
   return (
     <EditorShell>
       <EditorTopBar>
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/articles")}
+          onClick={() => void handleBack()}
         >
           <ArrowLeft className="size-3.5" />
           返回列表
@@ -189,12 +227,13 @@ export default function ArticleEditorPage({
         <span className="text-xs text-muted-foreground">
           {status === "published" ? "已发布" : "草稿"}
           {savedAt ? ` · ${fmtDate(savedAt)}` : ""}
+          {saveLabel ? ` · ${saveLabel}` : ""}
         </span>
         <div className="flex-1" />
         <Button
           variant="outline"
           size="sm"
-          disabled={previewing}
+          disabled={previewing || saving}
           onClick={handlePreview}
         >
           {previewing ? (
@@ -226,7 +265,10 @@ export default function ArticleEditorPage({
           <div className="shrink-0">
             <EditorTitleInput
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                markDirty();
+              }}
               placeholder="标题…"
               aria-label="文章标题"
             />
@@ -237,7 +279,10 @@ export default function ArticleEditorPage({
               <input
                 className="w-[120px] rounded-sm border-0 bg-muted px-2 py-[3px] text-xs text-muted-foreground outline-none"
                 value={slug}
-                onChange={(e) => setSlug(e.target.value)}
+                onChange={(e) => {
+                  setSlug(e.target.value);
+                  markDirty();
+                }}
                 placeholder="slug"
                 aria-label="文章 slug"
                 spellCheck={false}
@@ -247,7 +292,10 @@ export default function ArticleEditorPage({
                 placeholder="添加分类"
                 className="min-w-[130px]"
                 value={categoryIds}
-                onChange={setCategoryIds}
+                onChange={(next) => {
+                  setCategoryIds(next);
+                  markDirty();
+                }}
                 options={categories.map((c) => ({ value: c.id, label: c.name }))}
               />
               <MultiSelect
@@ -255,7 +303,10 @@ export default function ArticleEditorPage({
                 placeholder="添加标签"
                 className="min-w-[180px] max-w-[300px]"
                 value={tagIds}
-                onChange={setTagIds}
+                onChange={(next) => {
+                  setTagIds(next);
+                  markDirty();
+                }}
                 options={tags.map((t) => ({ value: t.id, label: t.name }))}
               />
               <span className="ml-auto text-xs text-muted-foreground">
@@ -271,7 +322,7 @@ export default function ArticleEditorPage({
             ref={editorRef}
             initialContent={initialContent}
             placeholder="开始写…"
-            onChange={setSnapshot}
+            onChange={handleEditorChange}
             onPasteImage={handlePasteImage}
             onPickImage={handlePickImage}
             onResolveImageUrl={(src) => imageUrls.get(src) ?? src}

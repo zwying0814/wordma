@@ -14,6 +14,7 @@ import { Markdown } from "@tiptap/markdown";
 import { EditorToolbar } from "./components/EditorToolbar";
 import { ImageBubbleMenu } from "./components/ImageBubbleMenu";
 import { TableBubbleMenu } from "./components/TableBubbleMenu";
+import { TextBubbleMenu } from "./components/TextBubbleMenu";
 import { SlashCommand } from "./extensions/SlashCommand";
 import { createImageNodeView } from "./extensions/image-node-view";
 import {
@@ -135,12 +136,8 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
           return true;
         },
       },
-      onCreate({ editor: current }) {
+      onCreate() {
         readyRef.current?.();
-        changeRef.current?.({
-          json: current.getJSON(),
-          wordCount: countWords(current.getJSON()),
-        });
       },
       onUpdate({ editor: current }) {
         const json = current.getJSON();
@@ -165,6 +162,7 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
         <EditorToolbar editor={editor} onPickImage={onPickImage} />
         {editor ? (
           <>
+            <TextBubbleMenu editor={editor} />
             <ImageBubbleMenu editor={editor} />
             <TableBubbleMenu editor={editor} />
           </>

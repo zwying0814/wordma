@@ -49,7 +49,17 @@ export function createSchemaExtensions(options: SchemaOptions = {}) {
   });
 
   return [
-    StarterKit,
+    StarterKit.configure({
+      link: {
+        openOnClick: false,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: {
+          rel: "noopener noreferrer",
+          target: "_blank",
+        },
+      },
+    }),
     image,
     TableKit.configure({ table: { resizable: true } }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),

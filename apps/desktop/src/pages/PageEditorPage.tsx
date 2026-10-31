@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -18,6 +18,7 @@ import {
 } from "../components/common/editor-shell";
 import MediaPickerModal from "../components/MediaPickerModal";
 import { WordmaEditor, type WordmaEditorHandle } from "../editor/WordmaEditor";
+import { useDocumentAutosave } from "../editor/lib/use-document-autosave";
 import { parseInitialContent } from "../editor/lib/initial-content";
 import { useEditorMedia } from "../editor/lib/use-editor-media";
 import type { EditorSnapshot } from "../editor/types";
@@ -45,7 +46,50 @@ export default function PageEditorPage({
   const [contentError, setContentError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<EditorSnapshot | null>(null);
   const [showInNav, setShowInNav] = useState(true);
-  const [saving, setSaving] = useState(false);
+
+  const persistDocument = useCallback(
+    async (silent: boolean) => {
+      if (!page || contentError) return false;
+      const nextTitle = title.trim();
+      if (!nextTitle) {
+        if (!silent) toast.error("页面标题不能为空");
+        return false;
+      }
+      const latest = editorRef.current?.getSnapshot();
+      if (!latest) return false;
+      try {
+        const saved = await updatePage(page.id, {
+          title: nextTitle,
+          content: JSON.stringify(latest.json),
+          slug: slug.trim(),
+          showInNav,
+        });
+        setPage(saved);
+        setSlug(saved.slug);
+        if (!silent) toast.success("页面已保存");
+        return true;
+      } catch (e) {
+        toast.error(String(e));
+        return false;
+      }
+    },
+    [page, contentError, title, slug, showInNav],
+  );
+
+  const {
+    markDirty,
+    persist,
+    reset,
+    dirty,
+    state: saveState,
+  } = useDocumentAutosave({
+    enabled:
+      page !== null &&
+      initialContent !== null &&
+      contentError === null &&
+      title.trim().length > 0,
+    save: persistDocument,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +104,7 @@ export default function PageEditorPage({
         setContentError(parsed.error);
         setSnapshot(null);
         setShowInNav(p.showInNav);
+        reset();
       })
       .catch((e) => {
         if (cancelled) return;
@@ -68,39 +113,27 @@ export default function PageEditorPage({
     return () => {
       cancelled = true;
     };
-  }, [params.id]);
+  }, [params.id, reset]);
+
+  const handleEditorChange = useCallback(
+    (next: EditorSnapshot) => {
+      setSnapshot(next);
+      markDirty();
+    },
+    [markDirty],
+  );
 
   const handleSave = async () => {
-    if (!page) return;
     if (contentError) {
       toast.error("正文 JSON 损坏，已阻止保存以免覆盖；请先备份并修复数据");
       return;
     }
-    if (!title.trim()) {
-      toast.error("页面标题不能为空");
-      return;
-    }
-    const snapshot = editorRef.current?.getSnapshot();
-    if (!snapshot) {
-      toast.error("编辑器尚未就绪");
-      return;
-    }
-    setSaving(true);
-    try {
-      const saved = await updatePage(page.id, {
-        title: title.trim(),
-        content: JSON.stringify(snapshot.json),
-        slug: slug.trim(),
-        showInNav,
-      });
-      setPage(saved);
-      setSlug(saved.slug);
-      toast.success("页面已保存");
-    } catch (e) {
-      toast.error(String(e));
-    } finally {
-      setSaving(false);
-    }
+    await persist(false);
+  };
+
+  const handleBack = async () => {
+    if (dirty && !(await persist(false))) return;
+    navigate("/pages");
   };
 
   if (loadError !== null) {
@@ -116,18 +149,38 @@ export default function PageEditorPage({
     return <LoadingScreen />;
   }
 
+  const saving = saveState === "saving";
+  const saveLabel =
+    saveState === "saving"
+      ? "保存中…"
+      : saveState === "error"
+        ? "保存失败"
+        : dirty
+          ? "未保存"
+          : saveState === "saved"
+            ? "已保存"
+            : "";
+
   return (
     <EditorShell>
       <EditorTopBar>
-        <Button variant="ghost" size="sm" onClick={() => navigate("/pages")}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => void handleBack()}
+        >
           <ArrowLeft className="size-3.5" />
           返回列表
         </Button>
+        <span className="text-xs text-muted-foreground">{saveLabel}</span>
         <div className="flex-1" />
         <label className="flex items-center gap-2 text-[13px] text-foreground">
           <Checkbox
             checked={showInNav}
-            onCheckedChange={(checked) => setShowInNav(checked === true)}
+            onCheckedChange={(checked) => {
+              setShowInNav(checked === true);
+              markDirty();
+            }}
           />
           显示在站点导航
         </label>
@@ -141,7 +194,10 @@ export default function PageEditorPage({
           <div className="shrink-0">
             <EditorTitleInput
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                markDirty();
+              }}
               placeholder="页面标题…"
               aria-label="页面标题"
             />
@@ -149,7 +205,10 @@ export default function PageEditorPage({
               <input
                 className="w-[140px] rounded-sm border-0 bg-muted px-2 py-[3px] text-xs text-muted-foreground outline-none"
                 value={slug}
-                onChange={(e) => setSlug(e.target.value)}
+                onChange={(e) => {
+                  setSlug(e.target.value);
+                  markDirty();
+                }}
                 placeholder="slug"
                 aria-label="页面 slug"
                 spellCheck={false}
@@ -167,7 +226,7 @@ export default function PageEditorPage({
             ref={editorRef}
             initialContent={initialContent}
             placeholder="开始写…"
-            onChange={setSnapshot}
+            onChange={handleEditorChange}
             onPasteImage={handlePasteImage}
             onPickImage={handlePickImage}
             onResolveImageUrl={(src) => imageUrls.get(src) ?? src}
