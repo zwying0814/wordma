@@ -72,6 +72,10 @@ export default function PageEditorPage({
 
   const handleSave = async () => {
     if (!page) return;
+    if (contentError) {
+      toast.error("正文 JSON 损坏，已阻止保存以免覆盖；请先备份并修复数据");
+      return;
+    }
     if (!title.trim()) {
       toast.error("页面标题不能为空");
       return;

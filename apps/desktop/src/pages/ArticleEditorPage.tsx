@@ -93,6 +93,10 @@ export default function ArticleEditorPage({
 
   const handleSave = async (next: ArticleStatus) => {
     if (!article) return;
+    if (contentError) {
+      toast.error("正文 JSON 损坏，已阻止保存以免覆盖；请先备份并修复数据");
+      return;
+    }
     if (next === "published" && !title.trim()) {
       setTitleError(true);
       return;
@@ -128,6 +132,10 @@ export default function ArticleEditorPage({
   // 保存当前状态 → 渲染站点 → 打开浏览器预览
   const handlePreview = async () => {
     if (!article) return;
+    if (contentError) {
+      toast.error("正文 JSON 损坏，已阻止保存以免覆盖；请先备份并修复数据");
+      return;
+    }
     const content = currentContent();
     if (content === null) {
       toast.error("编辑器尚未就绪");
