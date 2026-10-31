@@ -17,6 +17,8 @@ import {
   RemoveFormatting,
   SquareCode,
   Strikethrough,
+  Subscript,
+  Superscript,
   Underline,
   Undo2,
   type LucideIcon,
@@ -36,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { CODE_LANGUAGES } from "@wordma/editor-schema";
 import { Button } from "@/components/ui/button";
+import { ColorMenu } from "./ColorMenu";
 import { TableGridPicker } from "./TableGridPicker";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -94,6 +97,8 @@ export function EditorToolbar({
             italic: e.isActive("italic"),
             strike: e.isActive("strike"),
             underline: e.isActive("underline"),
+            subscript: e.isActive("subscript"),
+            superscript: e.isActive("superscript"),
             headingLevel:
               HEADING_LEVELS.find((level) =>
                 e.isActive("heading", { level }),
@@ -203,6 +208,19 @@ export function EditorToolbar({
         active={state.underline}
         onClick={run((c) => c.toggleUnderline())}
       />
+      <ToolButton
+        label="下标"
+        icon={Subscript}
+        active={state.subscript}
+        onClick={run((c) => c.toggleSubscript())}
+      />
+      <ToolButton
+        label="上标"
+        icon={Superscript}
+        active={state.superscript}
+        onClick={run((c) => c.toggleSuperscript())}
+      />
+      <ColorMenu editor={editor} />
       <Separator orientation="vertical" className="mx-1 h-[18px]" />
       <ToolButton
         label="无序列表"

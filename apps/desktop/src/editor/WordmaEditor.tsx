@@ -3,8 +3,10 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
+import type { Node as PMNode } from "@tiptap/pm/model";
 import type { JSONContent } from "@wordma/editor-schema";
 import {
   countWords,
@@ -12,7 +14,7 @@ import {
 } from "@wordma/editor-schema";
 import { Markdown } from "@tiptap/markdown";
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
-import { GripVertical } from "lucide-react";
+import { BlockMenu } from "./components/BlockMenu";
 import { EditorToolbar } from "./components/EditorToolbar";
 import { ImageBubbleMenu } from "./components/ImageBubbleMenu";
 import { TableBubbleMenu } from "./components/TableBubbleMenu";
@@ -64,6 +66,11 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
     changeRef.current = onChange;
     const readyRef = useRef(onReady);
     readyRef.current = onReady;
+    const [blockTarget, setBlockTarget] = useState<{
+      node: PMNode;
+      pos: number;
+    } | null>(null);
+    const blockMenuOpenRef = useRef(false);
 
     const extensions = useMemo(
       () => [
@@ -175,9 +182,20 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
         {editor ? (
           <DragHandle
             editor={editor}
-            className="flex h-6 w-4 items-center justify-center rounded-sm text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground"
+            onNodeChange={({ node, pos }) => {
+              if (blockMenuOpenRef.current) return;
+              setBlockTarget(node ? { node, pos } : null);
+            }}
+            className="flex h-6 items-center rounded-sm text-muted-foreground/50"
           >
-            <GripVertical className="size-3.5" />
+            <BlockMenu
+              editor={editor}
+              target={blockTarget}
+              onOpenChange={(open) => {
+                blockMenuOpenRef.current = open;
+                if (!open) setBlockTarget(null);
+              }}
+            />
           </DragHandle>
         ) : null}
       </div>

@@ -189,3 +189,10 @@ main.wrap { padding-top: 32px; padding-bottom: 56px; }
 .post-content .hljs-selector-id { color: #953800; }
 .post-content .hljs-emphasis { font-style: italic; }
 .post-content .hljs-strong { font-weight: 600; }
+
+/* 文字颜色 / 背景高亮 */
+.post-content mark {
+  border-radius: 2px;
+  padding: 0 2px;
+  color: inherit;
+}

@@ -228,3 +228,10 @@
 .wm-editor .hljs-strong {
   font-weight: 600;
 }
+
+/* 文字颜色 / 背景高亮 */
+.wm-editor mark {
+  border-radius: 2px;
+  padding: 0 2px;
+  color: inherit;
+}
