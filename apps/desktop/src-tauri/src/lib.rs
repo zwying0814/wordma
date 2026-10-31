@@ -56,7 +56,6 @@ pub fn run() {
             media::upload_media,
             media::delete_media_cmd,
             theme::open_preview_cmd,
-            theme::get_content_css_cmd,
             theme::open_themes_dir_cmd,
             theme::delete_theme_cmd,
             theme::get_preview_port_cmd,

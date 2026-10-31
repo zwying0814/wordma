@@ -66,9 +66,6 @@ export const openThemesDir = (): Promise<void> =>
 export const deleteTheme = (name: string): Promise<void> =>
   invoke("delete_theme_cmd", { name });
 
-export const getContentCss = (siteId: number): Promise<string> =>
-  invoke("get_content_css_cmd", { siteId });
-
 export const getPreviewPort = (): Promise<number> =>
   invoke("get_preview_port_cmd");
 
@@ -86,9 +83,3 @@ export const setThemeSettings = (
   name: string,
   values: Record<string, unknown>,
 ): Promise<void> => invoke("set_theme_settings_cmd", { siteId, name, values });
-
-export const previewMarkdownHtml = (
-  siteId: number,
-  markdown: string,
-  contentOnly: boolean,
-): Promise<string> => invoke("preview_markdown_html_cmd", { siteId, markdown, contentOnly });

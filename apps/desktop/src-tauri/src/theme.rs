@@ -69,10 +69,6 @@ const BUILTIN_FILES: &[(&str, &str)] = &[
         "assets/style.css",
         include_str!("../../../../themes/default/assets/style.css"),
     ),
-    (
-        "assets/content.css",
-        include_str!("../../../../themes/default/assets/content.css"),
-    ),
 ];
 
 pub fn themes_root(app: &AppHandle) -> Result<PathBuf, String> {
@@ -1258,19 +1254,6 @@ fn ensure_preview_listener(port: u16) -> Result<(), String> {
 pub struct ThemeSettingsPayload {
     pub schema: Vec<ThemeSetting>,
     pub values: serde_json::Map<String, serde_json::Value>,
-}
-
-/// 主题 content.css 内容（编辑器内容区排版，跟随主题）
-#[tauri::command]
-pub fn get_content_css_cmd(app: AppHandle, db: State<Db>, site_id: i64) -> Result<String, String> {
-    let themes_dir = themes_root(&app)?;
-    extract_builtin_theme(&themes_dir)?;
-    let conn = db.0.lock().map_err(|e| format!("数据库连接不可用: {e}"))?;
-    let active = get_active_theme_name(&conn, site_id)?;
-    Ok(fs::read_to_string(
-        themes_dir.join(&active).join("assets").join("content.css"),
-    )
-    .unwrap_or_default())
 }
 
 #[tauri::command]
