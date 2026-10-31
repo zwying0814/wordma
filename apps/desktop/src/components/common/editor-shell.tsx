@@ -27,17 +27,42 @@ export function EditorTopBar({
   );
 }
 
-export function EditorBody({ children }: { children: ReactNode }) {
+export function EditorBody({
+  children,
+  scroll = true,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+}) {
   return (
-    <div className="flex min-h-0 flex-1 justify-center overflow-y-auto">
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 justify-center",
+        scroll ? "overflow-y-auto" : "overflow-hidden",
+      )}
+    >
       {children}
     </div>
   );
 }
 
-export function EditorColumn({ children }: { children: ReactNode }) {
+export function EditorColumn({
+  children,
+  fill = false,
+  className,
+}: {
+  children: ReactNode;
+  fill?: boolean;
+  className?: string;
+}) {
   return (
-    <div className="flex w-full min-w-0 flex-col px-8 pt-7 pb-16">
+    <div
+      className={cn(
+        "flex w-full min-w-0 flex-col px-8 pt-7",
+        fill ? "min-h-0 flex-1 pb-0" : "pb-16",
+        className,
+      )}
+    >
       {children}
     </div>
   );

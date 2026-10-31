@@ -98,7 +98,7 @@ const DEFAULT_ITEMS: SlashMenuItem[] = [
   },
 ];
 
-/** 输入 "/" 唤出的命令菜单；菜单 UI 由 SlashMenu 渲染 */
+/** 输入 "/" 唤出的命令菜单 */
 export const SlashCommand = Extension.create({
   name: "slashCommand",
 
@@ -136,7 +136,7 @@ export const SlashCommand = Extension.create({
               });
               popup = document.createElement("div");
               popup.style.position = "fixed";
-              popup.style.zIndex = "1050";
+              popup.style.zIndex = "50";
               popup.appendChild(renderer.element as HTMLElement);
               document.body.appendChild(popup);
               syncPosition(props.clientRect?.());

@@ -29,7 +29,6 @@ export const SlashMenu = forwardRef<SlashMenuHandle, Props>(
   function SlashMenu({ items, command }, ref) {
     const [selected, setSelected] = useState(0);
 
-    // 过滤结果变化时重置选中项
     useEffect(() => setSelected(0), [items]);
 
     useImperativeHandle(

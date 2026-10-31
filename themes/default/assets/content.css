@@ -4,8 +4,8 @@
   font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
   font-size: 15px;
   line-height: 1.9;
-  color: var(--ant-color-text);
-  caret-color: var(--ant-color-primary);
+  color: #1F2328;
+  caret-color: #3563D9;
 }
 
 .post-content p {
@@ -45,14 +45,14 @@
 .post-content blockquote {
   margin: 0 0 0.6em;
   padding: 4px 0 4px 14px;
-  border-left: 3px solid var(--ant-color-border);
-  color: var(--ant-color-text-secondary);
+  border-left: 3px solid #E5E7EB;
+  color: #667085;
 }
 
 .post-content pre {
   margin: 0 0 0.6em;
   padding: 12px 14px;
-  background: var(--ant-color-fill-tertiary);
+  background: #F3F4F6;
   border-radius: 8px;
   overflow-x: auto;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -63,7 +63,7 @@
 .post-content code {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.9em;
-  background: var(--ant-color-fill-tertiary);
+  background: #F3F4F6;
   border-radius: 4px;
   padding: 1px 5px;
 }
@@ -76,7 +76,7 @@
 
 .post-content hr {
   border: none;
-  border-top: 1px solid var(--ant-color-border-secondary);
+  border-top: 1px solid #E5E7EB;
   margin: 1.2em 0;
 }
 
@@ -89,7 +89,7 @@
 /* Placeholder 扩展：空文档首行显示占位文字 */
 .post-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: var(--ant-color-text-quaternary);
+  color: #9AA1AC;
   float: left;
   height: 0;
   pointer-events: none;
@@ -104,13 +104,13 @@
 
 .post-content th,
 .post-content td {
-  border: 1px solid var(--ant-color-border-secondary);
+  border: 1px solid #E5E7EB;
   padding: 6px 10px;
   text-align: left;
 }
 
 .post-content th {
-  background: var(--ant-color-fill-tertiary);
+  background: #F3F4F6;
   font-weight: 600;
 }
 
@@ -118,7 +118,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--ant-color-primary-bg);
+  background: #EAF0FB;
   opacity: 0.3;
   pointer-events: none;
 }
@@ -129,7 +129,7 @@
   top: 0;
   bottom: -2px;
   width: 4px;
-  background: var(--ant-color-primary);
+  background: #3563D9;
   pointer-events: none;
 }
 
@@ -158,7 +158,7 @@
   position: absolute;
   width: 10px;
   height: 10px;
-  background: var(--ant-color-primary);
+  background: #3563D9;
   border: 2px solid #fff;
   border-radius: 2px;
   z-index: 2;

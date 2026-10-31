@@ -1,0 +1,178 @@
+/* 编辑器内容排版：ProseMirror 生成内容只能靠嵌套选择器，统一以 .wm-editor 隔离。
+   颜色全部引用应用设计令牌。 */
+.wm-editor {
+  outline: none;
+  min-height: 100%;
+  padding-bottom: 4rem;
+  font-family: var(--font-editor);
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--foreground);
+}
+
+.wm-editor p {
+  margin: 0 0 0.6em;
+}
+
+.wm-editor h1,
+.wm-editor h2,
+.wm-editor h3 {
+  margin: 0.9em 0 0.4em;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.wm-editor h1 {
+  font-size: 1.7em;
+}
+
+.wm-editor h2 {
+  font-size: 1.4em;
+}
+
+.wm-editor h3 {
+  font-size: 1.18em;
+}
+
+.wm-editor ul,
+.wm-editor ol {
+  margin: 0 0 0.6em;
+  padding-inline-start: 1.6em;
+}
+
+.wm-editor li {
+  margin: 0.15em 0;
+}
+
+.wm-editor blockquote {
+  margin: 0 0 0.6em;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.wm-editor pre {
+  margin: 0 0 0.6em;
+  padding: 12px 14px;
+  background: var(--muted);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.wm-editor code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.wm-editor pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.wm-editor hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.2em 0;
+}
+
+.wm-editor img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 表格 */
+.wm-editor table {
+  position: relative;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 0.8em;
+  font-size: 13.5px;
+  overflow: visible;
+}
+
+.wm-editor th,
+.wm-editor td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.wm-editor th {
+  background: var(--muted);
+  font-weight: 600;
+}
+
+.wm-editor .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.wm-editor .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background: var(--primary);
+  pointer-events: none;
+}
+
+.wm-editor .tableWrapper {
+  overflow-x: auto;
+}
+
+/* 图片节点视图：四角缩放手柄（仅选中时显示） */
+.image-node-view {
+  position: relative;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.6em auto;
+}
+
+.image-node-view img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.image-node-view .resize-handle {
+  display: none;
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--primary);
+  border: 2px solid var(--card);
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.image-node-view.ProseMirror-selectednode {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.image-node-view.ProseMirror-selectednode .resize-handle {
+  display: block;
+}
+
+/* Placeholder 扩展 */
+.wm-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

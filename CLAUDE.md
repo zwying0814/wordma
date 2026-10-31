@@ -6,11 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Wordma —— 类 Gridea 的静态博客平台（桌面端）。pnpm monorepo：`apps/desktop` 是 Tauri 2 + React 19 + TypeScript + Vite 应用（Rust 后端 + SQLite），`packages/*` 为 workspace 源码包：
 
-- `@wordma/editor` —— Tiptap 编辑器组件（HTML 存取 + `/` 斜杠命令菜单），对外仅导出 `<WordmaEditor initialValue onChange placeholder />`
+- `@wordma/editor-schema` —— 编辑器与静态渲染器共用的 Tiptap 扩展清单、JSON→HTML 渲染、字数统计（无 UI）
+- `@wordma/content-renderer` —— Bun CLI：批量把 Tiptap JSON 正文渲染成 HTML，随应用分发为 `content-renderer/cli.js`
 
-workspace 包是**源码包**（`exports` 直接指向 `./src/index.ts`，无构建产物）。UI 栈为 **Tailwind CSS 4 + shadcn/ui v4（`base-nova`，Base UI 内核）+ lucide-react**，设计令牌在 `apps/desktop/src/styles/theme.css`（取值以 `design/styles.css` 为准）。
+编辑器 UI 在 `apps/desktop/src/editor/`（`WordmaEditor`、工具栏、斜杠菜单、气泡菜单、图片 NodeView）。workspace 包是**源码包**（`exports` 直接指向 `./src/index.ts`，无构建产物）。UI 栈为 **Tailwind CSS 4 + shadcn/ui v4（`base-nova`，Base UI 内核）+ lucide-react**，设计令牌在 `apps/desktop/src/styles/theme.css`（取值以 `design/styles.css` 为准）。
 
-依赖版本用 **pnpm catalog** 管理（`pnpm-workspace.yaml`）：跨包共享的依赖用 `"catalog:"` 引用；单包内部的版本联动（如 editor 的 `@tiptap/*` 全家桶）在该包 package.json 里用精确版本锁定，不进 catalog。
+依赖版本用 **pnpm catalog** 管理（`pnpm-workspace.yaml`）：跨包共享的依赖用 `"catalog:"` 引用；单包内部的版本联动（如 app 的 `@tiptap/*` 全家桶）在该包 package.json 里用精确版本锁定，不进 catalog。
 
 ## 常用命令
 
@@ -25,13 +26,7 @@ cargo test                  # Rust 单测（首次编译较久）
 cargo test <test_name>      # 单个测试，如 cargo test active_site_roundtrip
 ```
 
-`@wordma/editor` 当前未被应用引用，应用构建不会类型检查它；改动该包后单独跑：
-
-```bash
-apps/desktop/node_modules/.bin/tsc --noEmit --ignoreConfig --jsx react-jsx \
-  --module esnext --moduleResolution bundler --target es2020 --lib es2020,dom \
-  --strict --skipLibCheck --allowImportingTsExtensions packages/editor/src/index.ts
-```
+`packages/editor-schema` 与 `packages/content-renderer` 由应用构建直接引用/打包，无需单独编译。
 
 ## 前后端边界
 
@@ -62,11 +57,10 @@ wouter（`App.tsx` 中 `Switch`）：`/welcome` 为首次创建页（已有站�
 - **设计令牌**只在 `src/styles/theme.css`：`:root` 放 hex，`@theme inline` 暴露工具类（`bg-card`、`text-muted-foreground`、`shadow-card`、`text-page-title`、`w-sidebar`…），`.dark` 同步维护。`--radius: 10px` 经 base-nova 倍率得到设计稿的 6/8/10 圆角。
 - **只用 token**：不要写 `text-gray-500`、`bg-[#fff]` 这类字面值；要新颜色先在 `theme.css` 加 token，再在组件里用工具类。设计稿 hex 也只钉在 `theme.css`。
 - `cn` 从 `@/lib/utils` 引入（底层是 `cn` 包，支持条件类名）。
-- **Tailwind 扫描范围**：workspace 源码包不在 node_modules 自动扫描内，`theme.css` 中的 `@source "../../../../packages/editor/src"` 不能删，否则编辑器包里的类名不会生成。
+- **编辑器**：`src/editor/WordmaEditor.tsx` 是 Tiptap 封装（非受控，靠 `key` 切换文章）；扩展清单一律从 `@wordma/editor-schema` 的 `createSchemaExtensions()` 取，保证编辑器与 Bun 渲染器一致。工具栏/斜杠/气泡用 `Button`、`Separator` 等 shadcn 件；图片 NodeView（`editor/extensions/image-node-view.ts`）负责 media URL 解析与四角缩放。正文排版作用域为 `.wm-editor`（`src/editor/editor.css`）。
 - **反馈约定**：一次性动作结果用 sonner 的 `toast()`（`App.tsx` 已挂一次 `<Toaster />`）；二次确认用 `ConfirmDialog`（AlertDialog）；可恢复错误用 `InlineAlert` 或表单内 `Field error`。
 - **Base UI 约定**：`DropdownMenuTrigger` / `Dialog` 默认渲染按钮；`Select` 用 `value` / `onValueChange`；多选用 `DropdownMenuCheckboxItem` + `closeOnClick={false}`。
-- **布局高度链**：`html/body/#root` 保持 100%，页面根节点 `h-full`。普通页面用 `PageView`（28/36/48 内边距 + 滚动），编辑器用 `EditorShell`。
-- **编辑器正文样式**作用域是 `.wm-editor`（`packages/editor/src/editor.css`）；接入编辑器时必须传 `contentClassName="wm-editor"`，否则标题/列表/代码块排版不生效。
+- **布局高度链**：`html/body/#root` 保持 100%，页面根节点 `h-full`。普通页面用 `PageView`（28/36/48 内边距 + 滚动）；编辑器页用 `EditorShell`，`EditorBody scroll={false}` + `EditorColumn fill`，由 `WordmaEditor` 自己拥有滚动区。
 
 ## 其他约定
 

@@ -1,4 +1,4 @@
-import type { JSONContent } from "@tiptap/core";
+import type { JSONContent, NodeViewRenderer } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TableKit } from "@tiptap/extension-table";
@@ -24,6 +24,8 @@ export const ImageNode = Image.extend({
 
 export interface SchemaOptions {
   placeholder?: string;
+  /** 应用侧注入图片 NodeView（缩放手柄/媒体 URL 解析）；静态渲染不传 */
+  imageNodeView?: () => NodeViewRenderer | null;
 }
 
 /**
@@ -31,18 +33,24 @@ export interface SchemaOptions {
  * 应用侧只在此之上追加 NodeView 与 UI 专用扩展（Markdown 粘贴、斜杠命令）。
  */
 export function createSchemaExtensions(options: SchemaOptions = {}) {
+  const image = ImageNode.extend({
+    addNodeView() {
+      return options.imageNodeView?.() ?? null;
+    },
+  }).configure({
+    allowBase64: false,
+    resize: {
+      enabled: true,
+      directions: ["top-left", "top-right", "bottom-left", "bottom-right"],
+      minWidth: 60,
+      minHeight: 40,
+      alwaysPreserveAspectRatio: true,
+    },
+  });
+
   return [
     StarterKit,
-    ImageNode.configure({
-      allowBase64: false,
-      resize: {
-        enabled: true,
-        directions: ["top-left", "top-right", "bottom-left", "bottom-right"],
-        minWidth: 60,
-        minHeight: 40,
-        alwaysPreserveAspectRatio: true,
-      },
-    }),
+    image,
     TableKit.configure({ table: { resizable: true } }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     Placeholder.configure({ placeholder: options.placeholder ?? "" }),

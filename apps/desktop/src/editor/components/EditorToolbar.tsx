@@ -7,9 +7,9 @@ import {
   AlignRight,
   Bold,
   Heading1,
-  ImagePlus,
   Heading2,
   Heading3,
+  ImagePlus,
   Italic,
   List,
   ListOrdered,
@@ -22,13 +22,9 @@ import {
   Undo2,
   type LucideIcon,
 } from "lucide-react";
-
-const barClass =
-  "flex shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-2.5 py-1.5";
-const btnClass =
-  "flex size-7 items-center justify-center rounded-sm border-0 p-0 text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
-const btnActiveClass = "bg-accent text-primary hover:bg-accent";
-const dividerClass = "mx-1 h-[18px] w-px bg-border";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 function ToolButton({
   label,
@@ -44,21 +40,27 @@ function ToolButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-sm"
       title={label}
       aria-label={label}
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className={active ? `${btnClass} ${btnActiveClass}` : btnClass}
+      className={cn(
+        "text-muted-foreground",
+        active &&
+          "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
+      )}
     >
-      <Icon size={16} />
-    </button>
+      <Icon className="size-4" />
+    </Button>
   );
 }
 
-export function Toolbar({
+export function EditorToolbar({
   editor,
   onPickImage,
 }: {
@@ -94,14 +96,18 @@ export function Toolbar({
     return null;
   }
 
-  const run = (fn: (c: ReturnType<Editor["chain"]>) => void) => () => {
-    const c = editor.chain().focus();
-    fn(c);
-    c.run();
+  const run = (fn: (chain: ReturnType<Editor["chain"]>) => void) => () => {
+    const chain = editor.chain().focus();
+    fn(chain);
+    chain.run();
   };
 
   return (
-    <div className={barClass} role="toolbar" aria-label="编辑工具栏">
+    <div
+      className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-border px-2.5 py-1.5"
+      role="toolbar"
+      aria-label="编辑工具栏"
+    >
       <ToolButton
         label="撤销"
         icon={Undo2}
@@ -117,15 +123,14 @@ export function Toolbar({
       <ToolButton
         label="插入图片"
         icon={ImagePlus}
-        disabled={!editor}
         onClick={() => {
-          if (!onPickImage || !editor) return;
-          onPickImage().then((url) => {
+          if (!onPickImage) return;
+          void onPickImage().then((url) => {
             if (url) editor.chain().focus().setImage({ src: url }).run();
           });
         }}
       />
-      <span className={dividerClass} />
+      <Separator orientation="vertical" className="mx-1 h-[18px]" />
       <ToolButton
         label="标题 1"
         icon={Heading1}
@@ -144,7 +149,7 @@ export function Toolbar({
         active={state.h3}
         onClick={run((c) => c.toggleHeading({ level: 3 }))}
       />
-      <span className={dividerClass} />
+      <Separator orientation="vertical" className="mx-1 h-[18px]" />
       <ToolButton
         label="加粗"
         icon={Bold}
@@ -163,7 +168,7 @@ export function Toolbar({
         active={state.strike}
         onClick={run((c) => c.toggleStrike())}
       />
-      <span className={dividerClass} />
+      <Separator orientation="vertical" className="mx-1 h-[18px]" />
       <ToolButton
         label="无序列表"
         icon={List}
@@ -193,7 +198,7 @@ export function Toolbar({
         icon={Minus}
         onClick={run((c) => c.setHorizontalRule())}
       />
-      <span className={dividerClass} />
+      <Separator orientation="vertical" className="mx-1 h-[18px]" />
       <ToolButton
         label="左对齐"
         icon={AlignLeft}
@@ -218,11 +223,13 @@ export function Toolbar({
         active={state.alignJustify}
         onClick={run((c) => c.setTextAlign("justify"))}
       />
-      <span className={dividerClass} />
+      <Separator orientation="vertical" className="mx-1 h-[18px]" />
       <ToolButton
         label="插入表格"
         icon={Table}
-        onClick={run((c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }))}
+        onClick={run((c) =>
+          c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
+        )}
       />
     </div>
   );

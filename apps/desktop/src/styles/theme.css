@@ -4,9 +4,6 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* workspace 源码包不在 node_modules 的自动扫描路径里，需显式声明 */
-@source "../../../../packages/editor/src";
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

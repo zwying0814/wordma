@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import type { JSONContent } from "@wordma/editor-schema";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
 import { getPage, updatePage } from "../lib/pages";
+import { InlineAlert } from "../components/common/inline-alert";
 import { LoadingScreen } from "../components/common/loading";
 import {
   EditorBody,
@@ -14,6 +16,11 @@ import {
   EditorTitleInput,
   EditorTopBar,
 } from "../components/common/editor-shell";
+import MediaPickerModal from "../components/MediaPickerModal";
+import { WordmaEditor, type WordmaEditorHandle } from "../editor/WordmaEditor";
+import { parseInitialContent } from "../editor/lib/initial-content";
+import { useEditorMedia } from "../editor/lib/use-editor-media";
+import type { EditorSnapshot } from "../editor/types";
 
 /** 独立页面编辑器：标题 + slug + 内容 */
 export default function PageEditorPage({
@@ -22,13 +29,21 @@ export default function PageEditorPage({
   params: { id: string };
 }) {
   const [, navigate] = useLocation();
+  const editorRef = useRef<WordmaEditorHandle>(null);
+  const { imageUrls, pickerOpen, handlePasteImage, handlePickImage, closePicker } =
+    useEditorMedia();
+
   const [page, setPage] = useState<Awaited<ReturnType<typeof getPage>> | null>(
     null,
   );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
-  const [content, setContent] = useState("");
+  const [initialContent, setInitialContent] = useState<
+    JSONContent | string | null
+  >(null);
+  const [contentError, setContentError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<EditorSnapshot | null>(null);
   const [showInNav, setShowInNav] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -37,10 +52,13 @@ export default function PageEditorPage({
     getPage(Number(params.id))
       .then((p) => {
         if (cancelled) return;
+        const parsed = parseInitialContent(p.content, p.contentFormat);
         setPage(p);
         setTitle(p.title);
         setSlug(p.slug);
-        setContent(p.content);
+        setInitialContent(parsed.value);
+        setContentError(parsed.error);
+        setSnapshot(null);
         setShowInNav(p.showInNav);
       })
       .catch((e) => {
@@ -58,11 +76,16 @@ export default function PageEditorPage({
       toast.error("页面标题不能为空");
       return;
     }
+    const snapshot = editorRef.current?.getSnapshot();
+    if (!snapshot) {
+      toast.error("编辑器尚未就绪");
+      return;
+    }
     setSaving(true);
     try {
       const saved = await updatePage(page.id, {
         title: title.trim(),
-        content,
+        content: JSON.stringify(snapshot.json),
         slug: slug.trim(),
         showInNav,
       });
@@ -85,7 +108,7 @@ export default function PageEditorPage({
     );
   }
 
-  if (!page) {
+  if (!page || initialContent === null) {
     return <LoadingScreen />;
   }
 
@@ -109,26 +132,45 @@ export default function PageEditorPage({
           保存
         </Button>
       </EditorTopBar>
-      <EditorBody>
-        <EditorColumn>
-          <EditorTitleInput
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="页面标题…"
-            aria-label="页面标题"
-          />
-          <div className="mt-0 mb-[18px] flex items-center gap-2 border-b border-border pt-2.5 pb-3.5">
-            <input
-              className="w-[140px] rounded-sm border-0 bg-muted px-2 py-[3px] text-xs text-muted-foreground outline-none"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              placeholder="slug"
-              aria-label="页面 slug"
-              spellCheck={false}
+      <EditorBody scroll={false}>
+        <EditorColumn fill className="max-w-[760px]">
+          <div className="shrink-0">
+            <EditorTitleInput
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="页面标题…"
+              aria-label="页面标题"
             />
+            <div className="mt-0 mb-[18px] flex items-center gap-2 border-b border-border pt-2.5 pb-3.5">
+              <input
+                className="w-[140px] rounded-sm border-0 bg-muted px-2 py-[3px] text-xs text-muted-foreground outline-none"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder="slug"
+                aria-label="页面 slug"
+                spellCheck={false}
+              />
+              <span className="ml-auto text-xs text-muted-foreground">
+                约 {snapshot?.wordCount ?? page.wordCount} 字
+              </span>
+            </div>
+            {contentError ? (
+              <InlineAlert className="mb-3">{contentError}</InlineAlert>
+            ) : null}
           </div>
+          <WordmaEditor
+            key={page.id}
+            ref={editorRef}
+            initialContent={initialContent}
+            placeholder="开始写…"
+            onChange={setSnapshot}
+            onPasteImage={handlePasteImage}
+            onPickImage={handlePickImage}
+            onResolveImageUrl={(src) => imageUrls.get(src) ?? src}
+          />
         </EditorColumn>
       </EditorBody>
+      <MediaPickerModal open={pickerOpen} onClose={closePicker} />
     </EditorShell>
   );
 }

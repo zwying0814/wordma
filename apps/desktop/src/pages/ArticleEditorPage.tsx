@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import type { JSONContent } from "@wordma/editor-schema";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useSite } from "../context/SiteContext";
@@ -13,6 +14,7 @@ import {
 } from "../lib/article";
 import { openPreview, renderSite } from "../lib/theme";
 import { fmtDate } from "../lib/words";
+import { InlineAlert } from "../components/common/inline-alert";
 import { LoadingScreen } from "../components/common/loading";
 import {
   EditorBody,
@@ -23,6 +25,11 @@ import {
   EditorTopBar,
 } from "../components/common/editor-shell";
 import { MultiSelect } from "../components/common/multi-select";
+import MediaPickerModal from "../components/MediaPickerModal";
+import { WordmaEditor, type WordmaEditorHandle } from "../editor/WordmaEditor";
+import { useEditorMedia } from "../editor/lib/use-editor-media";
+import { parseInitialContent } from "../editor/lib/initial-content";
+import type { EditorSnapshot } from "../editor/types";
 
 export default function ArticleEditorPage({
   params,
@@ -31,10 +38,18 @@ export default function ArticleEditorPage({
 }) {
   const { activeSite, reloadArticles, tags, categories } = useSite();
   const [, navigate] = useLocation();
+  const editorRef = useRef<WordmaEditorHandle>(null);
+  const { imageUrls, pickerOpen, handlePasteImage, handlePickImage, closePicker } =
+    useEditorMedia();
+
   const [article, setArticle] = useState<Article | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [initialContent, setInitialContent] = useState<
+    JSONContent | string | null
+  >(null);
+  const [contentError, setContentError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<EditorSnapshot | null>(null);
   const [status, setStatus] = useState<ArticleStatus>("draft");
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [tagIds, setTagIds] = useState<number[]>([]);
@@ -49,9 +64,12 @@ export default function ArticleEditorPage({
     getArticle(Number(params.id))
       .then((a) => {
         if (cancelled) return;
+        const parsed = parseInitialContent(a.content, a.contentFormat);
         setArticle(a);
         setTitle(a.title);
-        setContent(a.content);
+        setInitialContent(parsed.value);
+        setContentError(parsed.error);
+        setSnapshot(null);
         setStatus(a.status);
         setCategoryIds(a.categories.map((c) => c.id));
         setTagIds(a.tags.map((t) => t.id));
@@ -67,10 +85,21 @@ export default function ArticleEditorPage({
     };
   }, [params.id]);
 
+  const currentContent = () => {
+    const latest = editorRef.current?.getSnapshot();
+    if (!latest) return null;
+    return JSON.stringify(latest.json);
+  };
+
   const handleSave = async (next: ArticleStatus) => {
     if (!article) return;
     if (next === "published" && !title.trim()) {
       setTitleError(true);
+      return;
+    }
+    const content = currentContent();
+    if (content === null) {
+      toast.error("编辑器尚未就绪");
       return;
     }
     setSaving(true);
@@ -99,6 +128,11 @@ export default function ArticleEditorPage({
   // 保存当前状态 → 渲染站点 → 打开浏览器预览
   const handlePreview = async () => {
     if (!article) return;
+    const content = currentContent();
+    if (content === null) {
+      toast.error("编辑器尚未就绪");
+      return;
+    }
     setPreviewing(true);
     try {
       await updateArticle(article.id, {
@@ -129,7 +163,7 @@ export default function ArticleEditorPage({
     );
   }
 
-  if (!article) {
+  if (!article || initialContent === null) {
     return <LoadingScreen />;
   }
 
@@ -179,48 +213,64 @@ export default function ArticleEditorPage({
           {status === "published" ? "更新发布" : "发布"}
         </Button>
       </EditorTopBar>
-      <EditorBody>
-        <EditorColumn>
-          <EditorTitleInput
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="标题…"
-            aria-label="文章标题"
-          />
-          {titleError && (
-            <EditorFieldError>发布前需要先写一个标题</EditorFieldError>
-          )}
-          <div className="mt-0 mb-[18px] flex flex-wrap items-center gap-2 border-b border-border pt-2.5 pb-3.5">
-            <input
-              className="w-[120px] rounded-sm border-0 bg-muted px-2 py-[3px] text-xs text-muted-foreground outline-none"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              placeholder="slug"
-              aria-label="文章 slug"
-              spellCheck={false}
+      <EditorBody scroll={false}>
+        <EditorColumn fill className="max-w-[760px]">
+          <div className="shrink-0">
+            <EditorTitleInput
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="标题…"
+              aria-label="文章标题"
             />
-            <MultiSelect
-              label="添加分类"
-              placeholder="添加分类"
-              className="min-w-[130px]"
-              value={categoryIds}
-              onChange={setCategoryIds}
-              options={categories.map((c) => ({ value: c.id, label: c.name }))}
-            />
-            <MultiSelect
-              label="添加标签"
-              placeholder="添加标签"
-              className="min-w-[180px] max-w-[300px]"
-              value={tagIds}
-              onChange={setTagIds}
-              options={tags.map((t) => ({ value: t.id, label: t.name }))}
-            />
-            <span className="ml-auto text-xs text-muted-foreground">
-              约 {article.wordCount} 字
-            </span>
+            {titleError && (
+              <EditorFieldError>发布前需要先写一个标题</EditorFieldError>
+            )}
+            <div className="mt-0 mb-[18px] flex flex-wrap items-center gap-2 border-b border-border pt-2.5 pb-3.5">
+              <input
+                className="w-[120px] rounded-sm border-0 bg-muted px-2 py-[3px] text-xs text-muted-foreground outline-none"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                placeholder="slug"
+                aria-label="文章 slug"
+                spellCheck={false}
+              />
+              <MultiSelect
+                label="添加分类"
+                placeholder="添加分类"
+                className="min-w-[130px]"
+                value={categoryIds}
+                onChange={setCategoryIds}
+                options={categories.map((c) => ({ value: c.id, label: c.name }))}
+              />
+              <MultiSelect
+                label="添加标签"
+                placeholder="添加标签"
+                className="min-w-[180px] max-w-[300px]"
+                value={tagIds}
+                onChange={setTagIds}
+                options={tags.map((t) => ({ value: t.id, label: t.name }))}
+              />
+              <span className="ml-auto text-xs text-muted-foreground">
+                约 {snapshot?.wordCount ?? article.wordCount} 字
+              </span>
+            </div>
+            {contentError ? (
+              <InlineAlert className="mb-3">{contentError}</InlineAlert>
+            ) : null}
           </div>
+          <WordmaEditor
+            key={article.id}
+            ref={editorRef}
+            initialContent={initialContent}
+            placeholder="开始写…"
+            onChange={setSnapshot}
+            onPasteImage={handlePasteImage}
+            onPickImage={handlePickImage}
+            onResolveImageUrl={(src) => imageUrls.get(src) ?? src}
+          />
         </EditorColumn>
       </EditorBody>
+      <MediaPickerModal open={pickerOpen} onClose={closePicker} />
     </EditorShell>
   );
 }

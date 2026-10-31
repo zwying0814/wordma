@@ -163,11 +163,19 @@ pub fn render_site_content(
 fn run_renderer(app: &AppHandle, items: &[RenderInput]) -> Result<Vec<RenderOutput>, String> {
     let bun = resolve_bun()?;
     let entry = renderer_entry(app)?;
+    run_renderer_process(&bun, &entry, items)
+}
+
+fn run_renderer_process(
+    bun: &std::path::Path,
+    entry: &std::path::Path,
+    items: &[RenderInput],
+) -> Result<Vec<RenderOutput>, String> {
     let payload = serde_json::to_string(items)
         .map_err(|e| format!("序列化渲染请求失败: {e}"))?;
 
-    let mut child = Command::new(&bun)
-        .arg(&entry)
+    let mut child = Command::new(bun)
+        .arg(entry)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -326,5 +334,27 @@ mod tests {
             rendered_html(None, ContentKind::Article, 2, CONTENT_FORMAT_JSON, "{}").unwrap(),
             ""
         );
+    }
+
+    #[test]
+    fn bun_renderer_roundtrip() {
+        let bun = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("binaries")
+            .join(bun_binary_name());
+        let entry = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../packages/content-renderer/src/cli.ts");
+        if !bun.is_file() || !entry.is_file() {
+            return;
+        }
+        let items = vec![RenderInput {
+            kind: "article",
+            id: 1,
+            format: CONTENT_FORMAT_JSON.to_string(),
+            content: r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"你好"}]}]}"#.to_string(),
+        }];
+        let output = run_renderer_process(&bun, &entry, &items).unwrap();
+        assert_eq!(output.len(), 1);
+        assert!(output[0].ok);
+        assert_eq!(output[0].html.as_deref(), Some("<p>你好</p>"));
     }
 }
