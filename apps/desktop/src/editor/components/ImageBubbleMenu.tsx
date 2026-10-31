@@ -4,6 +4,7 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import { NodeSelection } from "@tiptap/pm/state";
 import { AlignCenter, AlignLeft, AlignRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export function ImageBubbleMenu({ editor }: { editor: Editor | null }) {
             width:
               (e.getAttributes("image").width as string | number | undefined) ??
               null,
+            alt: (e.getAttributes("image").alt as string | undefined) ?? "",
           }
         : null,
   });
@@ -91,6 +93,16 @@ export function ImageBubbleMenu({ editor }: { editor: Editor | null }) {
             </Button>
           );
         })}
+        <Separator orientation="vertical" className="mx-1 self-stretch" />
+        <Input
+          value={state?.alt ?? ""}
+          placeholder="alt 文本"
+          aria-label="图片替代文本"
+          className="h-6 w-[110px] text-xs"
+          onChange={(e) =>
+            editor.chain().updateAttributes("image", { alt: e.target.value }).run()
+          }
+        />
         <Separator orientation="vertical" className="mx-1 self-stretch" />
         <Button
           type="button"

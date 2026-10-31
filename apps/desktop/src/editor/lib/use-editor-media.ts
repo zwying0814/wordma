@@ -18,12 +18,14 @@ export function useEditorMedia() {
   }, [media]);
 
   const handlePasteImage = async (file: File) => {
+    const toastId = toast.loading(`正在上传 ${file.name}…`);
     try {
       const item = await uploadMedia(activeSite.id, file);
       reloadMedia();
+      toast.success("图片已上传", { id: toastId });
       return mediaPublicUrl(item);
     } catch (e) {
-      toast.error(String(e));
+      toast.error(String(e), { id: toastId });
       return null;
     }
   };

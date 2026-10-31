@@ -19,6 +19,7 @@ export function createImageNodeView({
   const wrapper = document.createElement("div");
   wrapper.className = "image-node-view";
   wrapper.contentEditable = "false";
+  wrapper.draggable = true;
 
   const img = document.createElement("img");
   img.draggable = false;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Film, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -26,12 +26,21 @@ import { EmptyState } from "./common/empty-state";
 
 interface Props {
   open: boolean;
+  /** 只允许选择图片（编辑器插图用）；默认全部媒体 */
+  acceptKind?: "image" | "all";
   /** 关闭弹窗：url 为 null 表示取消 */
   onClose: (url: string | null) => void;
 }
 
+const IMAGE_ACCEPT = "image/png,image/jpeg,image/gif,image/webp,image/svg+xml";
+const MEDIA_ACCEPT = `${IMAGE_ACCEPT},video/mp4,video/webm,video/quicktime`;
+
 /** 媒体库选择弹窗：供编辑器插入图片（选择已有或先上传） */
-export default function MediaPickerModal({ open, onClose }: Props) {
+export default function MediaPickerModal({
+  open,
+  acceptKind = "all",
+  onClose,
+}: Props) {
   const { activeSite } = useSite();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,6 +48,12 @@ export default function MediaPickerModal({ open, onClose }: Props) {
   const [uploading, setUploading] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<MediaItem | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const imagesOnly = acceptKind === "image";
+  const visibleItems = useMemo(
+    () => (imagesOnly ? items.filter((item) => item.kind === "image") : items),
+    [items, imagesOnly],
+  );
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -102,7 +117,9 @@ export default function MediaPickerModal({ open, onClose }: Props) {
         <DialogHeader>
           <DialogTitle>从媒体库插入图片</DialogTitle>
           <DialogDescription>
-            选择已有文件，或先上传新的图片/视频。
+            {imagesOnly
+              ? "选择已有图片，或先上传新的图片。"
+              : "选择已有文件，或先上传新的图片/视频。"}
           </DialogDescription>
         </DialogHeader>
 
@@ -111,7 +128,7 @@ export default function MediaPickerModal({ open, onClose }: Props) {
             ref={inputRef}
             type="file"
             multiple
-            accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,video/mp4,video/webm,video/quicktime"
+            accept={imagesOnly ? IMAGE_ACCEPT : MEDIA_ACCEPT}
             className="hidden"
             onChange={(e) => {
               const files = Array.from(e.target.files ?? []);
@@ -128,7 +145,7 @@ export default function MediaPickerModal({ open, onClose }: Props) {
             ) : (
               <Upload className="size-3.5" />
             )}
-            上传图片/视频
+            上传{imagesOnly ? "图片" : "图片/视频"}
           </Button>
         </div>
 
@@ -136,14 +153,14 @@ export default function MediaPickerModal({ open, onClose }: Props) {
           <div className="flex justify-center p-12">
             <Spinner className="size-5 text-muted-foreground" />
           </div>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <EmptyState
-            title="媒体库还是空的"
+            title={imagesOnly ? "媒体库里还没有图片" : "媒体库还是空的"}
             description="先上传几张图片吧。"
           />
         ) : (
           <div className="grid max-h-[50vh] grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 overflow-y-auto">
-            {items.map((item) => {
+            {visibleItems.map((item) => {
               const active = selected?.id === item.id;
               return (
                 <div

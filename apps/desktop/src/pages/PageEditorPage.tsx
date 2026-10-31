@@ -174,7 +174,11 @@ export default function PageEditorPage({
           />
         </EditorColumn>
       </EditorBody>
-      <MediaPickerModal open={pickerOpen} onClose={closePicker} />
+      <MediaPickerModal
+        open={pickerOpen}
+        acceptKind="image"
+        onClose={closePicker}
+      />
     </EditorShell>
   );
 }

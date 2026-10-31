@@ -278,7 +278,11 @@ export default function ArticleEditorPage({
           />
         </EditorColumn>
       </EditorBody>
-      <MediaPickerModal open={pickerOpen} onClose={closePicker} />
+      <MediaPickerModal
+        open={pickerOpen}
+        acceptKind="image"
+        onClose={closePicker}
+      />
     </EditorShell>
   );
 }

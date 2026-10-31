@@ -6,9 +6,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
-  Heading1,
-  Heading2,
-  Heading3,
+  ChevronDown,
   ImagePlus,
   Italic,
   List,
@@ -16,15 +14,25 @@ import {
   Minus,
   Quote,
   Redo2,
+  RemoveFormatting,
   SquareCode,
   Strikethrough,
   Table,
+  Underline,
   Undo2,
   type LucideIcon,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+
+const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
 
 function ToolButton({
   label,
@@ -77,9 +85,11 @@ export function EditorToolbar({
             bold: e.isActive("bold"),
             italic: e.isActive("italic"),
             strike: e.isActive("strike"),
-            h1: e.isActive("heading", { level: 1 }),
-            h2: e.isActive("heading", { level: 2 }),
-            h3: e.isActive("heading", { level: 3 }),
+            underline: e.isActive("underline"),
+            headingLevel:
+              HEADING_LEVELS.find((level) =>
+                e.isActive("heading", { level }),
+              ) ?? 0,
             bulletList: e.isActive("bulletList"),
             orderedList: e.isActive("orderedList"),
             blockquote: e.isActive("blockquote"),
@@ -131,24 +141,32 @@ export function EditorToolbar({
         }}
       />
       <Separator orientation="vertical" className="mx-1 h-[18px]" />
-      <ToolButton
-        label="标题 1"
-        icon={Heading1}
-        active={state.h1}
-        onClick={run((c) => c.toggleHeading({ level: 1 }))}
-      />
-      <ToolButton
-        label="标题 2"
-        icon={Heading2}
-        active={state.h2}
-        onClick={run((c) => c.toggleHeading({ level: 2 }))}
-      />
-      <ToolButton
-        label="标题 3"
-        icon={Heading3}
-        active={state.h3}
-        onClick={run((c) => c.toggleHeading({ level: 3 }))}
-      />
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label="段落样式"
+          className="flex h-7 items-center gap-1 rounded-sm px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+        >
+          {state.headingLevel ? `H${state.headingLevel}` : "正文"}
+          <ChevronDown className="size-3" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-[130px]">
+          <DropdownMenuItem
+            onClick={() => editor.chain().focus().setParagraph().run()}
+          >
+            正文
+          </DropdownMenuItem>
+          {HEADING_LEVELS.map((level) => (
+            <DropdownMenuItem
+              key={level}
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level }).run()
+              }
+            >
+              H{level} 标题
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Separator orientation="vertical" className="mx-1 h-[18px]" />
       <ToolButton
         label="加粗"
@@ -167,6 +185,12 @@ export function EditorToolbar({
         icon={Strikethrough}
         active={state.strike}
         onClick={run((c) => c.toggleStrike())}
+      />
+      <ToolButton
+        label="下划线"
+        icon={Underline}
+        active={state.underline}
+        onClick={run((c) => c.toggleUnderline())}
       />
       <Separator orientation="vertical" className="mx-1 h-[18px]" />
       <ToolButton
@@ -230,6 +254,12 @@ export function EditorToolbar({
         onClick={run((c) =>
           c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
         )}
+      />
+      <Separator orientation="vertical" className="mx-1 h-[18px]" />
+      <ToolButton
+        label="清除格式"
+        icon={RemoveFormatting}
+        onClick={run((c) => c.unsetAllMarks().clearNodes())}
       />
     </div>
   );
