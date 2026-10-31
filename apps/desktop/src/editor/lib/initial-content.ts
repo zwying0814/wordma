@@ -5,14 +5,11 @@ export const EMPTY_DOC: JSONContent = {
   content: [{ type: "paragraph" }],
 };
 
-/** 旧 HTML 直接交给编辑器解析；JSON 解析失败时回退空文档并返回错误文案 */
-export function parseInitialContent(
-  content: string,
-  format: string,
-): { value: JSONContent | string; error: string | null } {
-  if (format !== "tiptap-json-v1") {
-    return { value: content, error: null };
-  }
+/** 正文一律是 Tiptap JSON；解析失败时回退空文档并返回错误文案（保存会被阻止） */
+export function parseInitialContent(content: string): {
+  value: JSONContent;
+  error: string | null;
+} {
   try {
     const parsed = JSON.parse(content) as JSONContent;
     if (parsed.type !== "doc") {

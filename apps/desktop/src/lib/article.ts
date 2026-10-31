@@ -8,15 +8,12 @@ export interface ArticleRef {
   name: string;
 }
 
-export type ArticleContentFormat = "html" | "tiptap-json-v1";
-
 export interface Article {
   id: number;
   siteId: number;
   slug: string;
   title: string;
   content: string;
-  contentFormat: ArticleContentFormat;
   wordCount: number;
   status: ArticleStatus;
   categories: ArticleRef[];

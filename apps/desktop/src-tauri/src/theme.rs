@@ -755,9 +755,7 @@ pub fn render_site_to(
             rendered,
             crate::content_render::ContentKind::Page,
             p.id,
-            &p.content_format,
-            &p.content,
-        )?;
+        );
         pages_ctx.push(serde_json::json!({
             "title": p.title,
             "url": url,
@@ -817,9 +815,7 @@ pub fn render_site_to(
             rendered,
             crate::content_render::ContentKind::Article,
             a.id,
-            &a.content_format,
-            &a.content,
-        )?;
+        );
         article_html.insert(a.id, content_html.clone());
         let word_count = a.word_count;
         let date = a.created_at.get(0..10).unwrap_or("").to_string();
@@ -1743,11 +1739,12 @@ mod tests {
         let tag = insert_tag(&conn, site.id, "徒步").unwrap();
         let cat = insert_category(&conn, site.id, "户外").unwrap();
         let a = insert_article(&conn, site.id, "山中一日").unwrap();
+        let content = r#"{"type":"doc","content":[{"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"山"}]},{"type":"paragraph","content":[{"type":"text","marks":[{"type":"bold"}],"text":"出发"}]}]}"#;
         update_article(
             &conn,
             a.id,
             None,
-            Some("<h2>山</h2><p><strong>出发</strong>了。</p>"),
+            Some(content),
             Some(STATUS_PUBLISHED),
             None,
             &[cat.id],
@@ -1769,6 +1766,12 @@ mod tests {
         fs::create_dir_all(&media_src).unwrap();
         fs::write(media_src.join("p.png"), b"pngdata").unwrap();
 
+        // 测试桩：模拟 Bun 渲染结果（真实渲染由 content_render 单测覆盖）
+        let mut rendered = crate::content_render::RenderedContent::default();
+        rendered
+            .articles
+            .insert(a.id, "<h2>山</h2><p><strong>出发</strong>了。</p>".to_string());
+
         let report = render_site_to(
             &conn,
             &dist,
@@ -1778,7 +1781,7 @@ mod tests {
             false,
             "http://127.0.0.1:12739",
             Some(&media_src),
-            None,
+            Some(&rendered),
         )
         .unwrap();
         assert!(report.files >= 5);
@@ -1792,7 +1795,7 @@ mod tests {
         assert!(index.contains("关于我"));
         assert!(!index.contains("草稿箱里的文章"));
 
-        // 文章页：markdown 已转 HTML，slug 路由生效，标签文本在列
+        // 文章页：JSON 已由 Bun 转 HTML（此处为测试桩），slug 路由生效，标签文本在列
         let post_path = dist.join("post").join(format!("{}.html", a.slug));
         let post_html = fs::read_to_string(post_path).unwrap();
         assert!(post_html.contains("<h2>山</h2>"));
@@ -1859,10 +1862,6 @@ mod tests {
             &[],
         )
         .unwrap();
-        assert_eq!(
-            published.content_format,
-            crate::article::CONTENT_FORMAT_JSON
-        );
         assert_eq!(published.word_count, 2);
 
         let tmp = std::env::temp_dir().join(format!(

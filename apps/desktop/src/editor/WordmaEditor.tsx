@@ -28,8 +28,8 @@ export interface WordmaEditorHandle {
 }
 
 export interface WordmaEditorProps {
-  /** Tiptap JSON，或旧数据里的 HTML 字符串 */
-  initialContent: JSONContent | string;
+  /** Tiptap JSON 文档 */
+  initialContent: JSONContent;
   placeholder?: string;
   onChange?: (snapshot: EditorSnapshot) => void;
   onReady?: () => void;
@@ -81,7 +81,6 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
     );
 
     const editor = useEditor({
-      contentType: "html",
       extensions,
       content: initialContent,
       editorProps: {

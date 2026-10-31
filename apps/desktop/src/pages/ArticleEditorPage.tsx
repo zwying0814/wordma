@@ -45,9 +45,9 @@ export default function ArticleEditorPage({
   const [article, setArticle] = useState<Article | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [initialContent, setInitialContent] = useState<
-    JSONContent | string | null
-  >(null);
+  const [initialContent, setInitialContent] = useState<JSONContent | null>(
+    null,
+  );
   const [contentError, setContentError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<EditorSnapshot | null>(null);
   const [status, setStatus] = useState<ArticleStatus>("draft");
@@ -64,7 +64,7 @@ export default function ArticleEditorPage({
     getArticle(Number(params.id))
       .then((a) => {
         if (cancelled) return;
-        const parsed = parseInitialContent(a.content, a.contentFormat);
+        const parsed = parseInitialContent(a.content);
         setArticle(a);
         setTitle(a.title);
         setInitialContent(parsed.value);

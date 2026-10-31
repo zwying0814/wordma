@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS articles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     title TEXT NOT NULL DEFAULT '',
-    content TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\"}]}',
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS pages (
     site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     title TEXT NOT NULL DEFAULT '',
     slug TEXT NOT NULL,
-    content TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL DEFAULT '{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\"}]}',
     show_in_nav INTEGER NOT NULL DEFAULT 1,
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -87,61 +87,6 @@ pub fn is_unique_conflict(e: &rusqlite::Error) -> bool {
         e,
         rusqlite::Error::SqliteFailure(_, Some(msg)) if msg.contains("UNIQUE")
     )
-}
-
-/// 判断某列是否存在，不存在则补列（幂等）
-fn ensure_column(
-    conn: &Connection,
-    table: &str,
-    column: &str,
-    ddl: &str,
-) -> Result<(), String> {
-    let count: i64 = conn
-        .query_row(
-            &format!("SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = ?1"),
-            params![column],
-            |row| row.get(0),
-        )
-        .map_err(|e| format!("检查 {table}.{column} 失败: {e}"))?;
-    if count == 0 {
-        conn.execute(
-            &format!("ALTER TABLE {table} ADD COLUMN {column} {ddl}"),
-            [],
-        )
-        .map_err(|e| format!("添加 {table}.{column} 失败: {e}"))?;
-    }
-    Ok(())
-}
-
-/// 把已经是 Tiptap JSON 的旧行标记为新格式（不修改 content 本身）
-fn mark_json_content(conn: &Connection, table: &str) -> Result<(), String> {
-    let rows: Vec<(i64, String)> = {
-        let mut stmt = conn
-            .prepare(&format!(
-                "SELECT id, content FROM {table}
-                 WHERE content_format = 'html' AND content LIKE '{{%'"
-            ))
-            .map_err(|e| format!("检查 {table} 内容格式失败: {e}"))?;
-        let rows = stmt
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-            .map_err(|e| format!("检查 {table} 内容格式失败: {e}"))?;
-        rows.collect::<Result<Vec<_>, rusqlite::Error>>()
-            .map_err(|e| format!("读取 {table} 内容失败: {e}"))?
-    };
-    for (id, content) in rows {
-        let is_doc = serde_json::from_str::<serde_json::Value>(&content)
-            .ok()
-            .and_then(|value| value.get("type")?.as_str().map(|t| t == "doc"))
-            .unwrap_or(false);
-        if is_doc {
-            conn.execute(
-                &format!("UPDATE {table} SET content_format = 'tiptap-json-v1' WHERE id = ?1"),
-                params![id],
-            )
-            .map_err(|e| format!("标记 {table} JSON 内容失败: {e}"))?;
-        }
-    }
-    Ok(())
 }
 
 /// 执行全部迁移（幂等）；生产初始化与内存库测试共用
@@ -217,17 +162,6 @@ pub fn run_migrations(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("创建 slug 索引失败: {e}"))?;
 
-    // 正文格式：新库默认 html；已有 Tiptap JSON 的行自动标记为新格式
-    ensure_column(
-        conn,
-        "articles",
-        "content_format",
-        "TEXT NOT NULL DEFAULT 'html'",
-    )?;
-    ensure_column(conn, "pages", "content_format", "TEXT NOT NULL DEFAULT 'html'")?;
-    mark_json_content(conn, "articles")?;
-    mark_json_content(conn, "pages")?;
-
     Ok(())
 }
 
@@ -240,46 +174,3 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<Connection, Box<dyn std::error:
     Ok(conn)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn migration_adds_content_format_and_marks_json_rows() {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE articles (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                site_id INTEGER NOT NULL,
-                title TEXT NOT NULL DEFAULT '',
-                content TEXT NOT NULL DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'draft',
-                created_at TEXT NOT NULL DEFAULT '',
-                updated_at TEXT NOT NULL DEFAULT ''
-            );
-            INSERT INTO articles (site_id, title, content, status) VALUES
-                (1, 'json', '{\"type\":\"doc\",\"content\":[]}', 'draft'),
-                (1, 'html', '<p>旧内容</p>', 'draft');",
-        )
-        .unwrap();
-
-        run_migrations(&conn).unwrap();
-
-        let json_format: String = conn
-            .query_row(
-                "SELECT content_format FROM articles WHERE title = 'json'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        let html_format: String = conn
-            .query_row(
-                "SELECT content_format FROM articles WHERE title = 'html'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(json_format, "tiptap-json-v1");
-        assert_eq!(html_format, "html");
-    }
-}

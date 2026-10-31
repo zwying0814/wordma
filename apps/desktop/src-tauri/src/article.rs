@@ -9,26 +9,9 @@ use crate::db::Db;
 pub const STATUS_DRAFT: &str = "draft";
 pub const STATUS_PUBLISHED: &str = "published";
 
-pub const CONTENT_FORMAT_HTML: &str = "html";
-pub const CONTENT_FORMAT_JSON: &str = "tiptap-json-v1";
 /// 新文章的初始正文：空文档（编辑器挂载后会接管）
 pub(crate) const EMPTY_DOC_JSON: &str =
     r#"{"type":"doc","content":[{"type":"paragraph"}]}"#;
-
-/// HTML 文本长度：剥掉标签后的非空白字符数（字数统计口径与前端一致）
-pub fn html_text_len(html: &str) -> usize {
-    let mut text = String::new();
-    let mut in_tag = false;
-    for c in html.chars() {
-        match c {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => text.push(c),
-            _ => {}
-        }
-    }
-    text.chars().filter(|c| !c.is_whitespace()).count()
-}
 
 /// Tiptap JSON 文本长度：只统计 text 节点，跳过 MDX 源码块
 pub fn json_text_len(content: &str) -> usize {
@@ -54,26 +37,13 @@ pub fn json_text_len(content: &str) -> usize {
         .unwrap_or(0)
 }
 
-pub fn content_word_count(content: &str, format: &str) -> usize {
-    if format == CONTENT_FORMAT_JSON {
-        json_text_len(content)
-    } else {
-        html_text_len(content)
+pub(crate) fn validate_json_doc(content: &str) -> Result<(), String> {
+    let doc: serde_json::Value =
+        serde_json::from_str(content).map_err(|e| format!("正文不是合法 JSON: {e}"))?;
+    if doc.get("type").and_then(|t| t.as_str()) != Some("doc") {
+        return Err("正文 JSON 缺少 doc 根节点".into());
     }
-}
-
-/// 根据正文形态推断存储格式：以 `{` 开头且是 doc JSON 视为新格式，否则按 HTML
-pub(crate) fn infer_content_format(content: &str) -> Result<&'static str, String> {
-    if content.trim_start().starts_with('{') {
-        let doc: serde_json::Value = serde_json::from_str(content)
-            .map_err(|e| format!("正文 JSON 格式不正确: {e}"))?;
-        if doc.get("type").and_then(|t| t.as_str()) != Some("doc") {
-            return Err("正文 JSON 缺少 doc 根节点".into());
-        }
-        Ok(CONTENT_FORMAT_JSON)
-    } else {
-        Ok(CONTENT_FORMAT_HTML)
-    }
+    Ok(())
 }
 
 /// 文章关联的分类/标签引用（载荷里只带 id 与名称）
@@ -92,7 +62,6 @@ pub struct Article {
     pub slug: String,
     pub title: String,
     pub content: String,
-    pub content_format: String,
     pub word_count: usize,
     pub status: String,
     pub categories: Vec<ArticleRef>,
@@ -103,7 +72,7 @@ pub struct Article {
 
 /// 文章基础列（分类/标签由单独查询附加）
 const ARTICLE_COLS: &str =
-    "a.id, a.site_id, a.slug, a.title, a.content, a.content_format, a.status, a.created_at, a.updated_at";
+    "a.id, a.site_id, a.slug, a.title, a.content, a.status, a.created_at, a.updated_at";
 
 struct ArticleRow {
     id: i64,
@@ -111,7 +80,6 @@ struct ArticleRow {
     slug: String,
     title: String,
     content: String,
-    content_format: String,
     status: String,
     created_at: String,
     updated_at: String,
@@ -124,10 +92,9 @@ fn row_to_article_row(row: &rusqlite::Row) -> rusqlite::Result<ArticleRow> {
         slug: row.get(2)?,
         title: row.get(3)?,
         content: row.get(4)?,
-        content_format: row.get(5)?,
-        status: row.get(6)?,
-        created_at: row.get(7)?,
-        updated_at: row.get(8)?,
+        status: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
     })
 }
 
@@ -180,9 +147,8 @@ fn finish_articles(
                 site_id: r.site_id,
                 slug: r.slug,
                 title: r.title,
-                word_count: content_word_count(&r.content, &r.content_format),
+                word_count: json_text_len(&r.content),
                 content: r.content,
-                content_format: r.content_format,
                 status: r.status,
                 categories: categories_map.get(&r.id).cloned().unwrap_or_default(),
                 tags: tags_map.get(&r.id).cloned().unwrap_or_default(),
@@ -217,9 +183,8 @@ pub fn insert_article(
     for _ in 0..5 {
         let slug = generate_slug();
         let inserted = conn.execute(
-            "INSERT INTO articles (site_id, title, slug, content, content_format)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![site_id, title.trim(), slug, EMPTY_DOC_JSON, CONTENT_FORMAT_JSON],
+            "INSERT INTO articles (site_id, title, slug, content) VALUES (?1, ?2, ?3, ?4)",
+            params![site_id, title.trim(), slug, EMPTY_DOC_JSON],
         );
         match inserted {
             Ok(_) => return get_article(conn, conn.last_insert_rowid()),
@@ -296,7 +261,7 @@ pub fn update_article(
     let current = get_article(conn, id)?;
     let title = title.map(str::trim).unwrap_or(&current.title);
     let content = content.unwrap_or(&current.content);
-    let content_format = infer_content_format(content)?;
+    validate_json_doc(content)?;
     let status = status.unwrap_or(&current.status);
     if !is_valid_status(status) {
         return Err(format!("未知的状态: {status}"));
@@ -339,10 +304,9 @@ pub fn update_article(
     }
 
     conn.execute(
-        "UPDATE articles SET title = ?1, content = ?2, content_format = ?3,
-         status = ?4, slug = ?5,
-         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?6",
-        params![title, content, content_format, status, slug, id],
+        "UPDATE articles SET title = ?1, content = ?2, status = ?3, slug = ?4,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?5",
+        params![title, content, status, slug, id],
     )
     .map_err(|e| format!("保存文章失败: {e}"))?;
 
@@ -447,7 +411,6 @@ mod tests {
         assert_eq!(a.title, "第一篇");
         assert_eq!(a.status, STATUS_DRAFT);
         assert_eq!(a.content, EMPTY_DOC_JSON);
-        assert_eq!(a.content_format, CONTENT_FORMAT_JSON);
         assert_eq!(a.word_count, 0);
         // 自动生成 slug：8 位小写字母、无数字
         assert_eq!(a.slug.len(), 8);
@@ -456,11 +419,12 @@ mod tests {
         assert!(a.categories.is_empty());
 
         let b = insert_article(&conn, site.id, "").unwrap();
+        let content = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"正文内容"}]}]}"#;
         update_article(
             &conn,
             b.id,
             Some("第二篇"),
-            Some("正文内容"),
+            Some(content),
             Some(STATUS_PUBLISHED),
             None,
             &[],
@@ -485,10 +449,11 @@ mod tests {
         let conn = mem_db();
         let site = insert_site(&conn, "测试站", None).unwrap();
         let a = insert_article(&conn, site.id, "标题").unwrap();
-        update_article(&conn, a.id, None, Some("只改正文"), None, None, &[], &[]).unwrap();
+        let content = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"只改正文"}]}]}"#;
+        update_article(&conn, a.id, None, Some(content), None, None, &[], &[]).unwrap();
         let reloaded = get_article(&conn, a.id).unwrap();
         assert_eq!(reloaded.title, "标题");
-        assert_eq!(reloaded.content, "只改正文");
+        assert_eq!(reloaded.content, content);
         assert_eq!(reloaded.status, STATUS_DRAFT);
     }
 
@@ -587,7 +552,7 @@ mod tests {
     }
 
     #[test]
-    fn update_article_infers_json_format_and_counts_words() {
+    fn update_article_validates_json_and_counts_words() {
         let conn = mem_db();
         let site = insert_site(&conn, "站", None).unwrap();
         let a = insert_article(&conn, site.id, "文章").unwrap();
@@ -595,10 +560,9 @@ mod tests {
 
         let updated =
             update_article(&conn, a.id, None, Some(json), None, None, &[], &[]).unwrap();
-        assert_eq!(updated.content_format, CONTENT_FORMAT_JSON);
         assert_eq!(updated.word_count, 4);
 
-        // 以 { 开头但不是 doc：拒绝，避免坏 JSON 被当成 HTML 存下去
+        // 非 doc JSON / 坏 JSON：拒绝
         assert!(update_article(&conn, a.id, None, Some("{oops"), None, None, &[], &[]).is_err());
         assert!(update_article(
             &conn,

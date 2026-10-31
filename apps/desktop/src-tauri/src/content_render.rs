@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use crate::article::{Article, CONTENT_FORMAT_HTML, CONTENT_FORMAT_JSON};
+use crate::article::Article;
 use crate::pages::Page;
 
 #[derive(Clone, Copy, Debug)]
@@ -28,7 +28,6 @@ impl ContentKind {
 struct RenderInput {
     kind: &'static str,
     id: i64,
-    format: String,
     content: String,
 }
 
@@ -64,36 +63,20 @@ impl RenderedContent {
     }
 }
 
-/// 取正文 HTML：优先使用 Bun 渲染结果，旧 HTML 内容直接透传。
-/// 测试等无 Bun 场景可传 `None`。
+/// 取正文 HTML。生产路径会为每个条目写入结果（失败项写占位 HTML）；
+/// 测试等无 Bun 场景返回空串。
 pub fn rendered_html(
     rendered: Option<&RenderedContent>,
     kind: ContentKind,
     id: i64,
-    format: &str,
-    content: &str,
-) -> Result<String, String> {
-    if let Some(html) = rendered.and_then(|r| r.get(kind, id)) {
-        return Ok(html.clone());
-    }
-    if rendered.is_none() {
-        // 测试等无 Bun 场景：旧 HTML 透传，JSON 正文输出空内容
-        return Ok(if format == CONTENT_FORMAT_HTML {
-            content.to_string()
-        } else {
-            String::new()
-        });
-    }
-    if format == CONTENT_FORMAT_HTML {
-        return Ok(content.to_string());
-    }
-    Err(format!(
-        "正文渲染失败（{} {id}）：未得到 Bun 渲染结果",
-        kind.as_str()
-    ))
+) -> String {
+    rendered
+        .and_then(|r| r.get(kind, id))
+        .cloned()
+        .unwrap_or_default()
 }
 
-/// 站点内所有 JSON 正文一次性交给 Bun 渲染；全为旧 HTML 时直接跳过。
+/// 站点内所有正文一次性交给 Bun 渲染
 pub fn render_site_content(
     app: &AppHandle,
     articles: &[Article],
@@ -101,24 +84,18 @@ pub fn render_site_content(
 ) -> Result<RenderedContent, String> {
     let mut items: Vec<RenderInput> = Vec::new();
     for article in articles {
-        if article.content_format == CONTENT_FORMAT_JSON {
-            items.push(RenderInput {
-                kind: ContentKind::Article.as_str(),
-                id: article.id,
-                format: article.content_format.clone(),
-                content: article.content.clone(),
-            });
-        }
+        items.push(RenderInput {
+            kind: ContentKind::Article.as_str(),
+            id: article.id,
+            content: article.content.clone(),
+        });
     }
     for page in pages {
-        if page.content_format == CONTENT_FORMAT_JSON {
-            items.push(RenderInput {
-                kind: ContentKind::Page.as_str(),
-                id: page.id,
-                format: page.content_format.clone(),
-                content: page.content.clone(),
-            });
-        }
+        items.push(RenderInput {
+            kind: ContentKind::Page.as_str(),
+            id: page.id,
+            content: page.content.clone(),
+        });
     }
     if items.is_empty() {
         return Ok(RenderedContent::default());
@@ -134,17 +111,12 @@ pub fn render_site_content(
         };
         let html = match (output.ok, output.html) {
             (true, Some(html)) => html,
-            _ => error_html(
-                output
-                    .error
-                    .as_deref()
-                    .unwrap_or("渲染器未返回内容"),
-            ),
+            _ => error_html(output.error.as_deref().unwrap_or("渲染器未返回内容")),
         };
         rendered.bucket(kind).insert(output.id, html);
     }
 
-    // 渲染器漏返回的条目也补错误占位，避免整站渲染失败
+    // 渲染器漏返回的条目也补错误占位，避免整站空白
     for item in &items {
         let kind = if item.kind == "article" {
             ContentKind::Article
@@ -167,12 +139,12 @@ fn run_renderer(app: &AppHandle, items: &[RenderInput]) -> Result<Vec<RenderOutp
 }
 
 fn run_renderer_process(
-    bun: &std::path::Path,
-    entry: &std::path::Path,
+    bun: &Path,
+    entry: &Path,
     items: &[RenderInput],
 ) -> Result<Vec<RenderOutput>, String> {
-    let payload = serde_json::to_string(items)
-        .map_err(|e| format!("序列化渲染请求失败: {e}"))?;
+    let payload =
+        serde_json::to_string(items).map_err(|e| format!("序列化渲染请求失败: {e}"))?;
 
     let mut child = Command::new(bun)
         .arg(entry)
@@ -297,51 +269,24 @@ mod tests {
     #[test]
     fn rendered_html_prefers_map_and_falls_back() {
         let mut rendered = RenderedContent::default();
-        rendered.articles.insert(1, "<p>来自 Bun</p>".to_string());
+        rendered
+            .articles
+            .insert(1, "<p>来自 Bun</p>".to_string());
 
         assert_eq!(
-            rendered_html(
-                Some(&rendered),
-                ContentKind::Article,
-                1,
-                CONTENT_FORMAT_JSON,
-                "{}"
-            )
-            .unwrap(),
+            rendered_html(Some(&rendered), ContentKind::Article, 1),
             "<p>来自 Bun</p>"
         );
-        assert_eq!(
-            rendered_html(
-                Some(&rendered),
-                ContentKind::Article,
-                2,
-                CONTENT_FORMAT_HTML,
-                "<p>旧内容</p>"
-            )
-            .unwrap(),
-            "<p>旧内容</p>"
-        );
-        assert!(rendered_html(
-            Some(&rendered),
-            ContentKind::Article,
-            2,
-            CONTENT_FORMAT_JSON,
-            "{}"
-        )
-        .is_err());
-        // 无 Bun 场景（测试）：JSON 输出空内容，不报错
-        assert_eq!(
-            rendered_html(None, ContentKind::Article, 2, CONTENT_FORMAT_JSON, "{}").unwrap(),
-            ""
-        );
+        assert_eq!(rendered_html(Some(&rendered), ContentKind::Article, 2), "");
+        assert_eq!(rendered_html(None, ContentKind::Article, 2), "");
     }
 
     #[test]
     fn bun_renderer_roundtrip() {
-        let bun = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        let bun = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("binaries")
             .join(bun_binary_name());
-        let entry = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        let entry = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../../packages/content-renderer/src/cli.ts");
         if !bun.is_file() || !entry.is_file() {
             return;
@@ -349,7 +294,6 @@ mod tests {
         let items = vec![RenderInput {
             kind: "article",
             id: 1,
-            format: CONTENT_FORMAT_JSON.to_string(),
             content: r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"你好"}]}]}"#.to_string(),
         }];
         let output = run_renderer_process(&bun, &entry, &items).unwrap();

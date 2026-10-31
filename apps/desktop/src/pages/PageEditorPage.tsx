@@ -39,9 +39,9 @@ export default function PageEditorPage({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
-  const [initialContent, setInitialContent] = useState<
-    JSONContent | string | null
-  >(null);
+  const [initialContent, setInitialContent] = useState<JSONContent | null>(
+    null,
+  );
   const [contentError, setContentError] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<EditorSnapshot | null>(null);
   const [showInNav, setShowInNav] = useState(true);
@@ -52,7 +52,7 @@ export default function PageEditorPage({
     getPage(Number(params.id))
       .then((p) => {
         if (cancelled) return;
-        const parsed = parseInitialContent(p.content, p.contentFormat);
+        const parsed = parseInitialContent(p.content);
         setPage(p);
         setTitle(p.title);
         setSlug(p.slug);

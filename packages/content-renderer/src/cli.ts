@@ -3,7 +3,6 @@ import { renderToHTML, type JSONContent } from "@wordma/editor-schema";
 interface RenderInput {
   kind: "article" | "page";
   id: number;
-  format: string;
   content: string;
 }
 
@@ -16,17 +15,6 @@ interface RenderOutput {
 }
 
 function renderOne(item: RenderInput): RenderOutput {
-  if (item.format === "html") {
-    return { kind: item.kind, id: item.id, ok: true, html: item.content };
-  }
-  if (item.format !== "tiptap-json-v1") {
-    return {
-      kind: item.kind,
-      id: item.id,
-      ok: false,
-      error: `未知内容格式：${item.format}`,
-    };
-  }
   try {
     const doc = JSON.parse(item.content) as JSONContent;
     return { kind: item.kind, id: item.id, ok: true, html: renderToHTML(doc) };

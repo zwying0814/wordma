@@ -40,7 +40,7 @@ cargo test <test_name>      # 单个测试，如 cargo test active_site_roundtri
 - **主题包**：`app_data_dir/themes/<name>/`（`theme.yaml` + `templates/*.tera` + `assets/`）；内置默认主题源文件在项目根 `themes/default/`（与 apps/ 同级，随 include_str! 打进二进制），落盘走 manifest 指纹增量更新（未被用户修改的文件随内置版本覆盖，用户修改保留，见 `extract_builtin_theme`）。
 - **模板引擎 Tera 2**：`Tera::new()` 是空构造，模板用 `add_template_files` 加载（模板名 = templates 下相对路径，`extends` 按名引用）；对 `.tera` 开启 autoescape，正文 HTML 用 `| safe`。
 - **渲染管线**（`theme.rs` `render_site_to`）：路由规则（`routing.rs`，存 settings 键 `routing_rules:{site_id}`）→ `generate_path` 算每篇文章/页面的输出路径（冲突即整体报错）→ 正文转 HTML → 写入 `app_data_dir/preview/{site_id}/`。只有 `published` 文章进入公开站点。
-- **内容格式与渲染**：`articles.content` / `pages.content` 存 `content_format` 指定的格式（`html` 为旧数据，`tiptap-json-v1` 为新写入的 Tiptap JSON；写入时按正文形态自动推断）。JSON 正文由 `packages/content-renderer` 调用内置 Bun、复用 `packages/editor-schema` 的扩展清单渲染成 HTML，发布/预览前批量执行一次；缺 Bun 时明确报错。用 `pnpm -F desktop fetch:bun` 获取并校验侧车，`pnpm -F desktop stage:renderer` 生成随包分发的 `content-renderer/cli.js`。首次拉取代码后需先跑 `fetch:bun`（开发与打包都会自动执行）。
+- **正文与渲染**：`articles.content` / `pages.content` 一律存 Tiptap JSON 字符串（不再兼容旧 HTML；写入时校验必须含 `doc` 根节点）。正文由 `packages/content-renderer` 调用内置 Bun、复用 `packages/editor-schema` 的扩展清单渲染成 HTML，发布/预览前批量执行一次；缺 Bun 时明确报错。用 `pnpm -F desktop fetch:bun` 获取并校验侧车，`pnpm -F desktop stage:renderer` 生成随包分发的 `content-renderer/cli.js`。首次拉取代码后需先跑 `fetch:bun`（开发与打包都会自动执行）。
 - **预览**：`127.0.0.1:12739` 的本地静态服务（惰性启动，按请求读文件，重渲染后无需重启），`open_preview_cmd` 用 opener 插件打开浏览器。
 
 ## 路由与启动流
