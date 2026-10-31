@@ -27,3 +27,6 @@ design
 docs
 .claude
 tmp
+# Bun sidecar 与打包产物（由 pnpm fetch:bun / stage:renderer 生成）
+apps/desktop/src-tauri/binaries/
+apps/desktop/src-tauri/resources/content-renderer/

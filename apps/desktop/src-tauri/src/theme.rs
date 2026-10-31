@@ -691,6 +691,7 @@ pub fn render_site_to(
     include_drafts: bool,
     base_url: &str,
     media_dir: Option<&Path>,
+    rendered: Option<&crate::content_render::RenderedContent>,
 ) -> Result<RenderReport, String> {
     let rules = get_routing_rules(conn, site_id)?;
     let site = get_site(conn, site_id)?;
@@ -750,7 +751,13 @@ pub fn render_site_to(
                 p.title
             ));
         }
-        let content_html = p.content.clone();
+        let content_html = crate::content_render::rendered_html(
+            rendered,
+            crate::content_render::ContentKind::Page,
+            p.id,
+            &p.content_format,
+            &p.content,
+        )?;
         pages_ctx.push(serde_json::json!({
             "title": p.title,
             "url": url,
@@ -782,6 +789,7 @@ pub fn render_site_to(
     let mut posts_ctx: Vec<serde_json::Value> = Vec::new();
     let mut post_renders: Vec<(String, serde_json::Value)> = Vec::new();
     let mut post_urls: HashMap<i64, String> = HashMap::new();
+    let mut article_html: HashMap<i64, String> = HashMap::new();
     for a in &renderable {
         let url = generate_path(&rules.post, &post_vars(a))?;
         if !used.insert(url.clone()) {
@@ -805,8 +813,15 @@ pub fn render_site_to(
                 serde_json::json!({ "name": t.name, "url": tag_urls.get(&t.id).cloned().unwrap_or_default() })
             })
             .collect();
-        let content_html = a.content.clone();
-        let word_count = crate::article::html_text_len(&a.content);
+        let content_html = crate::content_render::rendered_html(
+            rendered,
+            crate::content_render::ContentKind::Article,
+            a.id,
+            &a.content_format,
+            &a.content,
+        )?;
+        article_html.insert(a.id, content_html.clone());
+        let word_count = a.word_count;
         let date = a.created_at.get(0..10).unwrap_or("").to_string();
         let categories_text = a
             .categories
@@ -925,7 +940,7 @@ pub fn render_site_to(
                     || (a.tags.iter().any(|t| t.id == *id) && *rule == "tag")
             })
             .map(|a| {
-                let word_count = crate::article::html_text_len(&a.content);
+                let word_count = a.word_count;
                 let category_links: Vec<serde_json::Value> = a
                     .categories
                     .iter()
@@ -1027,7 +1042,7 @@ pub fn render_site_to(
             xml_escape(&link),
             xml_escape(&link),
             rfc2822_date(&a.created_at),
-            a.content.clone(),
+            article_html.get(&a.id).cloned().unwrap_or_default(),
         ));
     }
     feed.push_str("</channel></rss>");
@@ -1449,7 +1464,20 @@ pub fn render_site_cmd(
     let base_url = format!("http://127.0.0.1:{port}");
     let dist = preview_root(&app)?.join(site_id.to_string());
     let media_dir = media_root(&app)?.join(site_id.to_string());
-    let report = render_site_to(&conn, &dist, &themes_dir, &active, site_id, true, &base_url, Some(&media_dir))?;
+    let articles = get_articles_by_site(&conn, site_id)?;
+    let pages = get_pages_by_site(&conn, site_id)?;
+    let rendered = crate::content_render::render_site_content(&app, &articles, &pages)?;
+    let report = render_site_to(
+        &conn,
+        &dist,
+        &themes_dir,
+        &active,
+        site_id,
+        true,
+        &base_url,
+        Some(&media_dir),
+        Some(&rendered),
+    )?;
     if let Ok(mut dir) = PREVIEW_DIR.write() {
         *dir = Some(dist);
     }
@@ -1645,6 +1673,7 @@ mod tests {
             false,
             "http://127.0.0.1:12739",
             None,
+            None,
         )
         .unwrap();
 
@@ -1678,6 +1707,7 @@ mod tests {
             false,
             "http://127.0.0.1:12739",
             None,
+            None,
         )
         .unwrap();
         let index = fs::read_to_string(dist.join("index.html")).unwrap();
@@ -1696,6 +1726,7 @@ mod tests {
             site2.id,
             false,
             "http://127.0.0.1:12739",
+            None,
             None,
         )
         .unwrap();
@@ -1747,6 +1778,7 @@ mod tests {
             false,
             "http://127.0.0.1:12739",
             Some(&media_src),
+            None,
         )
         .unwrap();
         assert!(report.files >= 5);
@@ -1790,7 +1822,7 @@ mod tests {
 
         // 预览模式渲染草稿详情页，但列表仍只显示已发布
         let dist2 = tmp.join("preview2");
-        render_site_to(&conn, &dist2, &themes_dir, "default", site.id, true, "http://127.0.0.1:12739", None).unwrap();
+        render_site_to(&conn, &dist2, &themes_dir, "default", site.id, true, "http://127.0.0.1:12739", None, None).unwrap();
         let draft_html =
             fs::read_to_string(dist2.join("post").join(format!("{}.html", draft.slug)))
                 .unwrap();
@@ -1804,8 +1836,66 @@ mod tests {
             .unwrap();
         let rules = RoutingRules { post: "/[year]/[month].html".into(), ..Default::default() };
         crate::routing::set_routing_rules(&conn, site.id, &rules).unwrap();
-        let err = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false, "http://127.0.0.1:12739", None).unwrap_err();
+        let err = render_site_to(&conn, &dist, &themes_dir, "default", site.id, false, "http://127.0.0.1:12739", None, None).unwrap_err();
         assert!(err.contains("路径冲突"));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn render_uses_bun_rendered_json_html() {
+        let conn = mem_db();
+        let site = insert_site(&conn, "JSON 站", None).unwrap();
+        let a = insert_article(&conn, site.id, "JSON 文章").unwrap();
+        let json = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"正文"}]}]}"#;
+        let published = update_article(
+            &conn,
+            a.id,
+            None,
+            Some(json),
+            Some(STATUS_PUBLISHED),
+            None,
+            &[],
+            &[],
+        )
+        .unwrap();
+        assert_eq!(
+            published.content_format,
+            crate::article::CONTENT_FORMAT_JSON
+        );
+        assert_eq!(published.word_count, 2);
+
+        let tmp = std::env::temp_dir().join(format!(
+            "wordma-json-render-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&tmp);
+        let themes_dir = tmp.join("themes");
+        extract_builtin_theme(&themes_dir).unwrap();
+        let dist = tmp.join("preview").join(site.id.to_string());
+
+        let mut rendered = crate::content_render::RenderedContent::default();
+        rendered
+            .articles
+            .insert(a.id, "<p>来自 Bun</p>".to_string());
+
+        render_site_to(
+            &conn,
+            &dist,
+            &themes_dir,
+            "default",
+            site.id,
+            false,
+            "http://127.0.0.1:12739",
+            None,
+            Some(&rendered),
+        )
+        .unwrap();
+
+        let post =
+            fs::read_to_string(dist.join("post").join(format!("{}.html", a.slug))).unwrap();
+        assert!(post.contains("<p>来自 Bun</p>"));
+        assert!(!post.contains("{\"type\":\"doc\""));
 
         let _ = fs::remove_dir_all(&tmp);
     }

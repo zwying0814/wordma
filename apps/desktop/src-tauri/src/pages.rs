@@ -2,7 +2,10 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::article::validate_slug;
+use crate::article::{
+    content_word_count, infer_content_format, validate_slug, CONTENT_FORMAT_JSON,
+    EMPTY_DOC_JSON,
+};
 use crate::db::Db;
 
 pub const TITLE_MAX: usize = 60;
@@ -15,6 +18,8 @@ pub struct Page {
     pub title: String,
     pub slug: String,
     pub content: String,
+    pub content_format: String,
+    pub word_count: usize,
     pub show_in_nav: bool,
     pub sort_order: i64,
     pub created_at: String,
@@ -22,19 +27,23 @@ pub struct Page {
 }
 
 const PAGE_COLS: &str =
-    "id, site_id, title, slug, content, show_in_nav, sort_order, created_at, updated_at";
+    "id, site_id, title, slug, content, content_format, show_in_nav, sort_order, created_at, updated_at";
 
 fn row_to_page(row: &rusqlite::Row) -> rusqlite::Result<Page> {
+    let content: String = row.get(4)?;
+    let content_format: String = row.get(5)?;
     Ok(Page {
         id: row.get(0)?,
         site_id: row.get(1)?,
         title: row.get(2)?,
         slug: row.get(3)?,
-        content: row.get(4)?,
-        show_in_nav: row.get::<_, i64>(5)? != 0,
-        sort_order: row.get(6)?,
-        created_at: row.get(7)?,
-        updated_at: row.get(8)?,
+        word_count: content_word_count(&content, &content_format),
+        content,
+        content_format,
+        show_in_nav: row.get::<_, i64>(6)? != 0,
+        sort_order: row.get(7)?,
+        created_at: row.get(8)?,
+        updated_at: row.get(9)?,
     })
 }
 
@@ -86,8 +95,9 @@ pub fn insert_page(
         return Err(format!("slug 已被使用: {slug}"));
     }
     conn.execute(
-        "INSERT INTO pages (site_id, title, slug) VALUES (?1, ?2, ?3)",
-        params![site_id, title, slug],
+        "INSERT INTO pages (site_id, title, slug, content, content_format)
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![site_id, title, slug, EMPTY_DOC_JSON, CONTENT_FORMAT_JSON],
     )
     .map_err(|e| format!("创建页面失败: {e}"))?;
     get_page(conn, conn.last_insert_rowid())
@@ -110,6 +120,7 @@ pub fn update_page(
         return Err(format!("页面标题不能超过 {TITLE_MAX} 个字符"));
     }
     let slug = validate_slug(slug)?;
+    let content_format = infer_content_format(content)?;
     let current = get_page(conn, id)?;
     if slug != current.slug {
         let taken: bool = conn
@@ -124,9 +135,10 @@ pub fn update_page(
         }
     }
     conn.execute(
-        "UPDATE pages SET title = ?1, content = ?2, slug = ?3, show_in_nav = ?4,
-         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?5",
-        params![title, content, slug, show_in_nav as i64, id],
+        "UPDATE pages SET title = ?1, content = ?2, content_format = ?3, slug = ?4,
+         show_in_nav = ?5,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?6",
+        params![title, content, content_format, slug, show_in_nav as i64, id],
     )
     .map_err(|e| format!("保存页面失败: {e}"))?;
     get_page(conn, id)

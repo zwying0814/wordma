@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "life.zwy.wordma",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm fetch:bun && pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm fetch:bun && pnpm stage:renderer && pnpm build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -32,6 +32,12 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "externalBin": [
+      "binaries/bun"
+    ],
+    "resources": {
+      "resources/content-renderer": "content-renderer"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

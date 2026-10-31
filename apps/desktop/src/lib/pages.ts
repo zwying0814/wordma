@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { ArticleContentFormat } from "./article";
 
 export interface SitePage {
   id: number;
@@ -6,6 +7,8 @@ export interface SitePage {
   title: string;
   slug: string;
   content: string;
+  contentFormat: ArticleContentFormat;
+  wordCount: number;
   showInNav: boolean;
   sortOrder: number;
   createdAt: string;

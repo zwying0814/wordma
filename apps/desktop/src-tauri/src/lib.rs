@@ -1,4 +1,5 @@
 mod article;
+mod content_render;
 mod db;
 mod media;
 mod pages;

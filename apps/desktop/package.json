@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "fetch:bun": "node scripts/fetch-bun.mjs",
+    "stage:renderer": "node scripts/stage-content-renderer.mjs",
     "tauri": "tauri"
   },
   "dependencies": {

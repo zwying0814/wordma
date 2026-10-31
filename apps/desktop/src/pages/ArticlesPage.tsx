@@ -12,7 +12,7 @@ import {
   type Article,
   type ArticleStatus,
 } from "../lib/article";
-import { countWordsHtml, fmtDate } from "../lib/words";
+import { fmtDate } from "../lib/words";
 import { ConfirmDialog } from "../components/common/confirm-dialog";
 import { EmptyState } from "../components/common/empty-state";
 import {
@@ -44,7 +44,7 @@ function ArticleRow({
     article.categories.map((c) => c.name).join("、") || null,
     article.tags.map((t) => t.name).join("、") || null,
     fmtDate(article.updatedAt),
-    `约 ${countWordsHtml(article.content)} 字`,
+    `约 ${article.wordCount} 字`,
   ]
     .filter(Boolean)
     .join(" · ");

@@ -12,7 +12,7 @@ import {
   type ArticleStatus,
 } from "../lib/article";
 import { openPreview, renderSite } from "../lib/theme";
-import { countWordsHtml, fmtDate } from "../lib/words";
+import { fmtDate } from "../lib/words";
 import { LoadingScreen } from "../components/common/loading";
 import {
   EditorBody,
@@ -216,7 +216,7 @@ export default function ArticleEditorPage({
               options={tags.map((t) => ({ value: t.id, label: t.name }))}
             />
             <span className="ml-auto text-xs text-muted-foreground">
-              约 {countWordsHtml(content)} 字
+              约 {article.wordCount} 字
             </span>
           </div>
         </EditorColumn>
