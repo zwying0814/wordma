@@ -230,16 +230,17 @@ fn bun_binary_name() -> &'static str {
 }
 
 fn renderer_entry(app: &AppHandle) -> Result<PathBuf, String> {
-    if let Ok(dir) = app.path().resource_dir() {
-        let candidate = dir.join("content-renderer").join("cli.js");
+    // 开发态优先源码，避免用到 resources 里过期的打包产物
+    if cfg!(debug_assertions) {
+        let candidate = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../packages/content-renderer/src/cli.ts");
         if candidate.is_file() {
             return Ok(candidate);
         }
     }
 
-    if cfg!(debug_assertions) {
-        let candidate = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../packages/content-renderer/src/cli.ts");
+    if let Ok(dir) = app.path().resource_dir() {
+        let candidate = dir.join("content-renderer").join("cli.js");
         if candidate.is_file() {
             return Ok(candidate);
         }

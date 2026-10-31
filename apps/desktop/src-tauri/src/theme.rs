@@ -1375,7 +1375,12 @@ pub fn open_preview_cmd(
     if let Ok(mut dir) = PREVIEW_DIR.write() {
         *dir = Some(dist);
     }
-    let url = format!("http://127.0.0.1:{port}/{target}");
+    let path = if target.starts_with('/') {
+        target.clone()
+    } else {
+        format!("/{target}")
+    };
+    let url = format!("http://127.0.0.1:{port}{path}");
     use tauri_plugin_opener::OpenerExt;
     app.opener()
         .open_url(&url, None::<&str>)
