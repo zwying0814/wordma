@@ -154,3 +154,38 @@ main.wrap { padding-top: 32px; padding-bottom: 56px; }
   background: #F9FAFB;
   font-weight: 600;
 }
+
+/* 代码块高亮（lowlight / highlight.js token） */
+.post-content .hljs-comment,
+.post-content .hljs-quote { color: #6e7781; font-style: italic; }
+.post-content .hljs-keyword,
+.post-content .hljs-selector-tag,
+.post-content .hljs-literal,
+.post-content .hljs-section,
+.post-content .hljs-link { color: #cf222e; }
+.post-content .hljs-string,
+.post-content .hljs-title,
+.post-content .hljs-name,
+.post-content .hljs-type,
+.post-content .hljs-attribute,
+.post-content .hljs-symbol,
+.post-content .hljs-bullet,
+.post-content .hljs-addition,
+.post-content .hljs-variable,
+.post-content .hljs-template-tag,
+.post-content .hljs-template-variable { color: #0a3069; }
+.post-content .hljs-number,
+.post-content .hljs-meta,
+.post-content .hljs-built_in,
+.post-content .hljs-builtin-name,
+.post-content .hljs-params { color: #0550ae; }
+.post-content .hljs-function,
+.post-content .hljs-title.function_,
+.post-content .hljs-title.class_ { color: #8250df; }
+.post-content .hljs-attr,
+.post-content .hljs-selector-attr,
+.post-content .hljs-selector-pseudo,
+.post-content .hljs-selector-class,
+.post-content .hljs-selector-id { color: #953800; }
+.post-content .hljs-emphasis { font-style: italic; }
+.post-content .hljs-strong { font-weight: 600; }

@@ -176,3 +176,55 @@
   height: 0;
   pointer-events: none;
 }
+
+/* 代码块高亮（lowlight / highlight.js token） */
+.wm-editor .hljs-comment,
+.wm-editor .hljs-quote {
+  color: #6e7781;
+  font-style: italic;
+}
+.wm-editor .hljs-keyword,
+.wm-editor .hljs-selector-tag,
+.wm-editor .hljs-literal,
+.wm-editor .hljs-section,
+.wm-editor .hljs-link {
+  color: #cf222e;
+}
+.wm-editor .hljs-string,
+.wm-editor .hljs-title,
+.wm-editor .hljs-name,
+.wm-editor .hljs-type,
+.wm-editor .hljs-attribute,
+.wm-editor .hljs-symbol,
+.wm-editor .hljs-bullet,
+.wm-editor .hljs-addition,
+.wm-editor .hljs-variable,
+.wm-editor .hljs-template-tag,
+.wm-editor .hljs-template-variable {
+  color: #0a3069;
+}
+.wm-editor .hljs-number,
+.wm-editor .hljs-meta,
+.wm-editor .hljs-built_in,
+.wm-editor .hljs-builtin-name,
+.wm-editor .hljs-params {
+  color: #0550ae;
+}
+.wm-editor .hljs-function,
+.wm-editor .hljs-title.function_,
+.wm-editor .hljs-title.class_ {
+  color: #8250df;
+}
+.wm-editor .hljs-attr,
+.wm-editor .hljs-selector-attr,
+.wm-editor .hljs-selector-pseudo,
+.wm-editor .hljs-selector-class,
+.wm-editor .hljs-selector-id {
+  color: #953800;
+}
+.wm-editor .hljs-emphasis {
+  font-style: italic;
+}
+.wm-editor .hljs-strong {
+  font-weight: 600;
+}

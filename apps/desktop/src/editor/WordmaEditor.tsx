@@ -11,6 +11,8 @@ import {
   createSchemaExtensions,
 } from "@wordma/editor-schema";
 import { Markdown } from "@tiptap/markdown";
+import { DragHandle } from "@tiptap/extension-drag-handle-react";
+import { GripVertical } from "lucide-react";
 import { EditorToolbar } from "./components/EditorToolbar";
 import { ImageBubbleMenu } from "./components/ImageBubbleMenu";
 import { TableBubbleMenu } from "./components/TableBubbleMenu";
@@ -170,6 +172,14 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
         <div className="min-h-0 flex-1 overflow-y-auto">
           <EditorContent editor={editor} />
         </div>
+        {editor ? (
+          <DragHandle
+            editor={editor}
+            className="flex h-6 w-4 items-center justify-center rounded-sm text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground"
+          >
+            <GripVertical className="size-3.5" />
+          </DragHandle>
+        ) : null}
       </div>
     );
   },

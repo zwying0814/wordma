@@ -17,7 +17,6 @@ import {
   RemoveFormatting,
   SquareCode,
   Strikethrough,
-  Table,
   Underline,
   Undo2,
   type LucideIcon,
@@ -28,7 +27,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CODE_LANGUAGES } from "@wordma/editor-schema";
 import { Button } from "@/components/ui/button";
+import { TableGridPicker } from "./TableGridPicker";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +102,9 @@ export function EditorToolbar({
             orderedList: e.isActive("orderedList"),
             blockquote: e.isActive("blockquote"),
             codeBlock: e.isActive("codeBlock"),
+            language:
+              (e.getAttributes("codeBlock").language as string | undefined) ??
+              "plaintext",
             alignLeft: e.isActive({ textAlign: "left" }),
             alignCenter: e.isActive({ textAlign: "center" }),
             alignRight: e.isActive({ textAlign: "right" }),
@@ -217,6 +228,38 @@ export function EditorToolbar({
         active={state.codeBlock}
         onClick={run((c) => c.toggleCodeBlock())}
       />
+      {state.codeBlock ? (
+        <Select
+          value={state.language}
+          onValueChange={(value) =>
+            editor
+              .chain()
+              .focus()
+              .updateAttributes("codeBlock", { language: value })
+              .run()
+          }
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label="代码语言"
+            className="h-7 w-[128px] text-xs"
+          >
+            <SelectValue>
+              {(selected) =>
+                CODE_LANGUAGES.find((item) => item.value === selected)?.label ??
+                "纯文本"
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent align="start" className="max-h-[280px]">
+            {CODE_LANGUAGES.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
       <ToolButton
         label="分割线"
         icon={Minus}
@@ -248,13 +291,7 @@ export function EditorToolbar({
         onClick={run((c) => c.setTextAlign("justify"))}
       />
       <Separator orientation="vertical" className="mx-1 h-[18px]" />
-      <ToolButton
-        label="插入表格"
-        icon={Table}
-        onClick={run((c) =>
-          c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
-        )}
-      />
+      <TableGridPicker editor={editor} />
       <Separator orientation="vertical" className="mx-1 h-[18px]" />
       <ToolButton
         label="清除格式"

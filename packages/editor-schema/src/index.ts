@@ -6,3 +6,4 @@ export {
 } from "./extensions";
 export { renderToHTML } from "./render";
 export { countWords } from "./count";
+export { CODE_LANGUAGES, type CodeLanguage } from "./languages";

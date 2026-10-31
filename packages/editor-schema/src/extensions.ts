@@ -1,9 +1,13 @@
 import type { JSONContent, NodeViewRenderer } from "@tiptap/core";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TableKit } from "@tiptap/extension-table";
 import TextAlign from "@tiptap/extension-text-align";
 import StarterKit from "@tiptap/starter-kit";
+import { common, createLowlight } from "lowlight";
+
+const lowlight = createLowlight(common);
 
 /** 图片节点：在 Tiptap 内置 width/height 之外增加 align，渲染为 data-align 供主题排版使用 */
 export const ImageNode = Image.extend({
@@ -50,6 +54,7 @@ export function createSchemaExtensions(options: SchemaOptions = {}) {
 
   return [
     StarterKit.configure({
+      codeBlock: false,
       link: {
         openOnClick: false,
         autolink: true,
@@ -59,6 +64,11 @@ export function createSchemaExtensions(options: SchemaOptions = {}) {
           target: "_blank",
         },
       },
+    }),
+    CodeBlockLowlight.configure({
+      lowlight,
+      defaultLanguage: "plaintext",
+      languageClassPrefix: "language-",
     }),
     image,
     TableKit.configure({ table: { resizable: true } }),
