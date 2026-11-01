@@ -15,11 +15,33 @@ import { MdxBlock } from "./mdx";
 
 const lowlight = createLowlight(common);
 
-/** 图片节点：在 Tiptap 内置 width/height 之外增加 align，渲染为 data-align 供主题排版使用 */
+/** 图片节点：src/alt/title/width + align；width 以百分比或 px 存储，静态渲染为内联样式 */
 export const ImageNode = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (element) => {
+          const styleWidth = element.style.width;
+          if (styleWidth && styleWidth.includes("%")) {
+            return styleWidth;
+          }
+          const attr = element.getAttribute("width");
+          if (attr) {
+            return attr.includes("%") ? attr : Number(attr);
+          }
+          return styleWidth || null;
+        },
+        renderHTML: (attributes) => {
+          if (!attributes.width) return {};
+          const width =
+            typeof attributes.width === "number"
+              ? `${attributes.width}px`
+              : String(attributes.width);
+          return { style: `width: ${width}` };
+        },
+      },
       align: {
         default: "center",
         parseHTML: (element) =>
@@ -51,13 +73,6 @@ export function createSchemaExtensions(options: SchemaOptions = {}) {
     },
   }).configure({
     allowBase64: false,
-    resize: {
-      enabled: true,
-      directions: ["top-left", "top-right", "bottom-left", "bottom-right"],
-      minWidth: 60,
-      minHeight: 40,
-      alwaysPreserveAspectRatio: true,
-    },
   });
 
   return [

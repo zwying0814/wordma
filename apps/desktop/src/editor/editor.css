@@ -133,41 +133,6 @@
   overflow-x: auto;
 }
 
-/* 图片节点视图：四角缩放手柄（仅选中时显示） */
-.image-node-view {
-  position: relative;
-  display: block;
-  width: fit-content;
-  max-width: 100%;
-  margin: 0.6em auto;
-}
-
-.image-node-view img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-}
-
-.image-node-view .resize-handle {
-  display: none;
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background: var(--primary);
-  border: 2px solid var(--card);
-  border-radius: 2px;
-  z-index: 2;
-}
-
-.image-node-view.ProseMirror-selectednode {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-.image-node-view.ProseMirror-selectednode .resize-handle {
-  display: block;
-}
-
 /* Placeholder 扩展 */
 .wm-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

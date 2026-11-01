@@ -17,12 +17,12 @@ import { Markdown } from "@tiptap/markdown";
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import { BlockMenu } from "./components/BlockMenu";
 import { EditorToolbar } from "./components/EditorToolbar";
-import { ImageBubbleMenu } from "./components/ImageBubbleMenu";
 import { TableBubbleMenu } from "./components/TableBubbleMenu";
 import { TextBubbleMenu } from "./components/TextBubbleMenu";
 import { SlashCommand } from "./extensions/SlashCommand";
-import { createImageNodeView } from "./extensions/image-node-view";
+import { ImageNodeView } from "./extensions/image-node-view";
 import { MdxBlockView } from "./extensions/mdx-node-view";
+import { EditorImageContext } from "./image-context";
 import { cn } from "@/lib/utils";
 import {
   fixMarkdownTables,
@@ -111,12 +111,16 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
       () => [
         ...createSchemaExtensions({
           placeholder,
-          imageNodeView: () => (props) =>
-            createImageNodeView({
-              node: props.node,
-              editor: props.editor,
-              getPos: props.getPos,
-              resolveSrc: (src) => resolveRef.current?.(src) ?? src,
+          imageNodeView: () =>
+            ReactNodeViewRenderer(ImageNodeView, {
+              stopEvent: ({ event }) => {
+                const target = event.target;
+                return (
+                  target instanceof Element &&
+                  Boolean(target.closest("[data-image-ui]"))
+                );
+              },
+              ignoreMutation: () => true,
             }),
           mdxNodeView: () =>
             ReactNodeViewRenderer(MdxBlockView, {
@@ -213,62 +217,65 @@ export const WordmaEditor = forwardRef<WordmaEditorHandle, WordmaEditorProps>(
     );
 
     return (
-      <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${className ?? ""}`}>
-        <EditorToolbar editor={editor} onPickImage={onPickImage} />
-        {editor ? (
-          <>
-            <TextBubbleMenu editor={editor} />
-            <ImageBubbleMenu editor={editor} />
-            <TableBubbleMenu editor={editor} />
-          </>
-        ) : null}
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <EditorContent editor={editor} />
-        </div>
-        {editor ? (
-          <DragHandle
-            editor={editor}
-            onNodeChange={({ node, pos }) => {
-              if (blockMenuOpenRef.current) return;
-              if (node) {
+      <EditorImageContext.Provider
+        value={{ resolveSrc: (src) => resolveRef.current?.(src) ?? src }}
+      >
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${className ?? ""}`}>
+          <EditorToolbar editor={editor} onPickImage={onPickImage} />
+          {editor ? (
+            <>
+              <TextBubbleMenu editor={editor} />
+              <TableBubbleMenu editor={editor} />
+            </>
+          ) : null}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <EditorContent editor={editor} />
+          </div>
+          {editor ? (
+            <DragHandle
+              editor={editor}
+              onNodeChange={({ node, pos }) => {
+                if (blockMenuOpenRef.current) return;
+                if (node) {
+                  if (clearBlockTimerRef.current) {
+                    window.clearTimeout(clearBlockTimerRef.current);
+                    clearBlockTimerRef.current = null;
+                  }
+                  setBlockTarget({ node, pos });
+                  return;
+                }
+                if (blockHandleHoveredRef.current) return;
                 if (clearBlockTimerRef.current) {
                   window.clearTimeout(clearBlockTimerRef.current);
+                }
+                clearBlockTimerRef.current = window.setTimeout(() => {
                   clearBlockTimerRef.current = null;
-                }
-                setBlockTarget({ node, pos });
-                return;
-              }
-              if (blockHandleHoveredRef.current) return;
-              if (clearBlockTimerRef.current) {
-                window.clearTimeout(clearBlockTimerRef.current);
-              }
-              clearBlockTimerRef.current = window.setTimeout(() => {
-                clearBlockTimerRef.current = null;
-                if (
-                  !blockHandleHoveredRef.current &&
-                  !blockMenuOpenRef.current
-                ) {
-                  setBlockTarget(null);
-                }
-              }, 250);
-            }}
-            className={cn(
-              "wordma-drag-handle flex h-6 items-center rounded-sm text-muted-foreground/50",
-              blockTarget && "wordma-drag-handle-visible",
-            )}
-          >
-            <BlockMenu
-              editor={editor}
-              target={blockTarget}
-              onHandleHoverChange={setHandleHovered}
-              onOpenChange={(open) => {
-                blockMenuOpenRef.current = open;
-                if (!open) setBlockTarget(null);
+                  if (
+                    !blockHandleHoveredRef.current &&
+                    !blockMenuOpenRef.current
+                  ) {
+                    setBlockTarget(null);
+                  }
+                }, 250);
               }}
-            />
-          </DragHandle>
-        ) : null}
-      </div>
+              className={cn(
+                "wordma-drag-handle flex h-6 items-center rounded-sm text-muted-foreground/50",
+                blockTarget && "wordma-drag-handle-visible",
+              )}
+            >
+              <BlockMenu
+                editor={editor}
+                target={blockTarget}
+                onHandleHoverChange={setHandleHovered}
+                onOpenChange={(open) => {
+                  blockMenuOpenRef.current = open;
+                  if (!open) setBlockTarget(null);
+                }}
+              />
+            </DragHandle>
+          ) : null}
+        </div>
+      </EditorImageContext.Provider>
     );
   },
 );
